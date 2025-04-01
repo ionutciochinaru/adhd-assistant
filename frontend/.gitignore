@@ -1,0 +1,72 @@
+# Root .gitignore
+node_modules/
+.DS_Store
+*.log
+yarn-error.log
+npm-debug.log
+.vscode/
+.idea/
+
+# frontend/.gitignore
+# Expo
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+frontend/.expo-shared/
+
+# Native
+frontend/*.jks
+frontend/*.p8
+frontend/*.p12
+frontend/*.key
+frontend/*.mobileprovision
+frontend/*.orig.*
+
+# Node
+frontend/node_modules/
+frontend/npm-debug.log
+frontend/yarn-error.log
+
+# Environment variables
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Build artifacts
+frontend/build/
+frontend/web-build/
+
+# TypeScript
+frontend/*.tsbuildinfo
+
+# backend/.gitignore
+# Next.js
+backend/.next/
+backend/out/
+
+# Production
+backend/build
+backend/public/build
+
+# Debug
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# Environment variables
+backend/.env
+backend/.env.local
+backend/.env.development.local
+backend/.env.test.local
+backend/.env.production.local
+
+# Vercel
+backend/.vercel
+
+# Node
+backend/node_modules/
+
+# TypeScript
+backend/*.tsbuildinfo
