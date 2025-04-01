@@ -19,6 +19,7 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
+import ScreenLayout from '../../components/ScreenLayout';
 
 // Navigation types
 type TasksStackParamList = {
@@ -160,7 +161,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ScreenLayout>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -341,7 +342,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
-        </SafeAreaView>
+        </ScreenLayout>
     );
 };
 

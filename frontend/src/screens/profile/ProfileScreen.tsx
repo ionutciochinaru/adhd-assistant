@@ -12,18 +12,19 @@ import {
     TextInput,
     ActivityIndicator,
 } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
-import { useTaskNotifications } from '../../hooks/useTaskNotifications';
+import {useAuth} from '../../context/AuthContext';
+import {useTaskNotifications} from '../../hooks/useTaskNotifications';
 import * as Notifications from 'expo-notifications';
-import { supabase } from '../../utils/supabase';
+import {supabase} from '../../utils/supabase';
+import ScreenLayout from "../../components/ScreenLayout";
 
 const ProfileScreen = () => {
-    const { user, signOut, updateUser } = useAuth();
+    const {user, signOut, updateUser} = useAuth();
     const [name, setName] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
     const [loadingPreferences, setLoadingPreferences] = useState(true);
-    const { enableDailyDigest, disableDailyDigest, syncTaskNotifications } = useTaskNotifications();
+    const {enableDailyDigest, disableDailyDigest, syncTaskNotifications} = useTaskNotifications();
     const [notificationPermission, setNotificationPermission] = useState<boolean>(false);
 
     // Notification preferences
@@ -48,7 +49,7 @@ const ProfileScreen = () => {
             setLoadingPreferences(true);
 
             // Fetch user data from the users table
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('users')
                 .select('name, notification_preferences')
                 .eq('id', user?.id)
@@ -71,7 +72,7 @@ const ProfileScreen = () => {
                     medicationReminders: false
                 };
 
-                const { error: insertError } = await supabase
+                const {error: insertError} = await supabase
                     .from('users')
                     .insert({
                         id: user?.id,
@@ -109,12 +110,12 @@ const ProfileScreen = () => {
     };
 
     const checkNotificationPermissions = async () => {
-        const { status } = await Notifications.getPermissionsAsync();
+        const {status} = await Notifications.getPermissionsAsync();
         setNotificationPermission(status === 'granted');
     };
 
     const requestNotificationPermissions = async () => {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const {status} = await Notifications.requestPermissionsAsync();
         setNotificationPermission(status === 'granted');
 
         if (status === 'granted') {
@@ -136,15 +137,15 @@ const ProfileScreen = () => {
                     'Permission Required',
                     'Notifications need permission to function. Would you like to enable them?',
                     [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Enable', onPress: requestNotificationPermissions }
+                        {text: 'Cancel', style: 'cancel'},
+                        {text: 'Enable', onPress: requestNotificationPermissions}
                     ]
                 );
                 return;
             }
 
             // Update local state
-            const newNotifications = { ...notifications, [setting]: value };
+            const newNotifications = {...notifications, [setting]: value};
             setNotifications(newNotifications);
 
             // Prepare updated preferences
@@ -172,7 +173,7 @@ const ProfileScreen = () => {
             }
 
             // Save updated preferences to database
-            const { error: updateError } = await supabase
+            const {error: updateError} = await supabase
                 .from('users')
                 .update({
                     notification_preferences: updatedPrefs
@@ -189,7 +190,7 @@ const ProfileScreen = () => {
             Alert.alert('Error', 'Failed to update notification preferences');
 
             // Revert the local state change on error
-            setNotifications(prev => ({ ...prev, [setting]: !value }));
+            setNotifications(prev => ({...prev, [setting]: !value}));
         } finally {
             setLoadingPreferences(false);
         }
@@ -199,15 +200,15 @@ const ProfileScreen = () => {
         setLoading(true);
         try {
             // Update both user_metadata (auth) and users table (database)
-            const { error: updateError } = await supabase
+            const {error: updateError} = await supabase
                 .from('users')
-                .update({ name })
+                .update({name})
                 .eq('id', user?.id);
 
             if (updateError) throw updateError;
 
             // Also update the user metadata via auth if available
-            const { error } = await updateUser({ name });
+            const {error} = await updateUser({name});
 
             if (error) throw new Error(error);
 
@@ -226,170 +227,172 @@ const ProfileScreen = () => {
             'Sign Out',
             'Are you sure you want to sign out?',
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
+                {text: 'Cancel', style: 'cancel'},
+                {text: 'Sign Out', style: 'destructive', onPress: () => signOut()},
             ]
         );
     };
 
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.header}>
-                <View style={styles.profileImageContainer}>
-                    <Image
-                        source={require('../../../assets/adaptive-icon.png')}
-                        style={styles.profileImage}
-                    />
-                    <TouchableOpacity style={styles.editImageButton}>
-                        <Text style={styles.editImageText}>Edit</Text>
-                    </TouchableOpacity>
-                </View>
+        <ScreenLayout>
+            <ScrollView style={styles.container}>
+                <View style={styles.header}>
+                    <View style={styles.profileImageContainer}>
+                        <Image
+                            source={require('../../../assets/adaptive-icon.png')}
+                            style={styles.profileImage}
+                        />
+                        <TouchableOpacity style={styles.editImageButton}>
+                            <Text style={styles.editImageText}>Edit</Text>
+                        </TouchableOpacity>
+                    </View>
 
-                <View style={styles.profileInfo}>
-                    {isEditing ? (
-                        <View style={styles.editNameContainer}>
-                            <TextInput
-                                style={styles.nameInput}
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="Enter your name"
-                            />
-                            <View style={styles.editButtonsRow}>
+                    <View style={styles.profileInfo}>
+                        {isEditing ? (
+                            <View style={styles.editNameContainer}>
+                                <TextInput
+                                    style={styles.nameInput}
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="Enter your name"
+                                />
+                                <View style={styles.editButtonsRow}>
+                                    <TouchableOpacity
+                                        style={[styles.editButton, styles.cancelButton]}
+                                        onPress={() => setIsEditing(false)}
+                                    >
+                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.editButton, styles.saveButton]}
+                                        onPress={handleUpdateProfile}
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator size="small" color="#FFFFFF"/>
+                                        ) : (
+                                            <Text style={styles.saveButtonText}>Save</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={styles.nameContainer}>
+                                <Text style={styles.name}>{name || 'Add your name'}</Text>
                                 <TouchableOpacity
-                                    style={[styles.editButton, styles.cancelButton]}
-                                    onPress={() => setIsEditing(false)}
+                                    style={styles.editNameButton}
+                                    onPress={() => setIsEditing(true)}
                                 >
-                                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.editButton, styles.saveButton]}
-                                    onPress={handleUpdateProfile}
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <ActivityIndicator size="small" color="#FFFFFF" />
-                                    ) : (
-                                        <Text style={styles.saveButtonText}>Save</Text>
-                                    )}
+                                    <Text style={styles.editNameText}>Edit</Text>
                                 </TouchableOpacity>
                             </View>
-                        </View>
-                    ) : (
-                        <View style={styles.nameContainer}>
-                            <Text style={styles.name}>{name || 'Add your name'}</Text>
-                            <TouchableOpacity
-                                style={styles.editNameButton}
-                                onPress={() => setIsEditing(true)}
-                            >
-                                <Text style={styles.editNameText}>Edit</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-                    <Text style={styles.email}>{user?.email}</Text>
+                        )}
+                        <Text style={styles.email}>{user?.email}</Text>
+                    </View>
                 </View>
-            </View>
 
-            {!notificationPermission && (
-                <View style={styles.notificationPermissionContainer}>
-                    <Text style={styles.notificationPermissionText}>
-                        Notifications are disabled. Enable them to get reminders for your tasks.
-                    </Text>
-                    <TouchableOpacity
-                        style={styles.notificationPermissionButton}
-                        onPress={requestNotificationPermissions}
-                    >
-                        <Text style={styles.notificationPermissionButtonText}>
-                            Enable Notifications
+                {!notificationPermission && (
+                    <View style={styles.notificationPermissionContainer}>
+                        <Text style={styles.notificationPermissionText}>
+                            Notifications are disabled. Enable them to get reminders for your tasks.
                         </Text>
+                        <TouchableOpacity
+                            style={styles.notificationPermissionButton}
+                            onPress={requestNotificationPermissions}
+                        >
+                            <Text style={styles.notificationPermissionButtonText}>
+                                Enable Notifications
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Notification Preferences</Text>
+
+                    {loadingPreferences ? (
+                        <ActivityIndicator style={{margin: 20}} size="small" color="#3498db"/>
+                    ) : (
+                        <>
+                            <View style={styles.preferenceItem}>
+                                <Text style={styles.preferenceText}>Task Reminders</Text>
+                                <Switch
+                                    value={notifications.taskReminders}
+                                    onValueChange={(value) => toggleNotificationSetting('taskReminders', value)}
+                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
+                                    thumbColor={notifications.taskReminders ? '#3498db' : '#F4F4F4'}
+                                    disabled={!notificationPermission || loadingPreferences}
+                                />
+                            </View>
+
+                            <View style={styles.preferenceItem}>
+                                <Text style={styles.preferenceText}>Daily Task Digest</Text>
+                                <Switch
+                                    value={notifications.dailyDigest}
+                                    onValueChange={(value) => toggleNotificationSetting('dailyDigest', value)}
+                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
+                                    thumbColor={notifications.dailyDigest ? '#3498db' : '#F4F4F4'}
+                                    disabled={!notificationPermission || loadingPreferences}
+                                />
+                            </View>
+
+                            <View style={styles.preferenceItem}>
+                                <Text style={styles.preferenceText}>Weekly Progress Report</Text>
+                                <Switch
+                                    value={notifications.weeklyReport}
+                                    onValueChange={(value) => toggleNotificationSetting('weeklyReport', value)}
+                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
+                                    thumbColor={notifications.weeklyReport ? '#3498db' : '#F4F4F4'}
+                                    disabled={!notificationPermission || loadingPreferences}
+                                />
+                            </View>
+
+                            <View style={styles.preferenceItem}>
+                                <Text style={styles.preferenceText}>Medication Reminders</Text>
+                                <Switch
+                                    value={notifications.medicationReminders}
+                                    onValueChange={(value) => toggleNotificationSetting('medicationReminders', value)}
+                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
+                                    thumbColor={notifications.medicationReminders ? '#3498db' : '#F4F4F4'}
+                                    disabled={!notificationPermission || loadingPreferences}
+                                />
+                            </View>
+                        </>
+                    )}
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Account</Text>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <Text style={styles.menuItemText}>Change Password</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <Text style={styles.menuItemText}>Data & Privacy</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <Text style={styles.menuItemText}>Help & Support</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <Text style={styles.menuItemText}>About</Text>
                     </TouchableOpacity>
                 </View>
-            )}
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Notification Preferences</Text>
-
-                {loadingPreferences ? (
-                    <ActivityIndicator style={{margin: 20}} size="small" color="#3498db" />
-                ) : (
-                    <>
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceText}>Task Reminders</Text>
-                            <Switch
-                                value={notifications.taskReminders}
-                                onValueChange={(value) => toggleNotificationSetting('taskReminders', value)}
-                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                                thumbColor={notifications.taskReminders ? '#3498db' : '#F4F4F4'}
-                                disabled={!notificationPermission || loadingPreferences}
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceText}>Daily Task Digest</Text>
-                            <Switch
-                                value={notifications.dailyDigest}
-                                onValueChange={(value) => toggleNotificationSetting('dailyDigest', value)}
-                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                                thumbColor={notifications.dailyDigest ? '#3498db' : '#F4F4F4'}
-                                disabled={!notificationPermission || loadingPreferences}
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceText}>Weekly Progress Report</Text>
-                            <Switch
-                                value={notifications.weeklyReport}
-                                onValueChange={(value) => toggleNotificationSetting('weeklyReport', value)}
-                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                                thumbColor={notifications.weeklyReport ? '#3498db' : '#F4F4F4'}
-                                disabled={!notificationPermission || loadingPreferences}
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceText}>Medication Reminders</Text>
-                            <Switch
-                                value={notifications.medicationReminders}
-                                onValueChange={(value) => toggleNotificationSetting('medicationReminders', value)}
-                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                                thumbColor={notifications.medicationReminders ? '#3498db' : '#F4F4F4'}
-                                disabled={!notificationPermission || loadingPreferences}
-                            />
-                        </View>
-                    </>
-                )}
-            </View>
-
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Account</Text>
-
-                <TouchableOpacity style={styles.menuItem}>
-                    <Text style={styles.menuItemText}>Change Password</Text>
+                <TouchableOpacity
+                    style={styles.signOutButton}
+                    onPress={handleSignOut}
+                >
+                    <Text style={styles.signOutButtonText}>Sign Out</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem}>
-                    <Text style={styles.menuItemText}>Data & Privacy</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.menuItem}>
-                    <Text style={styles.menuItemText}>Help & Support</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.menuItem}>
-                    <Text style={styles.menuItemText}>About</Text>
-                </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-                style={styles.signOutButton}
-                onPress={handleSignOut}
-            >
-                <Text style={styles.signOutButtonText}>Sign Out</Text>
-            </TouchableOpacity>
-
-            <View style={styles.versionContainer}>
-                <Text style={styles.versionText}>Version 1.0.0</Text>
-            </View>
-        </ScrollView>
+                <View style={styles.versionContainer}>
+                    <Text style={styles.versionText}>Version 1.0.0</Text>
+                </View>
+            </ScrollView>
+        </ScreenLayout>
     );
 };
 
@@ -517,7 +520,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
         padding: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: {width: 0, height: 1},
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2,

@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import TaskItem from '../../components/TaskItem';
 import { Task } from '../../utils/supabase';
 import ScreenLayout from '../../components/ScreenLayout';
+import { Ionicons } from '@expo/vector-icons';
 
 const TasksScreen = () => {
     const navigation = useNavigation();
@@ -69,4 +70,304 @@ const TasksScreen = () => {
         };
     }, [user]);
 
-//
+    // Fetch tasks from Supabase
+    const fetchTasks = async () => {
+        if (!user) return;
+
+        try {
+            setRefreshing(true);
+
+            // Query tasks with subtask counts
+            const { data, error } = await supabase
+                .from('tasks')
+                .select(`
+                    *,
+                    subtasks:subtasks(count),
+                    subtasks_completed:subtasks(count).filter(status=eq.completed)
+                `)
+                .eq('user_id', user.id)
+                .order('due_date', { ascending: true, nullsLast: true });
+
+            if (error) {
+                throw error;
+            }
+
+            // Process the results to include subtask counts
+            const tasksWithCounts = data?.map(task => {
+                return {
+                    ...task,
+                    subtasks_count: task.subtasks?.[0]?.count || 0,
+                    subtasks_completed: task.subtasks_completed?.[0]?.count || 0
+                };
+            }) || [];
+
+            console.log(`Fetched ${tasksWithCounts.length} tasks`);
+            setTasks(tasksWithCounts);
+            applyFilter(filter, tasksWithCounts);
+        } catch (error: any) {
+            console.error('Error fetching tasks:', error.message);
+            Alert.alert('Error', 'Failed to load tasks');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    // Apply filter to tasks
+    const applyFilter = (filterType: 'all' | 'active' | 'completed', taskList = tasks) => {
+        switch (filterType) {
+            case 'active':
+                setFilteredTasks(taskList.filter(task => task.status === 'active'));
+                break;
+            case 'completed':
+                setFilteredTasks(taskList.filter(task => task.status === 'completed'));
+                break;
+            default:
+                setFilteredTasks(taskList);
+                break;
+        }
+        setFilter(filterType);
+    };
+
+    // Navigate to the task detail screen
+    const handleTaskPress = (taskId: string) => {
+        navigation.navigate('TaskDetail', { taskId } as any);
+    };
+
+    // Toggle task completion status
+    const toggleTaskCompletion = async (task: Task) => {
+        try {
+            const newStatus = task.status === 'active' ? 'completed' : 'active';
+
+            // Optimistic update
+            const updatedTasks = tasks.map(t =>
+                t.id === task.id
+                    ? {
+                        ...t,
+                        status: newStatus,
+                        completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+                    }
+                    : t
+            );
+
+            setTasks(updatedTasks);
+            applyFilter(filter, updatedTasks);
+
+            // Update in database
+            const { error } = await supabase
+                .from('tasks')
+                .update({
+                    status: newStatus,
+                    completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+                })
+                .eq('id', task.id);
+
+            if (error) throw error;
+        } catch (error: any) {
+            console.error('Error updating task status:', error.message);
+            Alert.alert('Error', 'Failed to update task status');
+            // Revert optimistic update
+            fetchTasks();
+        }
+    };
+
+    // Render empty state when no tasks are available
+    const renderEmpty = () => (
+        <View style={styles.emptyContainer}>
+            <Ionicons name="checkbox-outline" size={64} color="#bdc3c7" />
+            <Text style={styles.emptyTitle}>No tasks found</Text>
+            <Text style={styles.emptySubtitle}>
+                {filter === 'all'
+                    ? 'Tap the + button to create your first task'
+                    : `No ${filter} tasks found`}
+            </Text>
+        </View>
+    );
+
+    // Handle pull-to-refresh
+    const handleRefresh = () => {
+        fetchTasks();
+    };
+
+    return (
+        <ScreenLayout>
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>Tasks</Text>
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={() => navigation.navigate('CreateTask' as any)}
+                    >
+                        <Ionicons name="add" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.filterContainer}>
+                    <TouchableOpacity
+                        style={[
+                            styles.filterButton,
+                            filter === 'all' && styles.activeFilterButton,
+                        ]}
+                        onPress={() => applyFilter('all')}
+                    >
+                        <Text
+                            style={[
+                                styles.filterButtonText,
+                                filter === 'all' && styles.activeFilterButtonText,
+                            ]}
+                        >
+                            All
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.filterButton,
+                            filter === 'active' && styles.activeFilterButton,
+                        ]}
+                        onPress={() => applyFilter('active')}
+                    >
+                        <Text
+                            style={[
+                                styles.filterButtonText,
+                                filter === 'active' && styles.activeFilterButtonText,
+                            ]}
+                        >
+                            Active
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.filterButton,
+                            filter === 'completed' && styles.activeFilterButton,
+                        ]}
+                        onPress={() => applyFilter('completed')}
+                    >
+                        <Text
+                            style={[
+                                styles.filterButtonText,
+                                filter === 'completed' && styles.activeFilterButtonText,
+                            ]}
+                        >
+                            Completed
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#3498db" />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredTasks}
+                        renderItem={({ item }) => (
+                            <TaskItem
+                                task={item}
+                                onPress={() => handleTaskPress(item.id)}
+                                onToggleCompletion={toggleTaskCompletion}
+                            />
+                        )}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={[
+                            styles.tasksList,
+                            filteredTasks.length === 0 && styles.emptyList,
+                        ]}
+                        ListEmptyComponent={renderEmpty}
+                        onRefresh={handleRefresh}
+                        refreshing={refreshing}
+                    />
+                )}
+            </View>
+        </ScreenLayout>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F7F9FC',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E5E5',
+    },
+    title: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    addButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#3498db',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        padding: 16,
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E5E5',
+    },
+    filterButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        marginHorizontal: 8,
+        backgroundColor: '#F2F2F2',
+    },
+    activeFilterButton: {
+        backgroundColor: '#3498db',
+    },
+    filterButtonText: {
+        color: '#666',
+        fontWeight: '500',
+    },
+    activeFilterButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+    },
+    tasksList: {
+        paddingVertical: 8,
+    },
+    emptyList: {
+        flexGrow: 1,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 64,
+        padding: 20,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#7f8c8d',
+        marginTop: 16,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#95a5a6',
+        textAlign: 'center',
+        marginTop: 8,
+    },
+});
+
+export default TasksScreen;

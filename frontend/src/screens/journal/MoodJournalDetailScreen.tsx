@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { MoodJournal } from '../../utils/supabase';
+import ScreenLayout from "../../components/ScreenLayout";
 
 // Navigation types
 type JournalStackParamList = {
@@ -185,7 +186,8 @@ const MoodJournalDetailScreen = ({ route, navigation }: Props) => {
     };
 
     return (
-        <View style={styles.container}>
+        <ScreenLayout>
+            <View style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
@@ -324,6 +326,7 @@ const MoodJournalDetailScreen = ({ route, navigation }: Props) => {
                 </View>
             </ScrollView>
         </View>
+        </ScreenLayout>
     );
 };
 

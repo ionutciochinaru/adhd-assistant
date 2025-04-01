@@ -98,6 +98,12 @@ const MainNavigator = () => {
                 tabBarActiveTintColor: '#3498db',
                 tabBarInactiveTintColor: 'gray',
                 headerShown: false,
+                // Ensure proper spacing for the tab bar to not overlap with home indicator
+                tabBarStyle: {
+                    paddingBottom: Platform.OS === 'ios' ? 4 : 8,
+                    height: Platform.OS === 'ios' ? 88 : 60,
+                    paddingTop: 8,
+                }
             })}
         >
             <MainTab.Screen name="Tasks" component={TasksNavigator} />
@@ -156,7 +162,7 @@ export default function App() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
-                {/* Use StatusBar with translucent={true} to ensure proper layout */}
+                {/* Configure the status bar properly for both iOS and Android */}
                 <StatusBar
                     style="dark"
                     backgroundColor="transparent"

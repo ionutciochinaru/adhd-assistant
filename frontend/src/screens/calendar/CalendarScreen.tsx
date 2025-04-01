@@ -1,5 +1,5 @@
 // frontend/src/screens/calendar/CalendarScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
     View,
     Text,
@@ -9,11 +9,12 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
-import { Calendar as RNCalendar, DateData } from 'react-native-calendars';
-import { useFocusEffect } from '@react-navigation/native';
-import { supabase } from '../../utils/supabase';
-import { useAuth } from '../../context/AuthContext';
-import { Task } from '../../utils/supabase';
+import {Calendar as RNCalendar, DateData} from 'react-native-calendars';
+import {useFocusEffect} from '@react-navigation/native';
+import {supabase} from '../../utils/supabase';
+import {useAuth} from '../../context/AuthContext';
+import {Task} from '../../utils/supabase';
+import ScreenLayout from "../../components/ScreenLayout";
 
 type MarkedDates = {
     [date: string]: {
@@ -25,7 +26,7 @@ type MarkedDates = {
 };
 
 const CalendarScreen = () => {
-    const { user } = useAuth();
+    const {user} = useAuth();
     const [selectedDate, setSelectedDate] = useState<string>(
         new Date().toISOString().split('T')[0] // Today in YYYY-MM-DD format
     );
@@ -39,7 +40,8 @@ const CalendarScreen = () => {
             if (user) {
                 fetchTasks();
             }
-            return () => {}; // Cleanup function
+            return () => {
+            }; // Cleanup function
         }, [user])
     );
 
@@ -48,11 +50,11 @@ const CalendarScreen = () => {
         try {
             setLoading(true);
 
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('tasks')
                 .select('*')
                 .eq('user_id', user?.id)
-                .order('due_date', { ascending: true });
+                .order('due_date', {ascending: true});
 
             if (error) {
                 throw error;
@@ -125,7 +127,7 @@ const CalendarScreen = () => {
         setSelectedDate(dateStr);
 
         // Update marked dates
-        const updatedMarkedDates = { ...markedDates };
+        const updatedMarkedDates = {...markedDates};
 
         // Remove selection from previous date
         Object.keys(updatedMarkedDates).forEach(key => {
@@ -160,7 +162,7 @@ const CalendarScreen = () => {
     };
 
     // Render a task item
-    const renderTask = ({ item }: { item: Task }) => (
+    const renderTask = ({item}: { item: Task }) => (
         <TouchableOpacity
             style={[
                 styles.taskItem,
@@ -169,7 +171,7 @@ const CalendarScreen = () => {
         >
             <View style={styles.taskCheckbox}>
                 {item.status === 'completed' && (
-                    <View style={styles.checkboxInner} />
+                    <View style={styles.checkboxInner}/>
                 )}
             </View>
 
@@ -207,58 +209,60 @@ const CalendarScreen = () => {
     );
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Calendar</Text>
-            </View>
-
-            <RNCalendar
-                current={selectedDate}
-                onDayPress={onDateSelect}
-                markedDates={markedDates}
-                markingType="dot"
-                theme={{
-                    calendarBackground: '#FFFFFF',
-                    textSectionTitleColor: '#666',
-                    selectedDayBackgroundColor: '#3498db',
-                    selectedDayTextColor: '#FFFFFF',
-                    todayTextColor: '#3498db',
-                    dayTextColor: '#333',
-                    textDisabledColor: '#CCC',
-                    dotColor: '#3498db',
-                    selectedDotColor: '#FFFFFF',
-                    arrowColor: '#3498db',
-                    monthTextColor: '#333',
-                    indicatorColor: '#3498db',
-                    textDayFontWeight: '300',
-                    textMonthFontWeight: 'bold',
-                    textDayHeaderFontWeight: '500',
-                }}
-            />
-
-            <View style={styles.tasksHeader}>
-                <Text style={styles.tasksHeaderText}>
-                    Tasks for {new Date(selectedDate).toLocaleDateString()}
-                </Text>
-            </View>
-
-            {loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#3498db" />
+        <ScreenLayout>
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>Calendar</Text>
                 </View>
-            ) : tasks.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No tasks for this day</Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={tasks}
-                    renderItem={renderTask}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.taskList}
+
+                <RNCalendar
+                    current={selectedDate}
+                    onDayPress={onDateSelect}
+                    markedDates={markedDates}
+                    markingType="dot"
+                    theme={{
+                        calendarBackground: '#FFFFFF',
+                        textSectionTitleColor: '#666',
+                        selectedDayBackgroundColor: '#3498db',
+                        selectedDayTextColor: '#FFFFFF',
+                        todayTextColor: '#3498db',
+                        dayTextColor: '#333',
+                        textDisabledColor: '#CCC',
+                        dotColor: '#3498db',
+                        selectedDotColor: '#FFFFFF',
+                        arrowColor: '#3498db',
+                        monthTextColor: '#333',
+                        indicatorColor: '#3498db',
+                        textDayFontWeight: '300',
+                        textMonthFontWeight: 'bold',
+                        textDayHeaderFontWeight: '500',
+                    }}
                 />
-            )}
-        </View>
+
+                <View style={styles.tasksHeader}>
+                    <Text style={styles.tasksHeaderText}>
+                        Tasks for {new Date(selectedDate).toLocaleDateString()}
+                    </Text>
+                </View>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#3498db"/>
+                    </View>
+                ) : tasks.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>No tasks for this day</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={tasks}
+                        renderItem={renderTask}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.taskList}
+                    />
+                )}
+            </View>
+        </ScreenLayout>
     );
 };
 
@@ -319,7 +323,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: {width: 0, height: 1},
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2,

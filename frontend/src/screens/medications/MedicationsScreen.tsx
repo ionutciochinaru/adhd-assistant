@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import ScreenLayout from "../../components/ScreenLayout";
 
 const MedicationsScreen = () => {
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Medications</Text>
-            <Text style={styles.subtitle}>Coming soon!</Text>
-        </View>
+        <ScreenLayout>
+            <View style={styles.container}>
+                <Text style={styles.title}>Medications</Text>
+                <Text style={styles.subtitle}>Coming soon!</Text>
+            </View>
+        </ScreenLayout>
     );
 };
 

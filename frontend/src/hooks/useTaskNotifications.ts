@@ -27,7 +27,7 @@ export function useTaskNotifications() {
                 .from('users')
                 .select('notification_preferences')
                 .eq('id', user?.id)
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
 
@@ -196,7 +196,7 @@ export function useTaskNotifications() {
                 .from('users')
                 .select('notification_preferences')
                 .eq('id', user?.id)
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
 

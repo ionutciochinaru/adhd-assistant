@@ -18,6 +18,7 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                                                        backgroundColor = '#F7F9FC',
                                                        edges = ['top', 'left', 'right']
                                                    }) => {
+    // Get the current status bar height
     const statusBarHeight = StatusBar.currentHeight || 0;
 
     return (
@@ -29,9 +30,9 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
             edges={edges}
         >
             {/* Additional padding for status bar on Android when translucent */}
-            {Platform.OS === 'android' && (
+            {Platform.OS === 'android' && StatusBar.currentHeight ? (
                 <View style={{ height: statusBarHeight }} />
-            )}
+            ) : null}
             {children}
         </SafeAreaView>
     );

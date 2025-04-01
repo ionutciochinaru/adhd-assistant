@@ -16,6 +16,7 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import ScreenLayout from "../../components/ScreenLayout";
 
 // Navigation types
 type JournalStackParamList = {
@@ -213,7 +214,8 @@ const CreateMoodJournalScreen = ({ navigation }: Props) => {
     );
 
     return (
-        <View style={styles.container}>
+        <ScreenLayout>
+            <View style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.cancelButton}
@@ -333,6 +335,7 @@ const CreateMoodJournalScreen = ({ navigation }: Props) => {
                 </View>
             </ScrollView>
         </View>
+        </ScreenLayout>
     );
 };
 
