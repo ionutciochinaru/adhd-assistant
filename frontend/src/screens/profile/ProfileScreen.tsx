@@ -19,7 +19,7 @@ import { supabase } from '../../utils/supabase';
 
 const ProfileScreen = () => {
     const { user, signOut, updateUser } = useAuth();
-    const [name, setName] = useState(user?.user_metadata?.name || '');
+    const [name, setName] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
     const [loadingPreferences, setLoadingPreferences] = useState(true);
@@ -34,23 +34,64 @@ const ProfileScreen = () => {
         medicationReminders: true,
     });
 
-    // Load notification preferences on mount
+    // Load user profile data on mount
     useEffect(() => {
-        const loadUserPreferences = async () => {
-            try {
-                setLoadingPreferences(true);
-                const { data, error } = await supabase
+        if (user) {
+            loadUserData();
+            checkNotificationPermissions();
+        }
+    }, [user]);
+
+    // Load user data including name and notification preferences
+    const loadUserData = async () => {
+        try {
+            setLoadingPreferences(true);
+
+            // Fetch user data from the users table
+            const { data, error } = await supabase
+                .from('users')
+                .select('name, notification_preferences')
+                .eq('id', user?.id)
+                .maybeSingle(); // Use maybeSingle instead of single to handle no rows case
+
+            if (error && error.code !== 'PGRST116') {
+                // Handle errors except for "no rows returned"
+                console.error('Error loading user data:', error);
+                return;
+            }
+
+            // If no user record exists yet, create one
+            if (!data) {
+                console.log('No user record found, creating one...');
+
+                const defaultPrefs = {
+                    taskReminders: true,
+                    dailyDigest: false,
+                    weeklyReport: false,
+                    medicationReminders: false
+                };
+
+                const { error: insertError } = await supabase
                     .from('users')
-                    .select('notification_preferences')
-                    .eq('id', user?.id)
-                    .single();
+                    .insert({
+                        id: user?.id,
+                        email: user?.email,
+                        name: user?.user_metadata?.name || '',
+                        notification_preferences: defaultPrefs
+                    });
 
-                if (error) {
-                    console.error('Error loading user preferences:', error);
-                    return;
+                if (insertError) {
+                    console.error('Error creating user record:', insertError);
+                } else {
+                    // Set default values
+                    setName(user?.user_metadata?.name || '');
+                    setNotifications(defaultPrefs);
                 }
+            } else {
+                // User record exists, set the values
+                setName(data.name || user?.user_metadata?.name || '');
 
-                if (data?.notification_preferences) {
+                if (data.notification_preferences) {
                     const prefs = data.notification_preferences;
                     setNotifications({
                         taskReminders: prefs.taskReminders !== false,
@@ -59,23 +100,18 @@ const ProfileScreen = () => {
                         medicationReminders: prefs.medicationReminders !== false,
                     });
                 }
-            } catch (error) {
-                console.error('Error loading preferences:', error);
-            } finally {
-                setLoadingPreferences(false);
             }
-        };
-
-        const checkNotificationPermissions = async () => {
-            const { status } = await Notifications.getPermissionsAsync();
-            setNotificationPermission(status === 'granted');
-        };
-
-        if (user) {
-            loadUserPreferences();
-            checkNotificationPermissions();
+        } catch (error) {
+            console.error('Error loading user data:', error);
+        } finally {
+            setLoadingPreferences(false);
         }
-    }, [user]);
+    };
+
+    const checkNotificationPermissions = async () => {
+        const { status } = await Notifications.getPermissionsAsync();
+        setNotificationPermission(status === 'granted');
+    };
 
     const requestNotificationPermissions = async () => {
         const { status } = await Notifications.requestPermissionsAsync();
@@ -111,43 +147,28 @@ const ProfileScreen = () => {
             const newNotifications = { ...notifications, [setting]: value };
             setNotifications(newNotifications);
 
-            // Get current user preferences
-            const { data, error } = await supabase
-                .from('users')
-                .select('notification_preferences')
-                .eq('id', user?.id)
-                .single();
-
-            if (error) {
-                throw error;
-            }
-
             // Prepare updated preferences
-            const currentPrefs = data?.notification_preferences || {};
-            let updatedPrefs = { ...currentPrefs };
+            let updatedPrefs = {
+                taskReminders: newNotifications.taskReminders,
+                weeklyReport: newNotifications.weeklyReport,
+                medicationReminders: newNotifications.medicationReminders,
+                dailyDigest: {
+                    enabled: newNotifications.dailyDigest,
+                    hour: 8,
+                    minute: 0
+                }
+            };
 
             // Handle specific notification types
             if (setting === 'dailyDigest') {
                 if (value) {
                     await enableDailyDigest(8, 0); // 8:00 AM
-                    updatedPrefs.dailyDigest = { enabled: true, hour: 8, minute: 0 };
                 } else {
                     await disableDailyDigest();
-                    updatedPrefs.dailyDigest = { enabled: false };
                 }
-            } else if (setting === 'taskReminders') {
-                updatedPrefs.taskReminders = value;
-
-                if (value) {
-                    // Re-sync all task notifications
-                    await syncTaskNotifications();
-                }
-            } else if (setting === 'weeklyReport') {
-                updatedPrefs.weeklyReport = value;
-                // Implementation for weekly report would go here
-            } else if (setting === 'medicationReminders') {
-                updatedPrefs.medicationReminders = value;
-                // Implementation for medication reminders would go here
+            } else if (setting === 'taskReminders' && value) {
+                // Re-sync all task notifications if enabling
+                await syncTaskNotifications();
             }
 
             // Save updated preferences to database
@@ -159,6 +180,7 @@ const ProfileScreen = () => {
                 .eq('id', user?.id);
 
             if (updateError) {
+                console.error('Error updating preferences:', updateError);
                 throw updateError;
             }
 
@@ -175,14 +197,27 @@ const ProfileScreen = () => {
 
     const handleUpdateProfile = async () => {
         setLoading(true);
-        const { error } = await updateUser({ name });
-        setLoading(false);
+        try {
+            // Update both user_metadata (auth) and users table (database)
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({ name })
+                .eq('id', user?.id);
 
-        if (error) {
-            Alert.alert('Error', error);
-        } else {
+            if (updateError) throw updateError;
+
+            // Also update the user metadata via auth if available
+            const { error } = await updateUser({ name });
+
+            if (error) throw new Error(error);
+
             setIsEditing(false);
             Alert.alert('Success', 'Profile updated successfully');
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            Alert.alert('Error', 'Failed to update profile');
+        } finally {
+            setLoading(false);
         }
     };
 
