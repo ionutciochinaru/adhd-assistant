@@ -1,5 +1,5 @@
 // frontend/App.tsx
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -156,11 +156,11 @@ export default function App() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
-                {/* Change the StatusBar settings to ensure content respects it */}
+                {/* Use StatusBar with translucent={true} to ensure proper layout */}
                 <StatusBar
                     style="dark"
-                    backgroundColor="#f8f9fa"
-                    translucent={false}
+                    backgroundColor="transparent"
+                    translucent={true}
                 />
                 <AuthProvider>
                     <NavigationContainer>

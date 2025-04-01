@@ -327,8 +327,222 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                                     onSubmitEditing={addSubtask}
                                 />
                                 <TouchableOpacity
-                                    style={styles.addSubtaskButton}
+                                    style={[
+                                        styles.addSubtaskButton,
+                                        newSubtask.trim() === '' && styles.disabledAddSubtaskButton,
+                                    ]}
                                     onPress={addSubtask}
                                     disabled={newSubtask.trim() === ''}
                                 >
-                                    <Text style={styles.addSubtaskButtonText}>+</Text>
+                                    <Text style={styles.addSubtaskButtonText}>Add</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    );
+};
+
+const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
+    container: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#2c3e50',
+    },
+    cancelButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        color: '#95a5a6',
+    },
+    createButton: {
+        backgroundColor: '#3498db',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+    },
+    createButtonText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    formContainer: {
+        padding: 16,
+    },
+    label: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 8,
+    },
+    titleInput: {
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        marginBottom: 16,
+    },
+    descriptionInput: {
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        height: 100,
+        textAlignVertical: 'top',
+        marginBottom: 16,
+    },
+    priorityButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    priorityButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 4,
+    },
+    selectedPriorityButton: {
+        borderWidth: 2,
+    },
+    priorityButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    lowPriorityButton: {
+        backgroundColor: '#e8f5e9',
+        borderColor: '#27ae60',
+    },
+    mediumPriorityButton: {
+        backgroundColor: '#fff8e1',
+        borderColor: '#f39c12',
+    },
+    highPriorityButton: {
+        backgroundColor: '#ffebee',
+        borderColor: '#e74c3c',
+    },
+    dueDateContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    datePickerContainer: {
+        marginBottom: 16,
+    },
+    dateButton: {
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    dateButtonText: {
+        fontSize: 16,
+        color: '#2c3e50',
+    },
+    aiBreakdownContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    aiBreakdownButton: {
+        backgroundColor: '#3498db',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    aiBreakdownButtonText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    subtasksContainer: {
+        marginBottom: 20,
+    },
+    subtaskItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#ffffff',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+    subtaskText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#2c3e50',
+    },
+    subtaskRemoveButton: {
+        padding: 4,
+    },
+    subtaskRemoveButtonText: {
+        fontSize: 18,
+        color: '#e74c3c',
+        fontWeight: 'bold',
+    },
+    addSubtaskContainer: {
+        flexDirection: 'row',
+        marginBottom: 20,
+    },
+    subtaskInput: {
+        flex: 1,
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 14,
+        marginRight: 8,
+    },
+    addSubtaskButton: {
+        backgroundColor: '#3498db',
+        paddingHorizontal: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    disabledAddSubtaskButton: {
+        backgroundColor: '#bdc3c7',
+    },
+    addSubtaskButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
+    },
+});
+
+export default CreateTaskScreen;
