@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import {View, Text, ActivityIndicator, Platform, LogBox, StyleSheet, SafeAreaView} from 'react-native';
+import { View, Text, ActivityIndicator, Platform, LogBox, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from './src/services/NotificationService';
 
@@ -24,7 +24,7 @@ import ProfileScreen from './src/screens/profile/ProfileScreen';
 
 // Import context
 import { AuthProvider, useAuth } from './src/context/AuthContext';
-import {GestureHandlerRootView} from "react-native-gesture-handler";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // Configure notification handlers
 Notifications.setNotificationHandler({
@@ -141,7 +141,6 @@ LogBox.ignoreLogs([
 
 // Main App component with providers
 export default function App() {
-
     useEffect(() => {
         const setupNotifications = async () => {
             try {
@@ -155,32 +154,26 @@ export default function App() {
     }, []);
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-                <SafeAreaProvider style={styles.container} edges={['top', 'left', 'right']}>
-                    {/* Set StatusBar properties for the entire app */}
-                    <StatusBar
-                        barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'}
-                        backgroundColor="transparent"
-                        translucent={true}
-                    />
-
-                    <AuthProvider>
-                        <NavigationContainer>
-                            <RootNavigator />
-                        </NavigationContainer>
-                    </AuthProvider>
-                </SafeAreaProvider>
-            </GestureHandlerRootView>
-        </SafeAreaView>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+                {/* Change the StatusBar settings to ensure content respects it */}
+                <StatusBar
+                    style="dark"
+                    backgroundColor="#f8f9fa"
+                    translucent={false}
+                />
+                <AuthProvider>
+                    <NavigationContainer>
+                        <RootNavigator />
+                    </NavigationContainer>
+                </AuthProvider>
+            </SafeAreaProvider>
+        </GestureHandlerRootView>
     );
 }
+
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        backgroundColor: '#f8f9fa',
-    },
-    safeArea: {
         flex: 1,
         backgroundColor: '#f8f9fa',
     },

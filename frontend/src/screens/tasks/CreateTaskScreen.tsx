@@ -11,8 +11,9 @@ import {
     ActivityIndicator,
     Alert,
     Platform,
-    KeyboardAvoidingView, SafeAreaView,
+    KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -159,380 +160,175 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-            <ScrollView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={() => navigation.goBack()}
-                        disabled={loading}
-                    >
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>New Task</Text>
-                    <TouchableOpacity
-                        style={styles.createButton}
-                        onPress={createTask}
-                        disabled={loading || title.trim() === ''}
-                    >
-                        {loading ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.createButtonText}>Create</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.formContainer}>
-                    <Text style={styles.label}>Title</Text>
-                    <TextInput
-                        style={styles.titleInput}
-                        placeholder="Enter task title"
-                        value={title}
-                        onChangeText={setTitle}
-                        maxLength={100}
-                    />
-
-                    <Text style={styles.label}>Description (optional)</Text>
-                    <TextInput
-                        style={styles.descriptionInput}
-                        placeholder="Enter task description"
-                        value={description}
-                        onChangeText={setDescription}
-                        multiline
-                        numberOfLines={4}
-                    />
-
-                    <Text style={styles.label}>Priority</Text>
-                    <View style={styles.priorityButtons}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <ScrollView style={styles.container}>
+                    <View style={styles.header}>
                         <TouchableOpacity
-                            style={[
-                                styles.priorityButton,
-                                styles.lowPriorityButton,
-                                priority === 'low' && styles.selectedPriorityButton,
-                            ]}
-                            onPress={() => setPriority('low')}
+                            style={styles.cancelButton}
+                            onPress={() => navigation.goBack()}
+                            disabled={loading}
                         >
-                            <Text style={styles.priorityButtonText}>Low</Text>
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
                         </TouchableOpacity>
+                        <Text style={styles.headerTitle}>New Task</Text>
                         <TouchableOpacity
-                            style={[
-                                styles.priorityButton,
-                                styles.mediumPriorityButton,
-                                priority === 'medium' && styles.selectedPriorityButton,
-                            ]}
-                            onPress={() => setPriority('medium')}
-                        >
-                            <Text style={styles.priorityButtonText}>Medium</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[
-                                styles.priorityButton,
-                                styles.highPriorityButton,
-                                priority === 'high' && styles.selectedPriorityButton,
-                            ]}
-                            onPress={() => setPriority('high')}
-                        >
-                            <Text style={styles.priorityButtonText}>High</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.dueDateContainer}>
-                        <Text style={styles.label}>Due Date</Text>
-                        <Switch
-                            value={hasDueDate}
-                            onValueChange={setHasDueDate}
-                            trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                            thumbColor={hasDueDate ? '#3498db' : '#F4F4F4'}
-                        />
-                    </View>
-
-                    {hasDueDate && (
-                        <View style={styles.datePickerContainer}>
-                            <TouchableOpacity
-                                style={styles.dateButton}
-                                onPress={() => setShowDatePicker(true)}
-                            >
-                                <Text style={styles.dateButtonText}>
-                                    {dueDate.toLocaleDateString()}
-                                </Text>
-                            </TouchableOpacity>
-
-                            {showDatePicker && (
-                                <DateTimePicker
-                                    value={dueDate}
-                                    mode="date"
-                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                    onChange={onDateChange}
-                                    minimumDate={new Date()}
-                                />
-                            )}
-                        </View>
-                    )}
-
-                    <View style={styles.aiBreakdownContainer}>
-                        <Text style={styles.label}>AI Task Breakdown</Text>
-                        <Switch
-                            value={useAI}
-                            onValueChange={setUseAI}
-                            trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                            thumbColor={useAI ? '#3498db' : '#F4F4F4'}
-                        />
-                    </View>
-
-                    {useAI && (
-                        <TouchableOpacity
-                            style={styles.aiBreakdownButton}
-                            onPress={requestAIBreakdown}
+                            style={styles.createButton}
+                            onPress={createTask}
                             disabled={loading || title.trim() === ''}
                         >
                             {loading ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />
                             ) : (
-                                <Text style={styles.aiBreakdownButtonText}>
-                                    Generate Subtasks
-                                </Text>
+                                <Text style={styles.createButtonText}>Create</Text>
                             )}
                         </TouchableOpacity>
-                    )}
+                    </View>
 
-                    <Text style={styles.label}>Subtasks</Text>
-                    <View style={styles.subtasksContainer}>
-                        {subtasks.map((subtask, index) => (
-                            <View key={index} style={styles.subtaskItem}>
-                                <Text style={styles.subtaskText} numberOfLines={1}>
-                                    {subtask}
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.subtaskRemoveButton}
-                                    onPress={() => removeSubtask(index)}
-                                >
-                                    <Text style={styles.subtaskRemoveButtonText}>×</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ))}
+                    <View style={styles.formContainer}>
+                        <Text style={styles.label}>Title</Text>
+                        <TextInput
+                            style={styles.titleInput}
+                            placeholder="Enter task title"
+                            value={title}
+                            onChangeText={setTitle}
+                            maxLength={100}
+                        />
 
-                        <View style={styles.addSubtaskContainer}>
-                            <TextInput
-                                style={styles.subtaskInput}
-                                placeholder="Add a subtask"
-                                value={newSubtask}
-                                onChangeText={setNewSubtask}
-                                returnKeyType="done"
-                                onSubmitEditing={addSubtask}
-                            />
+                        <Text style={styles.label}>Description (optional)</Text>
+                        <TextInput
+                            style={styles.descriptionInput}
+                            placeholder="Enter task description"
+                            value={description}
+                            onChangeText={setDescription}
+                            multiline
+                            numberOfLines={4}
+                        />
+
+                        <Text style={styles.label}>Priority</Text>
+                        <View style={styles.priorityButtons}>
                             <TouchableOpacity
-                                style={styles.addSubtaskButton}
-                                onPress={addSubtask}
-                                disabled={newSubtask.trim() === ''}
+                                style={[
+                                    styles.priorityButton,
+                                    styles.lowPriorityButton,
+                                    priority === 'low' && styles.selectedPriorityButton,
+                                ]}
+                                onPress={() => setPriority('low')}
                             >
-                                <Text style={styles.addSubtaskButtonText}>+</Text>
+                                <Text style={styles.priorityButtonText}>Low</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.priorityButton,
+                                    styles.mediumPriorityButton,
+                                    priority === 'medium' && styles.selectedPriorityButton,
+                                ]}
+                                onPress={() => setPriority('medium')}
+                            >
+                                <Text style={styles.priorityButtonText}>Medium</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.priorityButton,
+                                    styles.highPriorityButton,
+                                    priority === 'high' && styles.selectedPriorityButton,
+                                ]}
+                                onPress={() => setPriority('high')}
+                            >
+                                <Text style={styles.priorityButtonText}>High</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
-        </SafeAreaView>
-    );
-};
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F7F9FC',
-    },
-    safeArea: {
-        flex: 1,
-        backgroundColor: '#f8f9fa',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    cancelButton: {
-        paddingHorizontal: 8,
-    },
-    cancelButtonText: {
-        fontSize: 16,
-        color: '#666',
-    },
-    createButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: '#3498db',
-        borderRadius: 6,
-    },
-    createButtonText: {
-        fontSize: 16,
-        color: '#FFFFFF',
-        fontWeight: '600',
-    },
-    formContainer: {
-        padding: 16,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 8,
-        marginTop: 16,
-        color: '#333',
-    },
-    titleInput: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-    },
-    descriptionInput: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        textAlignVertical: 'top',
-        minHeight: 100,
-    },
-    priorityButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 8,
-    },
-    priorityButton: {
-        flex: 1,
-        paddingVertical: 10,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        marginHorizontal: 4,
-        borderRadius: 6,
-    },
-    lowPriorityButton: {
-        backgroundColor: '#E8F8F5',
-    },
-    mediumPriorityButton: {
-        backgroundColor: '#FEF9E7',
-    },
-    highPriorityButton: {
-        backgroundColor: '#FDEDEC',
-    },
-    selectedPriorityButton: {
-        borderWidth: 2,
-        borderColor: '#3498db',
-    },
-    priorityButtonText: {
-        fontWeight: '600',
-    },
-    dueDateContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    datePickerContainer: {
-        marginTop: 8,
-    },
-    dateButton: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-    },
-    dateButtonText: {
-        fontSize: 16,
-    },
-    aiBreakdownContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    aiBreakdownButton: {
-        backgroundColor: '#8E44AD',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    aiBreakdownButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    subtasksContainer: {
-        marginTop: 8,
-    },
-    subtaskItem: {
-        flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 8,
-        alignItems: 'center',
-    },
-    subtaskText: {
-        flex: 1,
-        fontSize: 16,
-    },
-    subtaskRemoveButton: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#F0F0F0',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginLeft: 8,
-    },
-    subtaskRemoveButtonText: {
-        fontSize: 16,
-        color: '#666',
-        fontWeight: 'bold',
-    },
-    addSubtaskContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    subtaskInput: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        marginRight: 8,
-    },
-    addSubtaskButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#3498db',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    addSubtaskButtonText: {
-        fontSize: 24,
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-    },
-});
+                        <View style={styles.dueDateContainer}>
+                            <Text style={styles.label}>Due Date</Text>
+                            <Switch
+                                value={hasDueDate}
+                                onValueChange={setHasDueDate}
+                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
+                                thumbColor={hasDueDate ? '#3498db' : '#F4F4F4'}
+                            />
+                        </View>
 
-export default CreateTaskScreen;
+                        {hasDueDate && (
+                            <View style={styles.datePickerContainer}>
+                                <TouchableOpacity
+                                    style={styles.dateButton}
+                                    onPress={() => setShowDatePicker(true)}
+                                >
+                                    <Text style={styles.dateButtonText}>
+                                        {dueDate.toLocaleDateString()}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {showDatePicker && (
+                                    <DateTimePicker
+                                        value={dueDate}
+                                        mode="date"
+                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                        onChange={onDateChange}
+                                        minimumDate={new Date()}
+                                    />
+                                )}
+                            </View>
+                        )}
+
+                        <View style={styles.aiBreakdownContainer}>
+                            <Text style={styles.label}>AI Task Breakdown</Text>
+                            <Switch
+                                value={useAI}
+                                onValueChange={setUseAI}
+                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
+                                thumbColor={useAI ? '#3498db' : '#F4F4F4'}
+                            />
+                        </View>
+
+                        {useAI && (
+                            <TouchableOpacity
+                                style={styles.aiBreakdownButton}
+                                onPress={requestAIBreakdown}
+                                disabled={loading || title.trim() === ''}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.aiBreakdownButtonText}>
+                                        Generate Subtasks
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+
+                        <Text style={styles.label}>Subtasks</Text>
+                        <View style={styles.subtasksContainer}>
+                            {subtasks.map((subtask, index) => (
+                                <View key={index} style={styles.subtaskItem}>
+                                    <Text style={styles.subtaskText} numberOfLines={1}>
+                                        {subtask}
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={styles.subtaskRemoveButton}
+                                        onPress={() => removeSubtask(index)}
+                                    >
+                                        <Text style={styles.subtaskRemoveButtonText}>×</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+
+                            <View style={styles.addSubtaskContainer}>
+                                <TextInput
+                                    style={styles.subtaskInput}
+                                    placeholder="Add a subtask"
+                                    value={newSubtask}
+                                    onChangeText={setNewSubtask}
+                                    returnKeyType="done"
+                                    onSubmitEditing={addSubtask}
+                                />
+                                <TouchableOpacity
+                                    style={styles.addSubtaskButton}
+                                    onPress={addSubtask}
+                                    disabled={newSubtask.trim() === ''}
+                                >
+                                    <Text style={styles.addSubtaskButtonText}>+</Text>

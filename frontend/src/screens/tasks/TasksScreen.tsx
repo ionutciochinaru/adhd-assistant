@@ -164,12 +164,7 @@ const TasksScreen = () => {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-            <StatusBar
-                barStyle="dark-content"
-                backgroundColor="transparent"
-                translucent={true}
-            />
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <View style={styles.container}>
                 <View style={styles.header}>
                     <Text style={styles.title}>My Tasks</Text>
