@@ -17,6 +17,7 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 
 // Navigation types
 type TasksStackParamList = {
@@ -39,6 +40,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     const [newSubtask, setNewSubtask] = useState('');
     const [loading, setLoading] = useState(false);
     const [useAI, setUseAI] = useState(false);
+    const { scheduleTaskNotification } = useTaskNotifications();
 
     // Handle date change
     const onDateChange = (event: any, selectedDate?: Date) => {
@@ -142,6 +144,11 @@ const CreateTaskScreen = ({ navigation }: Props) => {
             }
 
             // Return to the task list
+            if (task?.id && hasDueDate) {
+                console.log('Scheduling notification for new task:', task.id);
+                await scheduleTaskNotification(task);
+            }
+
             navigation.goBack();
         } catch (error: any) {
             console.error('Error creating task:', error.message);

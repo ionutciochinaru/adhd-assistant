@@ -1,5 +1,5 @@
 // frontend/src/screens/profile/ProfileScreen.tsx
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
     View,
     Text,
@@ -13,12 +13,67 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useTaskNotifications } from '../../hooks/useTaskNotifications';
+import * as Notifications from 'expo-notifications';
 
 const ProfileScreen = () => {
     const { user, signOut, updateUser } = useAuth();
     const [name, setName] = useState(user?.user_metadata?.name || '');
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
+    const { enableDailyDigest, disableDailyDigest, syncTaskNotifications } = useTaskNotifications();
+    const [notificationPermission, setNotificationPermission] = useState<boolean>(false);
+
+    useEffect(() => {
+        const checkNotificationPermissions = async () => {
+            const { status } = await Notifications.getPermissionsAsync();
+            setNotificationPermission(status === 'granted');
+        };
+
+        checkNotificationPermissions();
+    }, []);
+
+    const requestNotificationPermissions = async () => {
+        const { status } = await Notifications.requestPermissionsAsync();
+        setNotificationPermission(status === 'granted');
+
+        if (status === 'granted') {
+            Alert.alert('Success', 'Notification permissions granted');
+            // Sync all notifications
+            await syncTaskNotifications();
+        } else {
+            Alert.alert('Error', 'Notification permissions denied');
+        }
+    };
+
+    const toggleNotificationSetting = async (setting: keyof typeof notifications, value: boolean) => {
+        const newNotifications = { ...notifications, [setting]: value };
+        setNotifications(newNotifications);
+
+        if (!notificationPermission) {
+            Alert.alert(
+                'Permission Required',
+                'Notifications need permission to function. Would you like to enable them?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Enable', onPress: requestNotificationPermissions }
+                ]
+            );
+            return;
+        }
+
+        // Handle specific notification types
+        if (setting === 'dailyDigest') {
+            if (value) {
+                await enableDailyDigest(8, 0); // 8:00 AM
+            } else {
+                await disableDailyDigest();
+            }
+        } else if (setting === 'taskReminders' && value) {
+            // Re-sync all task notifications
+            await syncTaskNotifications();
+        }
+    };
 
     // Notification preferences
     const [notifications, setNotifications] = useState({
@@ -352,6 +407,27 @@ const styles = StyleSheet.create({
     versionText: {
         color: '#999',
         fontSize: 14,
+    },
+    notificationPermissionContainer: {
+        backgroundColor: '#f8d7da',
+        padding: 16,
+        borderRadius: 8,
+        marginVertical: 16,
+    },
+    notificationPermissionText: {
+        fontSize: 14,
+        color: '#721c24',
+        marginBottom: 8,
+    },
+    notificationPermissionButton: {
+        backgroundColor: '#3498db',
+        padding: 10,
+        borderRadius: 4,
+        alignItems: 'center',
+    },
+    notificationPermissionButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
     },
 });
 

@@ -141,8 +141,6 @@ LogBox.ignoreLogs([
 
 // Main App component with providers
 export default function App() {
-    const notificationListener = useRef<Notifications.Subscription>();
-    const responseListener = useRef<Notifications.Subscription>();
 
     useEffect(() => {
         const setupNotifications = async () => {

@@ -18,6 +18,7 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Task, Subtask } from '../../utils/supabase';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 
 // Navigation types
 type TasksStackParamList = {
@@ -42,6 +43,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
     const [newSubtask, setNewSubtask] = useState('');
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [editedDueDate, setEditedDueDate] = useState<Date | null>(null);
+    const { scheduleTaskNotification, cancelTaskNotification } = useTaskNotifications();
 
     // Handle date change
     const onDateChange = (event: any, selectedDate?: Date) => {
@@ -102,6 +104,17 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
         try {
             setUpdating(true);
             const newStatus = task.status === 'active' ? 'completed' : 'active';
+
+            if (newStatus === 'completed') {
+                // Cancel notification if task is completed
+                cancelTaskNotification(task.id);
+            } else if (newStatus === 'active' && task.due_date) {
+                // Reschedule notification if task is reactivated and has a due date
+                scheduleTaskNotification({
+                    ...task,
+                    status: 'active'
+                });
+            }
 
             // Optimistic update
             setTask({
@@ -249,6 +262,14 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                 due_date: editedDueDate ? editedDueDate.toISOString() : null,
             });
 
+            if (task.due_date !== editedDueDate?.toISOString()) {
+                // Due date has changed, update notification
+                scheduleTaskNotification({
+                    ...task,
+                    due_date: editedDueDate ? editedDueDate.toISOString() : null,
+                });
+            }
+
             setIsEditing(false);
         } catch (error: any) {
             console.error('Error updating task:', error.message);
@@ -283,6 +304,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                             if (error) throw error;
 
                             // Navigate back to task list
+                            await cancelTaskNotification(task.id);
                             navigation.goBack();
                         } catch (error: any) {
                             console.error('Error deleting task:', error.message);
