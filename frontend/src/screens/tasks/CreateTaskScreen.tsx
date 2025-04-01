@@ -97,8 +97,10 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
         setLoading(true);
         try {
+            console.log('Creating new task:', title);
+
             // Create the task in the database
-            const { data, error } = await supabase
+            const { data: task, error: taskError } = await supabase
                 .from('tasks')
                 .insert({
                     user_id: user?.id,
@@ -108,15 +110,21 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                     status: 'active',
                     due_date: hasDueDate ? dueDate.toISOString() : null,
                 })
-                .select('id')
+                .select()
                 .single();
 
-            if (error) throw error;
+            if (taskError) {
+                console.error('Error creating task:', taskError);
+                throw taskError;
+            }
+
+            console.log('Task created successfully, ID:', task.id);
 
             // If we have subtasks, create them as well
-            if (subtasks.length > 0 && data?.id) {
+            if (subtasks.length > 0 && task?.id) {
+                console.log('Adding', subtasks.length, 'subtasks');
                 const subtasksToInsert = subtasks.map(title => ({
-                    task_id: data.id,
+                    task_id: task.id,
                     title,
                     status: 'active',
                 }));
@@ -125,7 +133,12 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                     .from('subtasks')
                     .insert(subtasksToInsert);
 
-                if (subtasksError) throw subtasksError;
+                if (subtasksError) {
+                    console.error('Error adding subtasks:', subtasksError);
+                    throw subtasksError;
+                }
+
+                console.log('Subtasks added successfully');
             }
 
             // Return to the task list

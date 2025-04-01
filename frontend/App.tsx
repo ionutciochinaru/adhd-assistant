@@ -168,7 +168,7 @@ export default function App() {
 
                 <AuthProvider>
                     <NavigationContainer>
-                        <MainNavigator />
+                        <RootNavigator />
                     </NavigationContainer>
                 </AuthProvider>
             </SafeAreaProvider>

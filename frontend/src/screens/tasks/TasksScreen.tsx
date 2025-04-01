@@ -8,7 +8,8 @@ import {
     FlatList,
     ActivityIndicator,
     Platform,
-    StatusBar
+    StatusBar,
+    Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,16 +21,20 @@ import { Task } from '../../utils/supabase';
 
 const TasksScreen = () => {
     const navigation = useNavigation();
-    const { user } = useAuth();
+    const { user, session } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
     // Fetch tasks on component mount and when user changes
     useEffect(() => {
         if (user) {
+            console.log('User authenticated, fetching tasks for ID:', user.id);
             fetchTasks();
+        } else {
+            console.log('No authenticated user found');
         }
     }, [user]);
 
@@ -42,23 +47,49 @@ const TasksScreen = () => {
     const fetchTasks = async () => {
         try {
             setLoading(true);
+            console.log('Fetching tasks from Supabase...');
+
+            // Get the current session token
+            const token = session?.access_token;
+
+            if (!token) {
+                console.warn('No auth token available, using existing session');
+            } else {
+                console.log('Auth token available for API request');
+            }
+
             const { data, error } = await supabase
                 .from('tasks')
                 .select('*')
                 .eq('user_id', user?.id)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase query error:', error);
+                throw error;
+            }
+
+            console.log('Tasks fetched successfully:', data?.length || 0);
             setTasks(data || []);
         } catch (error: any) {
             console.error('Error fetching tasks:', error.message);
+            Alert.alert('Error', 'Failed to load tasks. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
+    // Handle refresh action
+    const onRefresh = async () => {
+        console.log('Refreshing tasks list...');
+        setRefreshing(true);
+        await fetchTasks();
+        setRefreshing(false);
+    };
+
     // Filter tasks based on selected filter
     const filterTasks = () => {
+        console.log('Filtering tasks. Total tasks:', tasks.length, 'Current filter:', filter);
         switch (filter) {
             case 'active':
                 setFilteredTasks(tasks.filter(task => task.status === 'active'));
@@ -144,6 +175,8 @@ const TasksScreen = () => {
                         )}
                         contentContainerStyle={filteredTasks.length === 0 ? { flex: 1 } : styles.listContent}
                         ListEmptyComponent={renderEmptyState}
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
                     />
                 )}
             </View>

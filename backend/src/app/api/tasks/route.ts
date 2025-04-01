@@ -4,28 +4,50 @@ import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 // Helper to verify user session
 async function getUserFromRequest(request: NextRequest) {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    try {
+        // Try to get the session from the cookie
+        const authHeader = request.headers.get('authorization');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.split(' ')[1];
+            console.log('Token found in auth header');
+
+            const { data, error } = await supabase.auth.getUser(token);
+
+            if (error || !data.user) {
+                console.error('Error verifying token:', error);
+                return null;
+            }
+
+            return data.user;
+        } else {
+            // Fallback to session cookie authentication
+            const { data, error } = await supabase.auth.getSession();
+
+            if (error || !data.session) {
+                console.error('No valid session found:', error);
+                return null;
+            }
+
+            return data.session.user;
+        }
+    } catch (error) {
+        console.error('Auth error:', error);
         return null;
     }
-
-    const token = authHeader.split(' ')[1];
-    const { data, error } = await supabase.auth.getUser(token);
-
-    if (error || !data.user) {
-        return null;
-    }
-
-    return data.user;
 }
 
 // Get all tasks for a user
 export async function GET(request: NextRequest) {
     try {
+        console.log('GET /tasks request received');
+
         const user = await getUserFromRequest(request);
         if (!user) {
+            console.error('Unauthorized access attempt');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        console.log('Authorized user:', user.id);
 
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');
@@ -50,9 +72,11 @@ export async function GET(request: NextRequest) {
         const { data, error } = await query;
 
         if (error) {
+            console.error('Database query error:', error);
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
+        console.log(`Found ${data?.length || 0} tasks`);
         return NextResponse.json({ tasks: data });
     } catch (error) {
         console.error('Tasks API error:', error);
@@ -63,16 +87,23 @@ export async function GET(request: NextRequest) {
 // Create a new task
 export async function POST(request: NextRequest) {
     try {
+        console.log('POST /tasks request received');
+
         const user = await getUserFromRequest(request);
         if (!user) {
+            console.error('Unauthorized access attempt');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        console.log('Authorized user:', user.id);
 
         const { title, description, priority, due_date, subtasks } = await request.json();
 
         if (!title) {
             return NextResponse.json({ error: 'Title is required' }, { status: 400 });
         }
+
+        console.log('Creating task:', { title, priority, due_date });
 
         // Insert the task
         const { data: task, error: taskError } = await supabase
@@ -89,11 +120,16 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (taskError) {
+            console.error('Task creation error:', taskError);
             return NextResponse.json({ error: taskError.message }, { status: 400 });
         }
 
+        console.log('Task created with ID:', task.id);
+
         // If subtasks were provided, insert them
         if (subtasks && Array.isArray(subtasks) && subtasks.length > 0) {
+            console.log('Adding subtasks:', subtasks.length);
+
             const subtasksToInsert = subtasks.map((title: string) => ({
                 task_id: task.id,
                 title,
@@ -117,6 +153,7 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (getError) {
+            console.error('Error fetching complete task:', getError);
             return NextResponse.json({ error: getError.message }, { status: 400 });
         }
 
