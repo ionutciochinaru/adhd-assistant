@@ -568,4 +568,475 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                                             {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                                         </Text>
                                     </View>
-                                </View
+                                </View>
+
+                                <View style={styles.completionContainer}>
+                                    <Text style={styles.completionLabel}>
+                                        {task.status === 'completed' ? 'Completed' : 'Mark Complete'}
+                                    </Text>
+                                    <Switch
+                                        value={task.status === 'completed'}
+                                        onValueChange={toggleTaskCompletion}
+                                        disabled={updating}
+                                        trackColor={{ false: '#bdc3c7', true: '#2ecc71' }}
+                                        thumbColor={task.status === 'completed' ? '#27ae60' : '#ecf0f1'}
+                                    />
+                                </View>
+                            </View>
+
+                            {task.due_date && (
+                                <View style={styles.dueDateDisplay}>
+                                    <Text style={styles.dueDateLabel}>Due Date:</Text>
+                                    <Text style={styles.dueDateText}>
+                                        {new Date(task.due_date).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                            )}
+
+                            {task.description && (
+                                <View style={styles.descriptionContainer}>
+                                    <Text style={styles.descriptionTitle}>Description:</Text>
+                                    <Text style={styles.descriptionText}>{task.description}</Text>
+                                </View>
+                            )}
+
+                            <View style={styles.subtasksContainer}>
+                                <Text style={styles.subtasksTitle}>Subtasks:</Text>
+
+                                {subtasks.length === 0 ? (
+                                    <Text style={styles.noSubtasksText}>No subtasks yet</Text>
+                                ) : (
+                                    subtasks.map(subtask => (
+                                        <View key={subtask.id} style={styles.subtaskItem}>
+                                            <View style={styles.subtaskContent}>
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.checkbox,
+                                                        subtask.status === 'completed' && styles.checkedCheckbox
+                                                    ]}
+                                                    onPress={() => toggleSubtaskCompletion(subtask)}
+                                                >
+                                                    {subtask.status === 'completed' && (
+                                                        <Text style={styles.checkmark}>✓</Text>
+                                                    )}
+                                                </TouchableOpacity>
+                                                <Text style={[
+                                                    styles.subtaskText,
+                                                    subtask.status === 'completed' && styles.completedSubtaskText
+                                                ]}>
+                                                    {subtask.title}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={styles.deleteSubtaskButton}
+                                                onPress={() => deleteSubtask(subtask.id)}
+                                            >
+                                                <Text style={styles.deleteSubtaskButtonText}>×</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))
+                                )}
+
+                                <View style={styles.addSubtaskContainer}>
+                                    <TextInput
+                                        style={styles.addSubtaskInput}
+                                        value={newSubtask}
+                                        onChangeText={setNewSubtask}
+                                        placeholder="Add a new subtask"
+                                        returnKeyType="done"
+                                        onSubmitEditing={addSubtask}
+                                    />
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.addSubtaskButton,
+                                            newSubtask.trim() === '' && styles.disabledAddSubtaskButton
+                                        ]}
+                                        onPress={addSubtask}
+                                        disabled={newSubtask.trim() === '' || updating}
+                                    >
+                                        {updating ? (
+                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                        ) : (
+                                            <Text style={styles.addSubtaskButtonText}>Add</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+                </ScrollView>
+            </View>
+        </SafeAreaView>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    errorText: {
+        fontSize: 18,
+        color: '#e74c3c',
+        marginBottom: 20,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    backButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+    },
+    backButtonText: {
+        fontSize: 16,
+        color: '#3498db',
+    },
+    actionsContainer: {
+        flexDirection: 'row',
+    },
+    editButton: {
+        backgroundColor: '#3498db',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+        marginRight: 8,
+    },
+    editButtonText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    deleteButton: {
+        backgroundColor: '#e74c3c',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+    },
+    deleteButtonText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    editButtonsContainer: {
+        flexDirection: 'row',
+    },
+    cancelButton: {
+        backgroundColor: '#95a5a6',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+        marginRight: 8,
+    },
+    cancelButtonText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    saveButton: {
+        backgroundColor: '#2ecc71',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+    },
+    saveButtonText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    scrollView: {
+        flex: 1,
+    },
+    contentContainer: {
+        padding: 16,
+    },
+    taskDetailsContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    taskHeaderContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    taskTitleContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    taskTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#2c3e50',
+        flex: 1,
+    },
+    completedTaskTitle: {
+        textDecorationLine: 'line-through',
+        color: '#95a5a6',
+    },
+    priorityBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        marginLeft: 8,
+    },
+    lowPriorityBadge: {
+        backgroundColor: '#e8f5e9',
+    },
+    mediumPriorityBadge: {
+        backgroundColor: '#fff8e1',
+    },
+    highPriorityBadge: {
+        backgroundColor: '#ffebee',
+    },
+    priorityBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    completionContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    completionLabel: {
+        fontSize: 14,
+        marginRight: 8,
+        color: '#7f8c8d',
+    },
+    dueDateDisplay: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ecf0f1',
+    },
+    dueDateLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#7f8c8d',
+        marginRight: 8,
+    },
+    dueDateText: {
+        fontSize: 14,
+        color: '#34495e',
+    },
+    descriptionContainer: {
+        marginBottom: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ecf0f1',
+    },
+    descriptionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 8,
+    },
+    descriptionText: {
+        fontSize: 14,
+        color: '#34495e',
+        lineHeight: 20,
+    },
+    subtasksContainer: {
+        marginBottom: 16,
+    },
+    subtasksTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 12,
+    },
+    noSubtasksText: {
+        fontSize: 14,
+        color: '#7f8c8d',
+        fontStyle: 'italic',
+        marginBottom: 16,
+    },
+    subtaskItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ecf0f1',
+    },
+    subtaskContent: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    checkbox: {
+        width: 22,
+        height: 22,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#bdc3c7',
+        marginRight: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkedCheckbox: {
+        backgroundColor: '#3498db',
+        borderColor: '#3498db',
+    },
+    checkmark: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    subtaskText: {
+        fontSize: 14,
+        color: '#34495e',
+        flex: 1,
+    },
+    completedSubtaskText: {
+        textDecorationLine: 'line-through',
+        color: '#95a5a6',
+    },
+    deleteSubtaskButton: {
+        padding: 8,
+    },
+    deleteSubtaskButtonText: {
+        fontSize: 18,
+        color: '#e74c3c',
+        fontWeight: 'bold',
+    },
+    addSubtaskContainer: {
+        flexDirection: 'row',
+        marginTop: 12,
+    },
+    addSubtaskInput: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#bdc3c7',
+        borderRadius: 4,
+        paddingHorizontal: 12,
+        marginRight: 8,
+        backgroundColor: '#ffffff',
+    },
+    addSubtaskButton: {
+        backgroundColor: '#3498db',
+        paddingHorizontal: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 4,
+    },
+    disabledAddSubtaskButton: {
+        backgroundColor: '#95a5a6',
+    },
+    addSubtaskButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
+    },
+    editFormContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#bdc3c7',
+        borderRadius: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginBottom: 16,
+        backgroundColor: '#ffffff',
+        fontSize: 14,
+    },
+    textArea: {
+        height: 100,
+    },
+    priorityPickerContainer: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
+    priorityOption: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 4,
+        marginRight: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    selectedPriorityOption: {
+        borderWidth: 0,
+    },
+    priorityOptionText: {
+        fontSize: 14,
+        color: '#34495e',
+        fontWeight: '500',
+    },
+    selectedPriorityOptionText: {
+        color: '#ffffff',
+    },
+    dueDateContainer: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
+    datePickerButton: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#bdc3c7',
+        borderRadius: 4,
+        paddingHorizontal: 12,
+        justifyContent: 'center',
+        backgroundColor: '#ffffff',
+        marginRight: 8,
+    },
+    datePickerButtonText: {
+        color: '#34495e',
+        fontSize: 14,
+    },
+    clearDateButton: {
+        backgroundColor: '#95a5a6',
+        paddingHorizontal: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 4,
+    },
+    clearDateButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
+    },
+});
+
+export default TaskDetailScreen;

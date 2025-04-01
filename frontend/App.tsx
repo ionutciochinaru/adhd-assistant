@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import {View, Text, ActivityIndicator, Platform, LogBox} from 'react-native';
+import {View, Text, ActivityIndicator, Platform, LogBox, StyleSheet, SafeAreaView} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from './src/services/NotificationService';
 
@@ -155,21 +155,33 @@ export default function App() {
     }, []);
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaProvider>
-                {/* Set StatusBar properties for the entire app */}
-                <StatusBar
-                    barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'}
-                    backgroundColor="transparent"
-                    translucent={true}
-                />
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider style={styles.container} edges={['top', 'left', 'right']}>
+                    {/* Set StatusBar properties for the entire app */}
+                    <StatusBar
+                        barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'}
+                        backgroundColor="transparent"
+                        translucent={true}
+                    />
 
-                <AuthProvider>
-                    <NavigationContainer>
-                        <RootNavigator />
-                    </NavigationContainer>
-                </AuthProvider>
-            </SafeAreaProvider>
-        </GestureHandlerRootView>
+                    <AuthProvider>
+                        <NavigationContainer>
+                            <RootNavigator />
+                        </NavigationContainer>
+                    </AuthProvider>
+                </SafeAreaProvider>
+            </GestureHandlerRootView>
+        </SafeAreaView>
     );
 }
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
+});
