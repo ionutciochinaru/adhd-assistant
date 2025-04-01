@@ -40,10 +40,9 @@ const CalendarScreen = () => {
             if (user) {
                 fetchTasks();
             }
-            return () => {
-            }; // Cleanup function
-        }, [user])
+        }, [user, selectedDate]) // Add selectedDate
     );
+
 
     // Fetch all tasks for the calendar
     const fetchTasks = async () => {
@@ -61,53 +60,33 @@ const CalendarScreen = () => {
             }
 
             // Create marked dates object for the calendar
+            // Update marked dates
             const marked: MarkedDates = {};
-
-            // Add all tasks with due dates to the marked dates
             data?.forEach(task => {
-                if (task.due_date) {
-                    const dateStr = task.due_date.split('T')[0]; // Convert to YYYY-MM-DD
-
-                    if (marked[dateStr]) {
-                        // If date already has a marker, update it based on priority
-                        if (task.priority === 'high') {
-                            marked[dateStr].dotColor = '#e74c3c'; // High priority is red
-                        } else if (task.priority === 'medium' && marked[dateStr].dotColor !== '#e74c3c') {
-                            marked[dateStr].dotColor = '#f39c12'; // Medium priority is orange
-                        }
-                    } else {
-                        // Add new marker
-                        marked[dateStr] = {
-                            marked: true,
-                            dotColor: task.priority === 'high'
-                                ? '#e74c3c'
-                                : task.priority === 'medium'
-                                    ? '#f39c12'
-                                    : '#2ecc71',
-                        };
-                    }
+                const dateStr = task.due_date?.split('T')[0];
+                if (dateStr) {
+                    marked[dateStr] = {
+                        marked: true,
+                        dotColor: task.priority === 'high' ? '#e74c3c' :
+                            task.priority === 'medium' ? '#f39c12' :
+                                '#2ecc71',
+                    };
                 }
             });
 
-            // Mark the selected date
-            if (marked[selectedDate]) {
-                marked[selectedDate].selected = true;
-                marked[selectedDate].selectedColor = '#E1F0FE';
-            } else {
-                marked[selectedDate] = {
-                    marked: false,
-                    dotColor: '#3498db',
-                    selected: true,
-                    selectedColor: '#E1F0FE',
-                };
-            }
+            // Ensure selected date is marked
+            marked[selectedDate] = {
+                selected: true,
+                selectedColor: '#E1F0FE',
+                marked: marked[selectedDate]?.marked || false,
+                dotColor: marked[selectedDate]?.dotColor || '#3498db'
+            };
 
             setMarkedDates(marked);
 
             // Filter tasks for the selected date
             const filteredTasks = data?.filter(task => {
-                if (!task.due_date) return false;
-                return task.due_date.split('T')[0] === selectedDate;
+                return task.due_date?.split('T')[0] === selectedDate;
             }) || [];
 
             setTasks(filteredTasks);
