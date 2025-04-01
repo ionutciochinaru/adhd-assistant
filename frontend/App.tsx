@@ -1,25 +1,29 @@
-import React, { useState, useEffect } from 'react';
+// frontend/App.tsx
+import React, { useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { supabase } from './src/utils/supabase';
-import { Session } from '@supabase/supabase-js';
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from './src/services/NotificationService';
 
-// Import screens (will be created later)
-// Auth Screens
-const LoginScreen = () => <View><Text>Login Screen</Text></View>;
-const SignupScreen = () => <View><Text>Signup Screen</Text></View>;
-const ForgotPasswordScreen = () => <View><Text>Forgot Password Screen</Text></View>;
+// Import screens
+import LoginScreen from './src/screens/auth/LoginScreen';
+import SignupScreen from './src/screens/auth/SignupScreen';
+import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+// Import navigators
+import TasksNavigator from './src/navigation/TasksNavigator';
+// Import regular screens
+import CalendarScreen from './src/screens/calendar/CalendarScreen';
+import MoodJournalScreen from './src/screens/journal/MoodJournalScreen';
+import MedicationsScreen from './src/screens/medications/MedicationsScreen';
+import ProfileScreen from './src/screens/profile/ProfileScreen';
 
-// Main App Screens
-const TasksScreen = () => <View><Text>Tasks Screen</Text></View>;
-const CalendarScreen = () => <View><Text>Calendar Screen</Text></View>;
-const MoodJournalScreen = () => <View><Text>Mood Journal Screen</Text></View>;
-const MedicationsScreen = () => <View><Text>Medications Screen</Text></View>;
-const ProfileScreen = () => <View><Text>Profile Screen</Text></View>;
+// Import context
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 
 // Navigation types
 type AuthStackParamList = {
@@ -57,11 +61,36 @@ const AuthNavigator = () => {
     );
 };
 
-// Main App Navigator
+// Main App Navigator with Bottom Tabs
 const MainNavigator = () => {
     return (
-        <MainTab.Navigator>
-            <MainTab.Screen name="Tasks" component={TasksScreen} />
+        <MainTab.Navigator
+            screenOptions={({ route }) => ({
+                tabBarIcon: ({ focused, color, size }) => {
+                    let iconName: keyof typeof Ionicons.glyphMap;
+
+                    if (route.name === 'Tasks') {
+                        iconName = focused ? 'checkbox' : 'checkbox-outline';
+                    } else if (route.name === 'Calendar') {
+                        iconName = focused ? 'calendar' : 'calendar-outline';
+                    } else if (route.name === 'MoodJournal') {
+                        iconName = focused ? 'journal' : 'journal-outline';
+                    } else if (route.name === 'Medications') {
+                        iconName = focused ? 'medical' : 'medical-outline';
+                    } else if (route.name === 'Profile') {
+                        iconName = focused ? 'person-circle' : 'person-circle-outline';
+                    } else {
+                        iconName = 'help-circle-outline';
+                    }
+
+                    return <Ionicons name={iconName} size={size} color={color} />;
+                },
+                tabBarActiveTintColor: '#3498db',
+                tabBarInactiveTintColor: 'gray',
+                headerShown: false,
+            })}
+        >
+            <MainTab.Screen name="Tasks" component={TasksNavigator} />
             <MainTab.Screen name="Calendar" component={CalendarScreen} />
             <MainTab.Screen name="MoodJournal" component={MoodJournalScreen} />
             <MainTab.Screen name="Medications" component={MedicationsScreen} />
@@ -70,47 +99,74 @@ const MainNavigator = () => {
     );
 };
 
-// Root Navigator - switches between Auth and Main flows
-export default function App() {
-    const [session, setSession] = useState<Session | null>(null);
-    const [loading, setLoading] = useState(true);
+// Root Navigator with auth state
+const RootNavigator = () => {
+    const { user, loading } = useAuth();
 
-    useEffect(() => {
-        // Check if there's an active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setLoading(false);
-        });
-
-        // Set up listener for auth state changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-        });
-
-        // Cleanup subscription
-        return () => subscription.unsubscribe();
-    }, []);
-
-    // Show loading screen while checking authentication
+    // Show loading screen while checking auth state
     if (loading) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#0000ff" />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F9FC' }}>
+                <ActivityIndicator size="large" color="#3498db" />
+                <Text style={{ marginTop: 16, fontSize: 16, color: '#666' }}>Loading...</Text>
             </View>
         );
     }
 
     return (
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            {user ? (
+                <RootStack.Screen name="Main" component={MainNavigator} />
+            ) : (
+                <RootStack.Screen name="Auth" component={AuthNavigator} />
+            )}
+        </RootStack.Navigator>
+    );
+};
+
+// Main App component with providers
+export default function App() {
+    const notificationListener = useRef<Notifications.Subscription>();
+    const responseListener = useRef<Notifications.Subscription>();
+
+    useEffect(() => {
+        // Register for push notifications
+        registerForPushNotificationsAsync();
+
+        // This listener is fired whenever a notification is received while the app is foregrounded
+        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+            const data = notification.request.content.data;
+            console.log('Notification received in foreground:', data);
+            // You can handle the notification data here, e.g., refreshing a task list
+        });
+
+        // This listener is fired whenever a user taps on or interacts with a notification
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+            const data = response.notification.request.content.data;
+            console.log('Notification response received:', data);
+
+            // Handle notification tap based on data
+            // E.g., navigate to specific screens based on the notification type
+        });
+
+        return () => {
+            // Clean up the listeners
+            if (notificationListener.current) {
+                Notifications.removeNotificationSubscription(notificationListener.current);
+            }
+            if (responseListener.current) {
+                Notifications.removeNotificationSubscription(responseListener.current);
+            }
+        };
+    }, []);
+
+    return (
         <SafeAreaProvider>
-            <NavigationContainer>
-                <RootStack.Navigator screenOptions={{ headerShown: false }}>
-                    {session ? (
-                        <RootStack.Screen name="Main" component={MainNavigator} />
-                    ) : (
-                        <RootStack.Screen name="Auth" component={AuthNavigator} />
-                    )}
-                </RootStack.Navigator>
-            </NavigationContainer>
+            <AuthProvider>
+                <NavigationContainer>
+                    <RootNavigator />
+                </NavigationContainer>
+            </AuthProvider>
             <StatusBar style="auto" />
         </SafeAreaProvider>
     );
