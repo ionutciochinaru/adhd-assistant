@@ -391,7 +391,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
             <View style={styles.container}>
                 <View style={styles.header}>
                     <TouchableOpacity
@@ -672,6 +672,10 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
+    safeArea: {
         flex: 1,
         backgroundColor: '#f8f9fa',
     },

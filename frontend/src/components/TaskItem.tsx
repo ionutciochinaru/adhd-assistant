@@ -4,15 +4,21 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { Task } from '../utils/supabase';
 
+// Extended Task type that includes optional subtask counts
+interface ExtendedTask extends Task {
+    subtasks_count?: number;
+    subtasks_completed?: number;
+}
+
 type TaskItemProps = {
-    task: Task;
+    task: ExtendedTask;
     onPress: () => void;
-    onToggleCompletion?: (task: Task) => void;
+    onToggleCompletion?: (task: ExtendedTask) => void;
 };
 
 const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
     // Format the due date if present
-    const formatDueDate = (dateString?: string) => {
+    const formatDueDate = (dateString?: string | null) => {
         if (!dateString) return null;
 
         const date = new Date(dateString);
@@ -167,7 +173,7 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                     )}
 
                     {/* Show subtask count if any */}
-                    {task.subtasks_count > 0 && (
+                    {task.subtasks_count && task.subtasks_count > 0 && (
                         <View style={styles.subtaskContainer}>
                             <Ionicons name="list-outline" size={14} color="#7f8c8d" />
                             <Text style={styles.subtaskText}>

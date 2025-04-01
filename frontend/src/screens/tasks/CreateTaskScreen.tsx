@@ -11,7 +11,7 @@ import {
     ActivityIndicator,
     Alert,
     Platform,
-    KeyboardAvoidingView,
+    KeyboardAvoidingView, SafeAreaView,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
@@ -159,6 +159,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     };
 
     return (
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -336,6 +337,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 };
 
@@ -343,6 +345,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F7F9FC',
+    },
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
     },
     header: {
         flexDirection: 'row',
