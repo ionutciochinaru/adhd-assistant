@@ -15,23 +15,67 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 import * as Notifications from 'expo-notifications';
+import { supabase } from '../../utils/supabase';
 
 const ProfileScreen = () => {
     const { user, signOut, updateUser } = useAuth();
     const [name, setName] = useState(user?.user_metadata?.name || '');
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [loadingPreferences, setLoadingPreferences] = useState(true);
     const { enableDailyDigest, disableDailyDigest, syncTaskNotifications } = useTaskNotifications();
     const [notificationPermission, setNotificationPermission] = useState<boolean>(false);
 
+    // Notification preferences
+    const [notifications, setNotifications] = useState({
+        taskReminders: true,
+        dailyDigest: true,
+        weeklyReport: true,
+        medicationReminders: true,
+    });
+
+    // Load notification preferences on mount
     useEffect(() => {
+        const loadUserPreferences = async () => {
+            try {
+                setLoadingPreferences(true);
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('notification_preferences')
+                    .eq('id', user?.id)
+                    .single();
+
+                if (error) {
+                    console.error('Error loading user preferences:', error);
+                    return;
+                }
+
+                if (data?.notification_preferences) {
+                    const prefs = data.notification_preferences;
+                    setNotifications({
+                        taskReminders: prefs.taskReminders !== false,
+                        dailyDigest: prefs.dailyDigest?.enabled || false,
+                        weeklyReport: prefs.weeklyReport !== false,
+                        medicationReminders: prefs.medicationReminders !== false,
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading preferences:', error);
+            } finally {
+                setLoadingPreferences(false);
+            }
+        };
+
         const checkNotificationPermissions = async () => {
             const { status } = await Notifications.getPermissionsAsync();
             setNotificationPermission(status === 'granted');
         };
 
-        checkNotificationPermissions();
-    }, []);
+        if (user) {
+            loadUserPreferences();
+            checkNotificationPermissions();
+        }
+    }, [user]);
 
     const requestNotificationPermissions = async () => {
         const { status } = await Notifications.requestPermissionsAsync();
@@ -47,41 +91,87 @@ const ProfileScreen = () => {
     };
 
     const toggleNotificationSetting = async (setting: keyof typeof notifications, value: boolean) => {
-        const newNotifications = { ...notifications, [setting]: value };
-        setNotifications(newNotifications);
+        try {
+            setLoadingPreferences(true);
 
-        if (!notificationPermission) {
-            Alert.alert(
-                'Permission Required',
-                'Notifications need permission to function. Would you like to enable them?',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Enable', onPress: requestNotificationPermissions }
-                ]
-            );
-            return;
-        }
-
-        // Handle specific notification types
-        if (setting === 'dailyDigest') {
-            if (value) {
-                await enableDailyDigest(8, 0); // 8:00 AM
-            } else {
-                await disableDailyDigest();
+            // Check if notification permission is granted
+            if (!notificationPermission) {
+                Alert.alert(
+                    'Permission Required',
+                    'Notifications need permission to function. Would you like to enable them?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Enable', onPress: requestNotificationPermissions }
+                    ]
+                );
+                return;
             }
-        } else if (setting === 'taskReminders' && value) {
-            // Re-sync all task notifications
-            await syncTaskNotifications();
+
+            // Update local state
+            const newNotifications = { ...notifications, [setting]: value };
+            setNotifications(newNotifications);
+
+            // Get current user preferences
+            const { data, error } = await supabase
+                .from('users')
+                .select('notification_preferences')
+                .eq('id', user?.id)
+                .single();
+
+            if (error) {
+                throw error;
+            }
+
+            // Prepare updated preferences
+            const currentPrefs = data?.notification_preferences || {};
+            let updatedPrefs = { ...currentPrefs };
+
+            // Handle specific notification types
+            if (setting === 'dailyDigest') {
+                if (value) {
+                    await enableDailyDigest(8, 0); // 8:00 AM
+                    updatedPrefs.dailyDigest = { enabled: true, hour: 8, minute: 0 };
+                } else {
+                    await disableDailyDigest();
+                    updatedPrefs.dailyDigest = { enabled: false };
+                }
+            } else if (setting === 'taskReminders') {
+                updatedPrefs.taskReminders = value;
+
+                if (value) {
+                    // Re-sync all task notifications
+                    await syncTaskNotifications();
+                }
+            } else if (setting === 'weeklyReport') {
+                updatedPrefs.weeklyReport = value;
+                // Implementation for weekly report would go here
+            } else if (setting === 'medicationReminders') {
+                updatedPrefs.medicationReminders = value;
+                // Implementation for medication reminders would go here
+            }
+
+            // Save updated preferences to database
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({
+                    notification_preferences: updatedPrefs
+                })
+                .eq('id', user?.id);
+
+            if (updateError) {
+                throw updateError;
+            }
+
+        } catch (error) {
+            console.error('Error updating notification preferences:', error);
+            Alert.alert('Error', 'Failed to update notification preferences');
+
+            // Revert the local state change on error
+            setNotifications(prev => ({ ...prev, [setting]: !value }));
+        } finally {
+            setLoadingPreferences(false);
         }
     };
-
-    // Notification preferences
-    const [notifications, setNotifications] = useState({
-        taskReminders: true,
-        dailyDigest: true,
-        weeklyReport: true,
-        medicationReminders: true,
-    });
 
     const handleUpdateProfile = async () => {
         setLoading(true);
@@ -164,56 +254,74 @@ const ProfileScreen = () => {
                 </View>
             </View>
 
+            {!notificationPermission && (
+                <View style={styles.notificationPermissionContainer}>
+                    <Text style={styles.notificationPermissionText}>
+                        Notifications are disabled. Enable them to get reminders for your tasks.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.notificationPermissionButton}
+                        onPress={requestNotificationPermissions}
+                    >
+                        <Text style={styles.notificationPermissionButtonText}>
+                            Enable Notifications
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Notification Preferences</Text>
 
-                <View style={styles.preferenceItem}>
-                    <Text style={styles.preferenceText}>Task Reminders</Text>
-                    <Switch
-                        value={notifications.taskReminders}
-                        onValueChange={(value) =>
-                            setNotifications({...notifications, taskReminders: value})
-                        }
-                        trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                        thumbColor={notifications.taskReminders ? '#3498db' : '#F4F4F4'}
-                    />
-                </View>
+                {loadingPreferences ? (
+                    <ActivityIndicator style={{margin: 20}} size="small" color="#3498db" />
+                ) : (
+                    <>
+                        <View style={styles.preferenceItem}>
+                            <Text style={styles.preferenceText}>Task Reminders</Text>
+                            <Switch
+                                value={notifications.taskReminders}
+                                onValueChange={(value) => toggleNotificationSetting('taskReminders', value)}
+                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
+                                thumbColor={notifications.taskReminders ? '#3498db' : '#F4F4F4'}
+                                disabled={!notificationPermission || loadingPreferences}
+                            />
+                        </View>
 
-                <View style={styles.preferenceItem}>
-                    <Text style={styles.preferenceText}>Daily Task Digest</Text>
-                    <Switch
-                        value={notifications.dailyDigest}
-                        onValueChange={(value) =>
-                            setNotifications({...notifications, dailyDigest: value})
-                        }
-                        trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                        thumbColor={notifications.dailyDigest ? '#3498db' : '#F4F4F4'}
-                    />
-                </View>
+                        <View style={styles.preferenceItem}>
+                            <Text style={styles.preferenceText}>Daily Task Digest</Text>
+                            <Switch
+                                value={notifications.dailyDigest}
+                                onValueChange={(value) => toggleNotificationSetting('dailyDigest', value)}
+                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
+                                thumbColor={notifications.dailyDigest ? '#3498db' : '#F4F4F4'}
+                                disabled={!notificationPermission || loadingPreferences}
+                            />
+                        </View>
 
-                <View style={styles.preferenceItem}>
-                    <Text style={styles.preferenceText}>Weekly Progress Report</Text>
-                    <Switch
-                        value={notifications.weeklyReport}
-                        onValueChange={(value) =>
-                            setNotifications({...notifications, weeklyReport: value})
-                        }
-                        trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                        thumbColor={notifications.weeklyReport ? '#3498db' : '#F4F4F4'}
-                    />
-                </View>
+                        <View style={styles.preferenceItem}>
+                            <Text style={styles.preferenceText}>Weekly Progress Report</Text>
+                            <Switch
+                                value={notifications.weeklyReport}
+                                onValueChange={(value) => toggleNotificationSetting('weeklyReport', value)}
+                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
+                                thumbColor={notifications.weeklyReport ? '#3498db' : '#F4F4F4'}
+                                disabled={!notificationPermission || loadingPreferences}
+                            />
+                        </View>
 
-                <View style={styles.preferenceItem}>
-                    <Text style={styles.preferenceText}>Medication Reminders</Text>
-                    <Switch
-                        value={notifications.medicationReminders}
-                        onValueChange={(value) =>
-                            setNotifications({...notifications, medicationReminders: value})
-                        }
-                        trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                        thumbColor={notifications.medicationReminders ? '#3498db' : '#F4F4F4'}
-                    />
-                </View>
+                        <View style={styles.preferenceItem}>
+                            <Text style={styles.preferenceText}>Medication Reminders</Text>
+                            <Switch
+                                value={notifications.medicationReminders}
+                                onValueChange={(value) => toggleNotificationSetting('medicationReminders', value)}
+                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
+                                thumbColor={notifications.medicationReminders ? '#3498db' : '#F4F4F4'}
+                                disabled={!notificationPermission || loadingPreferences}
+                            />
+                        </View>
+                    </>
+                )}
             </View>
 
             <View style={styles.section}>
@@ -346,6 +454,27 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: '#FFFFFF',
     },
+    notificationPermissionContainer: {
+        backgroundColor: '#f8d7da',
+        margin: 16,
+        padding: 16,
+        borderRadius: 8,
+    },
+    notificationPermissionText: {
+        fontSize: 14,
+        color: '#721c24',
+        marginBottom: 8,
+    },
+    notificationPermissionButton: {
+        backgroundColor: '#3498db',
+        padding: 10,
+        borderRadius: 4,
+        alignItems: 'center',
+    },
+    notificationPermissionButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
+    },
     section: {
         backgroundColor: '#FFFFFF',
         borderRadius: 8,
@@ -408,27 +537,6 @@ const styles = StyleSheet.create({
         color: '#999',
         fontSize: 14,
     },
-    notificationPermissionContainer: {
-        backgroundColor: '#f8d7da',
-        padding: 16,
-        borderRadius: 8,
-        marginVertical: 16,
-    },
-    notificationPermissionText: {
-        fontSize: 14,
-        color: '#721c24',
-        marginBottom: 8,
-    },
-    notificationPermissionButton: {
-        backgroundColor: '#3498db',
-        padding: 10,
-        borderRadius: 4,
-        alignItems: 'center',
-    },
-    notificationPermissionButtonText: {
-        color: '#ffffff',
-        fontWeight: '600',
-    },
 });
 
-export default ProfileScreen;
+export default ProfileScreen
