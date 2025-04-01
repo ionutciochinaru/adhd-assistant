@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, ActivityIndicator } from 'react-native';
+import {View, Text, ActivityIndicator, Platform, LogBox} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from './src/services/NotificationService';
 
@@ -24,6 +24,16 @@ import ProfileScreen from './src/screens/profile/ProfileScreen';
 
 // Import context
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import {GestureHandlerRootView} from "react-native-gesture-handler";
+
+// Configure notification handlers
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+    }),
+});
 
 // Navigation types
 type AuthStackParamList = {
@@ -124,50 +134,44 @@ const RootNavigator = () => {
     );
 };
 
+LogBox.ignoreLogs([
+    'Sending `onAnimatedValueUpdate` with no listeners registered.',
+    'Non-serializable values were found in the navigation state',
+]);
+
 // Main App component with providers
 export default function App() {
     const notificationListener = useRef<Notifications.Subscription>();
     const responseListener = useRef<Notifications.Subscription>();
 
     useEffect(() => {
-        // Register for push notifications
-        registerForPushNotificationsAsync();
-
-        // This listener is fired whenever a notification is received while the app is foregrounded
-        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-            const data = notification.request.content.data;
-            console.log('Notification received in foreground:', data);
-            // You can handle the notification data here, e.g., refreshing a task list
-        });
-
-        // This listener is fired whenever a user taps on or interacts with a notification
-        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-            const data = response.notification.request.content.data;
-            console.log('Notification response received:', data);
-
-            // Handle notification tap based on data
-            // E.g., navigate to specific screens based on the notification type
-        });
-
-        return () => {
-            // Clean up the listeners
-            if (notificationListener.current) {
-                Notifications.removeNotificationSubscription(notificationListener.current);
-            }
-            if (responseListener.current) {
-                Notifications.removeNotificationSubscription(responseListener.current);
+        const setupNotifications = async () => {
+            try {
+                await registerForPushNotificationsAsync();
+            } catch (error) {
+                console.error('Error setting up notifications:', error);
             }
         };
+
+        setupNotifications();
     }, []);
 
     return (
-        <SafeAreaProvider>
-            <AuthProvider>
-                <NavigationContainer>
-                    <RootNavigator />
-                </NavigationContainer>
-            </AuthProvider>
-            <StatusBar style="auto" />
-        </SafeAreaProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+                {/* Set StatusBar properties for the entire app */}
+                <StatusBar
+                    barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'}
+                    backgroundColor="transparent"
+                    translucent={true}
+                />
+
+                <AuthProvider>
+                    <NavigationContainer>
+                        <MainNavigator />
+                    </NavigationContainer>
+                </AuthProvider>
+            </SafeAreaProvider>
+        </GestureHandlerRootView>
     );
 }

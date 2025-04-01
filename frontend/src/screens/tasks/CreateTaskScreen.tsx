@@ -16,7 +16,7 @@ import {
 import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Navigation types
 type TasksStackParamList = {
@@ -34,25 +34,18 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [hasDueDate, setHasDueDate] = useState(false);
     const [dueDate, setDueDate] = useState(new Date());
-    const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
     const [subtasks, setSubtasks] = useState<string[]>([]);
     const [newSubtask, setNewSubtask] = useState('');
     const [loading, setLoading] = useState(false);
     const [useAI, setUseAI] = useState(false);
 
-    // Show/hide date picker
-    const showDatePicker = () => {
-        setDatePickerVisible(true);
-    };
-
-    const hideDatePicker = () => {
-        setDatePickerVisible(false);
-    };
-
-    // Handle date confirmation
-    const handleConfirmDate = (date: Date) => {
-        setDueDate(date);
-        hideDatePicker();
+    // Handle date change
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        setShowDatePicker(Platform.OS === 'ios'); // Keep open on iOS, close on Android
+        if (selectedDate) {
+            setDueDate(selectedDate);
+        }
     };
 
     // Add a new subtask
@@ -241,20 +234,22 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                         <View style={styles.datePickerContainer}>
                             <TouchableOpacity
                                 style={styles.dateButton}
-                                onPress={showDatePicker}
+                                onPress={() => setShowDatePicker(true)}
                             >
                                 <Text style={styles.dateButtonText}>
                                     {dueDate.toLocaleDateString()}
                                 </Text>
                             </TouchableOpacity>
 
-                            <DateTimePickerModal
-                                isVisible={isDatePickerVisible}
-                                mode="date"
-                                onConfirm={handleConfirmDate}
-                                onCancel={hideDatePicker}
-                                minimumDate={new Date()}
-                            />
+                            {showDatePicker && (
+                                <DateTimePicker
+                                    value={dueDate}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={onDateChange}
+                                    minimumDate={new Date()}
+                                />
+                            )}
                         </View>
                     )}
 

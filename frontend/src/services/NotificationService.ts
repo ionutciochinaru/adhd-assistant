@@ -2,6 +2,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { Task } from '../utils/supabase';
 
 // Configure notifications
@@ -40,7 +41,26 @@ export async function registerForPushNotificationsAsync() {
             return undefined;
         }
 
-        token = (await Notifications.getExpoPushTokenAsync()).data;
+        try {
+            // Try to get the project ID from Constants
+            const projectId = Constants?.expoConfig?.extra?.eas?.projectId ??
+                Constants?.easConfig?.projectId ??
+                process.env.EXPO_PUBLIC_PROJECT_ID ??
+                'your-project-id';
+
+            // First try getExpoPushTokenAsync
+            try {
+                token = (await Notifications.getExpoPushTokenAsync({
+                    projectId,
+                })).data;
+            } catch (expoPushError) {
+                // Fall back to getDevicePushTokenAsync if getExpoPushTokenAsync fails
+                console.log('Falling back to device push token:', expoPushError);
+                token = (await Notifications.getDevicePushTokenAsync()).data;
+            }
+        } catch (error) {
+            console.error('Error getting push token:', error);
+        }
     } else {
         console.log('Must use physical device for Push Notifications');
     }
@@ -60,14 +80,16 @@ export async function scheduleTaskReminder(task: Task) {
         // If due date is in the past, don't schedule a notification
         if (notificationDate <= new Date()) return null;
 
-        // Schedule the notification
+        // Schedule the notification with the correct trigger format
         const notificationId = await Notifications.scheduleNotificationAsync({
             content: {
                 title: 'Task Reminder',
                 body: `"${task.title}" is due in 1 hour`,
                 data: { taskId: task.id },
             },
-            trigger: notificationDate,
+            trigger: {
+                date: notificationDate,
+            },
         });
 
         return notificationId;
@@ -91,27 +113,12 @@ export async function cancelTaskReminder(notificationId: string) {
 // Schedule a daily task digest notification
 export async function scheduleDailyDigest(hour: number = 8, minute: number = 0) {
     try {
-        // Calculate when to send the notification (next occurrence of the specified time)
-        const now = new Date();
-        const scheduledTime = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate(),
-            hour,
-            minute
-        );
-
-        // If the time has already passed today, schedule for tomorrow
-        if (scheduledTime <= now) {
-            scheduledTime.setDate(scheduledTime.getDate() + 1);
-        }
-
-        // Schedule the notification
-        const notificationId = await Notifications.scheduleNotificationAsync({
+        // Schedule the notification with a daily repeating trigger
+        return await Notifications.scheduleNotificationAsync({
             content: {
                 title: 'Daily Task Digest',
                 body: 'Check your tasks for today',
-                data: { type: 'dailyDigest' },
+                data: {type: 'dailyDigest'},
             },
             trigger: {
                 hour,
@@ -119,8 +126,6 @@ export async function scheduleDailyDigest(hour: number = 8, minute: number = 0) 
                 repeats: true,
             },
         });
-
-        return notificationId;
     } catch (error) {
         console.error('Error scheduling daily digest:', error);
         return null;
@@ -181,6 +186,31 @@ export async function showNotification(title: string, body: string, data: any = 
     }
 }
 
+// Schedule a notification after a time interval (in seconds)
+export async function scheduleNotificationAfterInterval(
+    title: string,
+    body: string,
+    seconds: number,
+    data: any = {}
+) {
+    try {
+        const notificationId = await Notifications.scheduleNotificationAsync({
+            content: {
+                title,
+                body,
+                data,
+            },
+            trigger: {
+                seconds,
+            },
+        });
+        return notificationId;
+    } catch (error) {
+        console.error('Error scheduling interval notification:', error);
+        return null;
+    }
+}
+
 // Get all scheduled notifications
 export async function getAllScheduledNotifications() {
     try {
@@ -201,4 +231,19 @@ export async function cancelAllNotifications() {
         console.error('Error canceling all notifications:', error);
         return false;
     }
+}
+
+// Set up notification listeners
+export function setupNotificationListeners(
+    onNotificationReceived: (notification: Notifications.Notification) => void,
+    onNotificationResponse: (response: Notifications.NotificationResponse) => void
+) {
+    const notificationListener = Notifications.addNotificationReceivedListener(onNotificationReceived);
+    const responseListener = Notifications.addNotificationResponseReceivedListener(onNotificationResponse);
+
+    // Return a cleanup function to remove the listeners
+    return () => {
+        Notifications.removeNotificationSubscription(notificationListener);
+        Notifications.removeNotificationSubscription(responseListener);
+    };
 }

@@ -1,5 +1,5 @@
 // frontend/src/screens/tasks/TasksScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,415 +7,234 @@ import {
     TouchableOpacity,
     FlatList,
     ActivityIndicator,
-    Alert,
+    Platform,
+    StatusBar
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { StackScreenProps } from '@react-navigation/stack';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
+import TaskItem from '../../components/TaskItem';
 import { Task } from '../../utils/supabase';
 
-// Define navigation types
-type TasksStackParamList = {
-    TasksList: undefined;
-    CreateTask: undefined;
-    TaskDetail: { taskId: string };
-};
-
-type Props = StackScreenProps<TasksStackParamList, 'TasksList'>;
-
-const TasksScreen = ({ navigation }: Props) => {
+const TasksScreen = () => {
+    const navigation = useNavigation();
     const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'completed'>('all');
+    const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
-    // Fetch tasks when screen comes into focus
-    useFocusEffect(
-        useCallback(() => {
-            if (user) {
-                fetchTasks();
-            }
-            return () => {}; // Cleanup function
-        }, [user, activeFilter])
-    );
+    // Fetch tasks on component mount and when user changes
+    useEffect(() => {
+        if (user) {
+            fetchTasks();
+        }
+    }, [user]);
+
+    // Apply filter when tasks change or filter changes
+    useEffect(() => {
+        filterTasks();
+    }, [tasks, filter]);
 
     // Fetch tasks from Supabase
     const fetchTasks = async () => {
         try {
             setLoading(true);
-
-            // Build the query based on the active filter
-            let query = supabase
+            const { data, error } = await supabase
                 .from('tasks')
                 .select('*')
                 .eq('user_id', user?.id)
-                .order('due_date', { ascending: true });
+                .order('created_at', { ascending: false });
 
-            // Apply status filter if not 'all'
-            if (activeFilter === 'active') {
-                query = query.eq('status', 'active');
-            } else if (activeFilter === 'completed') {
-                query = query.eq('status', 'completed');
-            }
-
-            const { data, error } = await query;
-
-            if (error) {
-                throw error;
-            }
-
+            if (error) throw error;
             setTasks(data || []);
         } catch (error: any) {
             console.error('Error fetching tasks:', error.message);
-            Alert.alert('Error', 'Failed to load tasks. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
-    // Toggle task completion status
-    const toggleTaskCompletion = async (task: Task) => {
-        try {
-            const newStatus = task.status === 'active' ? 'completed' : 'active';
-
-            // Optimistic update
-            setTasks(tasks.map(t =>
-                t.id === task.id
-                    ? {
-                        ...t,
-                        status: newStatus,
-                        completed_at: newStatus === 'completed' ? new Date().toISOString() : null
-                    }
-                    : t
-            ));
-
-            // Update in database
-            const { error } = await supabase
-                .from('tasks')
-                .update({
-                    status: newStatus,
-                    completed_at: newStatus === 'completed' ? new Date().toISOString() : null
-                })
-                .eq('id', task.id);
-
-            if (error) {
-                throw error;
-            }
-        } catch (error: any) {
-            console.error('Error updating task:', error.message);
-            Alert.alert('Error', 'Failed to update task. Please try again.');
-
-            // Revert the optimistic update
-            fetchTasks();
+    // Filter tasks based on selected filter
+    const filterTasks = () => {
+        switch (filter) {
+            case 'active':
+                setFilteredTasks(tasks.filter(task => task.status === 'active'));
+                break;
+            case 'completed':
+                setFilteredTasks(tasks.filter(task => task.status === 'completed'));
+                break;
+            default:
+                setFilteredTasks(tasks);
         }
     };
 
-    // Navigate to task detail
-    const navigateToTaskDetail = (taskId: string) => {
-        navigation.navigate('TaskDetail', { taskId });
+    // Navigation to create task screen
+    const handleAddTask = () => {
+        navigation.navigate('CreateTask' as never);
     };
 
-    // Render a task item
-    const renderTask = ({ item }: { item: Task }) => (
-        <TouchableOpacity
-            style={[
-                styles.taskItem,
-                item.status === 'completed' && styles.completedTask
-            ]}
-            onPress={() => navigateToTaskDetail(item.id)}
-        >
-            <TouchableOpacity
-                style={styles.taskCheckbox}
-                onPress={(e) => {
-                    e.stopPropagation(); // Prevent navigation to detail screen
-                    toggleTaskCompletion(item);
-                }}
-            >
-                {item.status === 'completed' && (
-                    <View style={styles.checkboxInner} />
-                )}
-            </TouchableOpacity>
+    // Navigation to task detail screen
+    const handleTaskPress = (taskId: string) => {
+        navigation.navigate('TaskDetail' as never, { taskId } as never);
+    };
 
-            <View style={styles.taskContent}>
-                <Text
-                    style={[
-                        styles.taskTitle,
-                        item.status === 'completed' && styles.completedTaskText
-                    ]}
-                    numberOfLines={1}
-                >
-                    {item.title}
+    // Render empty state
+    const renderEmptyState = () => {
+        if (loading) return null;
+
+        return (
+            <View style={styles.emptyStateContainer}>
+                <Text style={styles.emptyStateText}>No tasks found</Text>
+                <Text style={styles.emptyStateSubtext}>
+                    Tap the "+" button to create your first
                 </Text>
-
-                {item.description ? (
-                    <Text
-                        style={[
-                            styles.taskDescription,
-                            item.status === 'completed' && styles.completedTaskText
-                        ]}
-                        numberOfLines={2}
-                    >
-                        {item.description}
-                    </Text>
-                ) : null}
-
-                {item.due_date ? (
-                    <Text style={styles.taskDueDate}>
-                        Due: {new Date(item.due_date).toLocaleDateString()}
-                    </Text>
-                ) : null}
             </View>
-
-            <View
-                style={[
-                    styles.taskPriority,
-                    styles[`priority${item.priority}`]
-                ]}
-            />
-        </TouchableOpacity>
-    );
+        );
+    };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>My Tasks</Text>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => navigation.navigate('CreateTask')}
-                >
-                    <Text style={styles.addButtonText}>+ Add Task</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.filterContainer}>
-                <TouchableOpacity
-                    style={[
-                        styles.filterButton,
-                        activeFilter === 'all' && styles.activeFilterButton,
-                    ]}
-                    onPress={() => setActiveFilter('all')}
-                >
-                    <Text
-                        style={[
-                            styles.filterButtonText,
-                            activeFilter === 'all' && styles.activeFilterButtonText,
-                        ]}
-                    >
-                        All
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[
-                        styles.filterButton,
-                        activeFilter === 'active' && styles.activeFilterButton,
-                    ]}
-                    onPress={() => setActiveFilter('active')}
-                >
-                    <Text
-                        style={[
-                            styles.filterButtonText,
-                            activeFilter === 'active' && styles.activeFilterButtonText,
-                        ]}
-                    >
-                        Active
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[
-                        styles.filterButton,
-                        activeFilter === 'completed' && styles.activeFilterButton,
-                    ]}
-                    onPress={() => setActiveFilter('completed')}
-                >
-                    <Text
-                        style={[
-                            styles.filterButtonText,
-                            activeFilter === 'completed' && styles.activeFilterButtonText,
-                        ]}
-                    >
-                        Completed
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#3498db" />
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="transparent"
+                translucent={true}
+            />
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>My Tasks</Text>
+                    <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
+                        <Text style={styles.addButtonText}>+ Add Task</Text>
+                    </TouchableOpacity>
                 </View>
-            ) : tasks.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No tasks found</Text>
-                    <Text style={styles.emptySubtext}>
-                        {activeFilter === 'all'
-                            ? 'Tap the "+" button to create your first task'
-                            : `No ${activeFilter} tasks found`}
-                    </Text>
+
+                <View style={styles.filterContainer}>
+                    <TouchableOpacity
+                        style={[styles.filterButton, filter === 'all' && styles.activeFilterButton]}
+                        onPress={() => setFilter('all')}
+                    >
+                        <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>All</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.filterButton, filter === 'active' && styles.activeFilterButton]}
+                        onPress={() => setFilter('active')}
+                    >
+                        <Text style={[styles.filterText, filter === 'active' && styles.activeFilterText]}>Active</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.filterButton, filter === 'completed' && styles.activeFilterButton]}
+                        onPress={() => setFilter('completed')}
+                    >
+                        <Text style={[styles.filterText, filter === 'completed' && styles.activeFilterText]}>Completed</Text>
+                    </TouchableOpacity>
                 </View>
-            ) : (
-                <FlatList
-                    data={tasks}
-                    renderItem={renderTask}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.taskList}
-                    onRefresh={fetchTasks}
-                    refreshing={loading}
-                />
-            )}
-        </View>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#3498db" />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredTasks}
+                        keyExtractor={item => item.id}
+                        renderItem={({ item }) => (
+                            <TaskItem task={item} onPress={() => handleTaskPress(item.id)} />
+                        )}
+                        contentContainerStyle={filteredTasks.length === 0 ? { flex: 1 } : styles.listContent}
+                        ListEmptyComponent={renderEmptyState}
+                    />
+                )}
+            </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#f8f9fa',
+    },
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: '#f8f9fa',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+        backgroundColor: '#ffffff',
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#2c3e50',
+    },
+    addButton: {
+        backgroundColor: '#3498db',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    addButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    filterButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginRight: 8,
+        backgroundColor: '#f1f2f6',
+    },
+    activeFilterButton: {
+        backgroundColor: '#3498db',
+    },
+    filterText: {
+        fontWeight: '500',
+        color: '#7f8c8d',
+    },
+    activeFilterText: {
+        color: '#ffffff',
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
-    },
-    title: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    addButton: {
-        backgroundColor: '#3498db',
-        paddingHorizontal: 12,
+    listContent: {
         paddingVertical: 8,
-        borderRadius: 6,
     },
-    addButtonText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
-    },
-    filterContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
-    },
-    filterButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        marginRight: 8,
-        borderRadius: 16,
-        backgroundColor: '#F0F0F0',
-    },
-    activeFilterButton: {
-        backgroundColor: '#E1F0FE',
-    },
-    filterButtonText: {
-        color: '#7F8C8D',
-        fontWeight: '500',
-    },
-    activeFilterButtonText: {
-        color: '#3498db',
-        fontWeight: '600',
-    },
-    emptyContainer: {
+    emptyStateContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        paddingHorizontal: 32,
     },
-    emptyText: {
+    emptyStateText: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#666',
+        color: '#7f8c8d',
         marginBottom: 8,
     },
-    emptySubtext: {
+    emptyStateSubtext: {
         fontSize: 16,
-        color: '#999',
+        color: '#95a5a6',
         textAlign: 'center',
-    },
-    taskList: {
-        padding: 16,
-    },
-    taskItem: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    completedTask: {
-        backgroundColor: '#F7F7F7',
-    },
-    taskCheckbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#3498db',
-        marginRight: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    checkboxInner: {
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: '#3498db',
-    },
-    taskContent: {
-        flex: 1,
-    },
-    taskTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 4,
-    },
-    taskDescription: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 6,
-    },
-    completedTaskText: {
-        textDecorationLine: 'line-through',
-        color: '#999',
-    },
-    taskDueDate: {
-        fontSize: 12,
-        color: '#888',
-    },
-    taskPriority: {
-        width: 4,
-        height: '100%',
-        borderRadius: 2,
-        marginLeft: 12,
-    },
-    prioritylow: {
-        backgroundColor: '#2ecc71',
-    },
-    prioritymedium: {
-        backgroundColor: '#f39c12',
-    },
-    priorityhigh: {
-        backgroundColor: '#e74c3c',
     },
 });
 

@@ -10,12 +10,14 @@ import {
     ActivityIndicator,
     Switch,
     TextInput,
+    Platform,
+    SafeAreaView,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Task, Subtask } from '../../utils/supabase';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Navigation types
 type TasksStackParamList = {
@@ -38,19 +40,15 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
     const [editedDescription, setEditedDescription] = useState('');
     const [editedPriority, setEditedPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [newSubtask, setNewSubtask] = useState('');
-    const [isDatePickerVisible, setDatePickerVisible] = useState(false);
-    const [editedDueDate, setEditedDueDate] = useState<string | null>(task?.due_date || null);
-    const showDatePicker = () => {
-        setDatePickerVisible(true);
-    };
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [editedDueDate, setEditedDueDate] = useState<Date | null>(null);
 
-    const hideDatePicker = () => {
-        setDatePickerVisible(false);
-    };
-
-    const handleConfirmDate = (date: Date) => {
-        setEditedDueDate(date.toISOString());
-        hideDatePicker();
+    // Handle date change
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        setShowDatePicker(Platform.OS === 'ios'); // Keep open on iOS, close on Android
+        if (selectedDate) {
+            setEditedDueDate(selectedDate);
+        }
     };
 
     // Load the task and its subtasks on component mount
@@ -87,6 +85,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             setEditedTitle(taskData.title);
             setEditedDescription(taskData.description || '');
             setEditedPriority(taskData.priority);
+            setEditedDueDate(taskData.due_date ? new Date(taskData.due_date) : null);
         } catch (error: any) {
             console.error('Error fetching task details:', error.message);
             Alert.alert('Error', 'Failed to load task details');
@@ -235,6 +234,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                     title: editedTitle.trim(),
                     description: editedDescription.trim() || null,
                     priority: editedPriority,
+                    due_date: editedDueDate ? editedDueDate.toISOString() : null,
                 })
                 .eq('id', task.id);
 
@@ -246,6 +246,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                 title: editedTitle.trim(),
                 description: editedDescription.trim() || null,
                 priority: editedPriority,
+                due_date: editedDueDate ? editedDueDate.toISOString() : null,
             });
 
             setIsEditing(false);
@@ -317,6 +318,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
     }
 
     return (
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <View style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity
@@ -335,6 +337,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                                 setEditedTitle(task.title);
                                 setEditedDescription(task.description || '');
                                 setEditedPriority(task.priority);
+                                setEditedDueDate(task.due_date ? new Date(task.due_date) : null);
                                 setIsEditing(false);
                             }}
                             disabled={updating}
@@ -365,212 +368,239 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                         <TouchableOpacity
                             style={styles.deleteButton}
                             onPress={deleteTask}
-                            disabled={updating}
                         >
-                            <Text style={styles.deleteButtonText}>Delete</Text>
+                            {updating ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.deleteButtonText}>Delete</Text>
+                            )}
                         </TouchableOpacity>
                     </View>
                 )}
             </View>
 
-            <ScrollView style={styles.content}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                 {isEditing ? (
-                    <View style={styles.editContainer}>
-                        <Text style={styles.editLabel}>Title</Text>
+                    <View style={styles.editFormContainer}>
+                        <Text style={styles.label}>Title:</Text>
                         <TextInput
-                            style={styles.editTitleInput}
+                            style={styles.input}
                             value={editedTitle}
                             onChangeText={setEditedTitle}
                             placeholder="Task title"
-                            maxLength={100}
+                            autoCapitalize="sentences"
                         />
 
-                        <Text style={styles.editLabel}>Description</Text>
+                        <Text style={styles.label}>Description:</Text>
                         <TextInput
-                            style={styles.editDescriptionInput}
+                            style={[styles.input, styles.textArea]}
                             value={editedDescription}
                             onChangeText={setEditedDescription}
                             placeholder="Task description (optional)"
                             multiline
                             numberOfLines={4}
+                            textAlignVertical="top"
                         />
 
-                        <Text style={styles.editLabel}>Priority</Text>
-                        <View style={styles.priorityButtons}>
+                        <Text style={styles.label}>Priority:</Text>
+                        <View style={styles.priorityPickerContainer}>
                             <TouchableOpacity
                                 style={[
-                                    styles.priorityButton,
-                                    styles.lowPriorityButton,
-                                    editedPriority === 'low' && styles.selectedPriorityButton,
+                                    styles.priorityOption,
+                                    editedPriority === 'low' && styles.selectedPriorityOption,
+                                    { backgroundColor: editedPriority === 'low' ? '#27ae60' : '#ecf0f1' }
                                 ]}
                                 onPress={() => setEditedPriority('low')}
                             >
-                                <Text style={styles.priorityButtonText}>Low</Text>
+                                <Text style={[
+                                    styles.priorityOptionText,
+                                    editedPriority === 'low' && styles.selectedPriorityOptionText
+                                ]}>Low</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[
-                                    styles.priorityButton,
-                                    styles.mediumPriorityButton,
-                                    editedPriority === 'medium' && styles.selectedPriorityButton,
+                                    styles.priorityOption,
+                                    editedPriority === 'medium' && styles.selectedPriorityOption,
+                                    { backgroundColor: editedPriority === 'medium' ? '#f39c12' : '#ecf0f1' }
                                 ]}
                                 onPress={() => setEditedPriority('medium')}
                             >
-                                <Text style={styles.priorityButtonText}>Medium</Text>
+                                <Text style={[
+                                    styles.priorityOptionText,
+                                    editedPriority === 'medium' && styles.selectedPriorityOptionText
+                                ]}>Medium</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[
-                                    styles.priorityButton,
-                                    styles.highPriorityButton,
-                                    editedPriority === 'high' && styles.selectedPriorityButton,
+                                    styles.priorityOption,
+                                    editedPriority === 'high' && styles.selectedPriorityOption,
+                                    { backgroundColor: editedPriority === 'high' ? '#e74c3c' : '#ecf0f1' }
                                 ]}
                                 onPress={() => setEditedPriority('high')}
                             >
-                                <Text style={styles.priorityButtonText}>High</Text>
+                                <Text style={[
+                                    styles.priorityOptionText,
+                                    editedPriority === 'high' && styles.selectedPriorityOptionText
+                                ]}>High</Text>
                             </TouchableOpacity>
                         </View>
+
+                        <Text style={styles.label}>Due Date (Optional):</Text>
+                        <View style={styles.dueDateContainer}>
+                            <TouchableOpacity
+                                style={styles.datePickerButton}
+                                onPress={() => setShowDatePicker(true)}
+                            >
+                                <Text style={styles.datePickerButtonText}>
+                                    {editedDueDate ? editedDueDate.toLocaleDateString() : 'Select a date'}
+                                </Text>
+                            </TouchableOpacity>
+                            {editedDueDate && (
+                                <TouchableOpacity
+                                    style={styles.clearDateButton}
+                                    onPress={() => setEditedDueDate(null)}
+                                >
+                                    <Text style={styles.clearDateButtonText}>Clear</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={editedDueDate || new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={onDateChange}
+                                minimumDate={new Date()}
+                            />
+                        )}
                     </View>
                 ) : (
-                    <View style={styles.taskDetails}>
-                        <View style={styles.taskHeaderRow}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.taskCheckbox,
-                                    task.status === 'completed' && styles.taskCheckboxChecked,
-                                ]}
-                                onPress={toggleTaskCompletion}
-                                disabled={updating}
-                            >
-                                {task.status === 'completed' && (
-                                    <View style={styles.checkboxInner} />
-                                )}
-                            </TouchableOpacity>
-
-                            <View
-                                style={[
-                                    styles.taskPriorityIndicator,
-                                    styles[`priority${task.priority}`],
-                                ]}
-                            />
-
-                            <Text
-                                style={[
+                    <View style={styles.taskDetailsContainer}>
+                        <View style={styles.taskHeaderContainer}>
+                            <View style={styles.taskTitleContainer}>
+                                <Text style={[
                                     styles.taskTitle,
-                                    task.status === 'completed' && styles.completedText,
-                                ]}
-                            >
-                                {task.title}
-                            </Text>
+                                    task.status === 'completed' && styles.completedTaskTitle
+                                ]}>
+                                    {task.title}
+                                </Text>
+                                <View style={[
+                                    styles.priorityBadge,
+                                    task.priority === 'low' && styles.lowPriorityBadge,
+                                    task.priority === 'medium' && styles.mediumPriorityBadge,
+                                    task.priority === 'high' && styles.highPriorityBadge,
+                                ]}>
+                                    <Text style={styles.priorityBadgeText}>
+                                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.completionContainer}>
+                                <Text style={styles.completionLabel}>
+                                    {task.status === 'completed' ? 'Completed' : 'Mark Complete'}
+                                </Text>
+                                <Switch
+                                    value={task.status === 'completed'}
+                                    onValueChange={toggleTaskCompletion}
+                                    disabled={updating}
+                                    trackColor={{ false: '#bdc3c7', true: '#2ecc71' }}
+                                    thumbColor={task.status === 'completed' ? '#27ae60' : '#ecf0f1'}
+                                />
+                            </View>
                         </View>
 
-                        {task.description ? (
-                            <Text
-                                style={[
-                                    styles.taskDescription,
-                                    task.status === 'completed' && styles.completedText,
-                                ]}
-                            >
-                                {task.description}
-                            </Text>
-                        ) : null}
+                        {task.due_date && (
+                            <View style={styles.dueDateDisplay}>
+                                <Text style={styles.dueDateLabel}>Due Date:</Text>
+                                <Text style={styles.dueDateText}>
+                                    {new Date(task.due_date).toLocaleDateString()}
+                                </Text>
+                            </View>
+                        )}
 
-                        {task.due_date ? (
-                            <Text style={styles.taskDueDate}>
-                                Due: {new Date(task.due_date).toLocaleDateString()}
-                            </Text>
-                        ) : null}
+                        {task.description && (
+                            <View style={styles.descriptionContainer}>
+                                <Text style={styles.descriptionTitle}>Description:</Text>
+                                <Text style={styles.descriptionText}>{task.description}</Text>
+                            </View>
+                        )}
 
-                        <View style={styles.taskStatusRow}>
-                            <Text style={styles.taskStatusLabel}>Status:</Text>
-                            <Text
-                                style={[
-                                    styles.taskStatusValue,
-                                    task.status === 'completed'
-                                        ? styles.taskCompletedStatus
-                                        : styles.taskActiveStatus,
-                                ]}
-                            >
-                                {task.status === 'completed' ? 'Completed' : 'Active'}
-                            </Text>
-                        </View>
+                        <View style={styles.subtasksContainer}>
+                            <Text style={styles.subtasksTitle}>Subtasks:</Text>
 
-                        {task.status === 'completed' && task.completed_at ? (
-                            <Text style={styles.taskCompletedDate}>
-                                Completed on: {new Date(task.completed_at).toLocaleDateString()}
-                            </Text>
-                        ) : null}
-                    </View>
-                )}
+                            {subtasks.length === 0 ? (
+                                <Text style={styles.noSubtasksText}>No subtasks yet</Text>
+                            ) : (
+                                subtasks.map(subtask => (
+                                    <View key={subtask.id} style={styles.subtaskItem}>
+                                        <View style={styles.subtaskContent}>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.checkbox,
+                                                    subtask.status === 'completed' && styles.checkedCheckbox
+                                                ]}
+                                                onPress={() => toggleSubtaskCompletion(subtask)}
+                                            >
+                                                {subtask.status === 'completed' && (
+                                                    <Text style={styles.checkmark}>✓</Text>
+                                                )}
+                                            </TouchableOpacity>
+                                            <Text style={[
+                                                styles.subtaskText,
+                                                subtask.status === 'completed' && styles.completedSubtaskText
+                                            ]}>
+                                                {subtask.title}
+                                            </Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={styles.deleteSubtaskButton}
+                                            onPress={() => deleteSubtask(subtask.id)}
+                                        >
+                                            <Text style={styles.deleteSubtaskButtonText}>×</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))
+                            )}
 
-                <View style={styles.subtasksSection}>
-                    <Text style={styles.subtasksHeader}>Subtasks</Text>
-
-                    {subtasks.length === 0 ? (
-                        <Text style={styles.noSubtasksText}>No subtasks yet</Text>
-                    ) : (
-                        subtasks.map((subtask) => (
-                            <View key={subtask.id} style={styles.subtaskItem}>
+                            <View style={styles.addSubtaskContainer}>
+                                <TextInput
+                                    style={styles.addSubtaskInput}
+                                    value={newSubtask}
+                                    onChangeText={setNewSubtask}
+                                    placeholder="Add a new subtask"
+                                    returnKeyType="done"
+                                    onSubmitEditing={addSubtask}
+                                />
                                 <TouchableOpacity
                                     style={[
-                                        styles.subtaskCheckbox,
-                                        subtask.status === 'completed' && styles.subtaskCheckboxChecked,
+                                        styles.addSubtaskButton,
+                                        newSubtask.trim() === '' && styles.disabledAddSubtaskButton
                                     ]}
-                                    onPress={() => toggleSubtaskCompletion(subtask)}
+                                    onPress={addSubtask}
+                                    disabled={newSubtask.trim() === '' || updating}
                                 >
-                                    {subtask.status === 'completed' && (
-                                        <View style={styles.checkboxInner} />
+                                    {updating ? (
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                    ) : (
+                                        <Text style={styles.addSubtaskButtonText}>Add</Text>
                                     )}
                                 </TouchableOpacity>
-
-                                <Text
-                                    style={[
-                                        styles.subtaskTitle,
-                                        subtask.status === 'completed' && styles.completedText,
-                                    ]}
-                                >
-                                    {subtask.title}
-                                </Text>
-
-                                <TouchableOpacity
-                                    style={styles.subtaskDeleteButton}
-                                    onPress={() => deleteSubtask(subtask.id)}
-                                >
-                                    <Text style={styles.subtaskDeleteButtonText}>×</Text>
-                                </TouchableOpacity>
                             </View>
-                        ))
-                    )}
-
-                    <View style={styles.addSubtaskContainer}>
-                        <TextInput
-                            style={styles.addSubtaskInput}
-                            value={newSubtask}
-                            onChangeText={setNewSubtask}
-                            placeholder="Add a subtask"
-                            returnKeyType="done"
-                            onSubmitEditing={addSubtask}
-                        />
-                        <TouchableOpacity
-                            style={styles.addSubtaskButton}
-                            onPress={addSubtask}
-                            disabled={updating || newSubtask.trim() === ''}
-                        >
-                            {updating ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.addSubtaskButtonText}>+</Text>
-                            )}
-                        </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
+                )}
             </ScrollView>
         </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: '#f8f9fa',
     },
     loadingContainer: {
         flex: 1,
@@ -585,21 +615,22 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontSize: 18,
-        marginBottom: 20,
         color: '#e74c3c',
+        marginBottom: 20,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#ffffff',
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
+        borderBottomColor: '#e0e0e0',
     },
     backButton: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
     },
     backButtonText: {
         fontSize: 16,
@@ -609,309 +640,329 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     editButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
         backgroundColor: '#3498db',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
         borderRadius: 4,
         marginRight: 8,
     },
     editButtonText: {
-        color: '#FFFFFF',
+        color: '#ffffff',
+        fontSize: 14,
         fontWeight: '600',
     },
     deleteButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
         backgroundColor: '#e74c3c',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
         borderRadius: 4,
     },
     deleteButtonText: {
-        color: '#FFFFFF',
+        color: '#ffffff',
+        fontSize: 14,
         fontWeight: '600',
     },
     editButtonsContainer: {
         flexDirection: 'row',
     },
     cancelButton: {
+        backgroundColor: '#95a5a6',
+        paddingVertical: 8,
         paddingHorizontal: 12,
-        paddingVertical: 6,
-        backgroundColor: '#ECF0F1',
         borderRadius: 4,
         marginRight: 8,
     },
     cancelButtonText: {
-        color: '#7F8C8D',
+        color: '#ffffff',
+        fontSize: 14,
         fontWeight: '600',
     },
     saveButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
         backgroundColor: '#2ecc71',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
         borderRadius: 4,
     },
     saveButtonText: {
-        color: '#FFFFFF',
+        color: '#ffffff',
+        fontSize: 14,
         fontWeight: '600',
     },
-    content: {
+    scrollView: {
         flex: 1,
+    },
+    contentContainer: {
         padding: 16,
     },
-    taskDetails: {
-        backgroundColor: '#FFFFFF',
+    taskDetailsContainer: {
+        backgroundColor: '#ffffff',
         borderRadius: 8,
         padding: 16,
         marginBottom: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowRadius: 4,
         elevation: 2,
     },
-    editContainer: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    editLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 8,
-        color: '#333',
-    },
-    editTitleInput: {
-        backgroundColor: '#F8F9FA',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 6,
-        padding: 10,
-        fontSize: 16,
-        marginBottom: 16,
-    },
-    editDescriptionInput: {
-        backgroundColor: '#F8F9FA',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 6,
-        padding: 10,
-        fontSize: 16,
-        marginBottom: 16,
-        textAlignVertical: 'top',
-        minHeight: 100,
-    },
-    priorityButtons: {
+    taskHeaderContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-    },
-    priorityButton: {
-        flex: 1,
-        paddingVertical: 10,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        marginHorizontal: 4,
-        borderRadius: 6,
-    },
-    lowPriorityButton: {
-        backgroundColor: '#E8F8F5',
-    },
-    mediumPriorityButton: {
-        backgroundColor: '#FEF9E7',
-    },
-    highPriorityButton: {
-        backgroundColor: '#FDEDEC',
-    },
-    selectedPriorityButton: {
-        borderWidth: 2,
-        borderColor: '#3498db',
-    },
-    priorityButtonText: {
-        fontWeight: '600',
-    },
-    taskHeaderRow: {
-        flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 12,
     },
-    taskCheckbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#3498db',
-        marginRight: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    taskCheckboxChecked: {
-        backgroundColor: '#F0F8FF',
-    },
-    checkboxInner: {
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: '#3498db',
-    },
-    taskPriorityIndicator: {
-        width: 4,
-        height: 24,
-        borderRadius: 2,
-        marginRight: 12,
-    },
-    prioritylow: {
-        backgroundColor: '#2ecc71',
-    },
-    prioritymedium: {
-        backgroundColor: '#f39c12',
-    },
-    priorityhigh: {
-        backgroundColor: '#e74c3c',
-    },
-    taskTitle: {
+    taskTitleContainer: {
         flex: 1,
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#333',
-    },
-    completedText: {
-        textDecorationLine: 'line-through',
-        color: '#95A5A6',
-    },
-    taskDescription: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 16,
-        lineHeight: 22,
-    },
-    taskDueDate: {
-        fontSize: 14,
-        color: '#3498db',
-        marginBottom: 16,
-    },
-    taskStatusRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    taskStatusLabel: {
+    taskTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#2c3e50',
+        flex: 1,
+    },
+    completedTaskTitle: {
+        textDecorationLine: 'line-through',
+        color: '#95a5a6',
+    },
+    priorityBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        marginLeft: 8,
+    },
+    lowPriorityBadge: {
+        backgroundColor: '#e8f5e9',
+    },
+    mediumPriorityBadge: {
+        backgroundColor: '#fff8e1',
+    },
+    highPriorityBadge: {
+        backgroundColor: '#ffebee',
+    },
+    priorityBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    completionContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    completionLabel: {
         fontSize: 14,
-        color: '#7F8C8D',
+        marginRight: 8,
+        color: '#7f8c8d',
+    },
+    dueDateDisplay: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ecf0f1',
+    },
+    dueDateLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#7f8c8d',
         marginRight: 8,
     },
-    taskStatusValue: {
+    dueDateText: {
         fontSize: 14,
-        fontWeight: '600',
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        borderRadius: 4,
+        color: '#34495e',
     },
-    taskCompletedStatus: {
-        backgroundColor: '#D5F5E3',
-        color: '#27AE60',
-    },
-    taskActiveStatus: {
-        backgroundColor: '#E8F4FC',
-        color: '#3498db',
-    },
-    taskCompletedDate: {
-        fontSize: 14,
-        color: '#7F8C8D',
-        marginTop: 8,
-    },
-    subtasksSection: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    subtasksHeader: {
-        fontSize: 18,
-        fontWeight: '600',
+    descriptionContainer: {
         marginBottom: 16,
-        color: '#333',
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ecf0f1',
+    },
+    descriptionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 8,
+    },
+    descriptionText: {
+        fontSize: 14,
+        color: '#34495e',
+        lineHeight: 20,
+    },
+    subtasksContainer: {
+        marginBottom: 16,
+    },
+    subtasksTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 12,
     },
     noSubtasksText: {
-        fontSize: 16,
-        color: '#95A5A6',
+        fontSize: 14,
+        color: '#7f8c8d',
         fontStyle: 'italic',
-        textAlign: 'center',
         marginBottom: 16,
     },
     subtaskItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        justifyContent: 'space-between',
+        paddingVertical: 8,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: '#ecf0f1',
     },
-    subtaskCheckbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+    subtaskContent: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    checkbox: {
+        width: 22,
+        height: 22,
+        borderRadius: 4,
         borderWidth: 2,
-        borderColor: '#3498db',
+        borderColor: '#bdc3c7',
         marginRight: 12,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    subtaskCheckboxChecked: {
-        backgroundColor: '#F0F8FF',
+    checkedCheckbox: {
+        backgroundColor: '#3498db',
+        borderColor: '#3498db',
     },
-    subtaskTitle: {
+    checkmark: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    subtaskText: {
+        fontSize: 14,
+        color: '#34495e',
         flex: 1,
-        fontSize: 16,
-        color: '#333',
     },
-    subtaskDeleteButton: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: '#F0F0F0',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 8,
+    completedSubtaskText: {
+        textDecorationLine: 'line-through',
+        color: '#95a5a6',
     },
-    subtaskDeleteButtonText: {
+    deleteSubtaskButton: {
+        padding: 8,
+    },
+    deleteSubtaskButtonText: {
         fontSize: 18,
-        color: '#E74C3C',
+        color: '#e74c3c',
         fontWeight: 'bold',
     },
     addSubtaskContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 16,
+        marginTop: 12,
     },
     addSubtaskInput: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
+        height: 40,
         borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 6,
-        padding: 10,
-        fontSize: 16,
+        borderColor: '#bdc3c7',
+        borderRadius: 4,
+        paddingHorizontal: 12,
         marginRight: 8,
+        backgroundColor: '#ffffff',
     },
     addSubtaskButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
         backgroundColor: '#3498db',
+        paddingHorizontal: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 4,
+    },
+    disabledAddSubtaskButton: {
+        backgroundColor: '#95a5a6',
+    },
+    addSubtaskButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
+    },
+    editFormContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#bdc3c7',
+        borderRadius: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginBottom: 16,
+        backgroundColor: '#ffffff',
+        fontSize: 14,
+    },
+    textArea: {
+        height: 100,
+    },
+    priorityPickerContainer: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
+    priorityOption: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 4,
+        marginRight: 8,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    addSubtaskButtonText: {
-        fontSize: 24,
-        color: '#FFFFFF',
-        fontWeight: 'bold',
+    selectedPriorityOption: {
+        borderWidth: 0,
+    },
+    priorityOptionText: {
+        fontSize: 14,
+        color: '#34495e',
+        fontWeight: '500',
+    },
+    selectedPriorityOptionText: {
+        color: '#ffffff',
+    },
+    dueDateContainer: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
+    datePickerButton: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#bdc3c7',
+        borderRadius: 4,
+        paddingHorizontal: 12,
+        justifyContent: 'center',
+        backgroundColor: '#ffffff',
+        marginRight: 8,
+    },
+    datePickerButtonText: {
+        color: '#34495e',
+        fontSize: 14,
+    },
+    clearDateButton: {
+        backgroundColor: '#95a5a6',
+        paddingHorizontal: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 4,
+    },
+    clearDateButtonText: {
+        color: '#ffffff',
+        fontWeight: '600',
     },
 });
 
