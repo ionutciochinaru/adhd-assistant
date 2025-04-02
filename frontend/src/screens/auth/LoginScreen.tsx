@@ -61,7 +61,7 @@ const LoginScreen = ({ navigation }: Props) => {
                         resizeMode="contain"
                     />
                     <Text style={styles.title}>ADHD Assistant</Text>
-                    <Text style={styles.subtitle}>Stay focused, get things done</Text>
+                    <Text style={styles.subtitle} numberOfLines={0}>Stay focused, get things done</Text>
                 </View>
 
                 <View style={styles.formContainer}>
@@ -131,10 +131,12 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         justifyContent: 'center',
         padding: 20,
+        minHeight: 500,
     },
     logoContainer: {
         alignItems: 'center',
         marginBottom: 40,
+        width: '100%',
     },
     logo: {
         width: 100,
@@ -150,6 +152,8 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 16,
         color: '#666',
+        textAlign: 'center',
+        marginHorizontal: 16,
     },
     formContainer: {
         width: '100%',
@@ -174,10 +178,13 @@ const styles = StyleSheet.create({
     forgotPasswordContainer: {
         alignSelf: 'flex-end',
         marginBottom: 24,
+        paddingVertical: 5,
+        paddingHorizontal: 5,
     },
     forgotPasswordText: {
         color: '#3498db',
         fontSize: 14,
+        textAlign: 'right',
     },
     loginButton: {
         backgroundColor: '#3498db',

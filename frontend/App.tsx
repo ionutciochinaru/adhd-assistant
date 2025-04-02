@@ -18,13 +18,13 @@ import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import TasksNavigator from './src/navigation/TasksNavigator';
 // Import regular screens
 import CalendarScreen from './src/screens/calendar/CalendarScreen';
-import MoodJournalScreen from './src/screens/journal/MoodJournalScreen';
 import MedicationsScreen from './src/screens/medications/MedicationsScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
 
 // Import context
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import MoodJournalScreen from "./src/screens/journal/MoodJournalDetailScreen";
 
 // Configure notification handlers
 Notifications.setNotificationHandler({
