@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 import ScreenLayout from '../../components/ScreenLayout';
+import BackButton from "../../components/BackButton";
 
 // Navigation types
 type TasksStackParamList = {
@@ -44,12 +45,36 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     const [useAI, setUseAI] = useState(false);
     const { scheduleTaskNotification } = useTaskNotifications();
 
+    const [errors, setErrors] = useState<{
+        title?: string;
+        subtasks?: string;
+    }>({});
+
     // Handle date change
     const onDateChange = (event: any, selectedDate?: Date) => {
         setShowDatePicker(Platform.OS === 'ios'); // Keep open on iOS, close on Android
         if (selectedDate) {
             setDueDate(selectedDate);
         }
+    };
+
+    const validateForm = (): boolean => {
+        const newErrors: {title?: string; subtasks?: string} = {};
+
+        // Validate title
+        if (title.trim() === '') {
+            newErrors.title = 'Task title is required';
+        } else if (title.length > 100) {
+            newErrors.title = 'Title must be less than 100 characters';
+        }
+
+        // Validate subtasks if needed
+        if (subtasks.length > 20) {
+            newErrors.subtasks = 'Maximum of 20 subtasks allowed';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
     // Add a new subtask
@@ -94,8 +119,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
     // Create the task
     const createTask = async () => {
-        if (title.trim() === '') {
-            Alert.alert('Error', 'Please enter a task title');
+        if (!validateForm()) {
             return;
         }
 
@@ -168,13 +192,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
             >
                 <ScrollView style={styles.container}>
                     <View style={styles.header}>
-                        <TouchableOpacity
-                            style={styles.cancelButton}
-                            onPress={() => navigation.goBack()}
-                            disabled={loading}
-                        >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
+                        <BackButton onPress={() => navigation.goBack()} label="Cancel" />
                         <Text style={styles.headerTitle}>New Task</Text>
                         <TouchableOpacity
                             style={styles.createButton}
@@ -192,12 +210,18 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                     <View style={styles.formContainer}>
                         <Text style={styles.label}>Title</Text>
                         <TextInput
-                            style={styles.titleInput}
+                            style={[styles.titleInput, errors.title && styles.inputError]}
                             placeholder="Enter task title"
                             value={title}
-                            onChangeText={setTitle}
+                            onChangeText={(text) => {
+                                setTitle(text);
+                                if (errors.title) {
+                                    setErrors({...errors, title: undefined});
+                                }
+                            }}
                             maxLength={100}
                         />
+                        {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
 
                         <Text style={styles.label}>Description (optional)</Text>
                         <TextInput
@@ -391,6 +415,15 @@ const styles = StyleSheet.create({
     },
     formContainer: {
         padding: 16,
+    },
+    inputError: {
+        borderColor: '#e74c3c',
+    },
+    errorText: {
+        color: '#e74c3c',
+        fontSize: 12,
+        marginTop: 4,
+        marginBottom: 8,
     },
     label: {
         fontSize: 16,

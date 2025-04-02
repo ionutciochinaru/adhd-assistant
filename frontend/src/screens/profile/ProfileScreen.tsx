@@ -17,6 +17,7 @@ import {useTaskNotifications} from '../../hooks/useTaskNotifications';
 import * as Notifications from 'expo-notifications';
 import {supabase} from '../../utils/supabase';
 import ScreenLayout from "../../components/ScreenLayout";
+import ActionButtons from "../../components/ActionButtons";
 
 const ProfileScreen = () => {
     const {user, signOut, updateUser} = useAuth();
@@ -256,25 +257,11 @@ const ProfileScreen = () => {
                                     onChangeText={setName}
                                     placeholder="Enter your name"
                                 />
-                                <View style={styles.editButtonsRow}>
-                                    <TouchableOpacity
-                                        style={[styles.editButton, styles.cancelButton]}
-                                        onPress={() => setIsEditing(false)}
-                                    >
-                                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.editButton, styles.saveButton]}
-                                        onPress={handleUpdateProfile}
-                                        disabled={loading}
-                                    >
-                                        {loading ? (
-                                            <ActivityIndicator size="small" color="#FFFFFF"/>
-                                        ) : (
-                                            <Text style={styles.saveButtonText}>Save</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
+                                <ActionButtons
+                                    onCancel={() => setIsEditing(false)}
+                                    onSave={handleUpdateProfile}
+                                    loading={loading}
+                                />
                             </View>
                         ) : (
                             <View style={styles.nameContainer}>

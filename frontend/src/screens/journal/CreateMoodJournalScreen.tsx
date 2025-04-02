@@ -17,6 +17,7 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import ScreenLayout from "../../components/ScreenLayout";
+import BackButton from "../../components/BackButton";
 
 // Navigation types
 type JournalStackParamList = {
@@ -217,13 +218,7 @@ const CreateMoodJournalScreen = ({ navigation }: Props) => {
         <ScreenLayout>
             <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => navigation.goBack()}
-                    disabled={loading}
-                >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
+                <BackButton onPress={() => navigation.goBack()} />
                 <Text style={styles.headerTitle}>New Journal Entry</Text>
                 <TouchableOpacity
                     style={styles.saveButton}

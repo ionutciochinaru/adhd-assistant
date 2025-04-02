@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { useAuth } from '../../context/AuthContext';
+import ActionButtons from "../../components/ActionButtons";
 
 // Define navigation param list type
 type AuthStackParamList = {
@@ -105,24 +106,14 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
                         />
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.resetButton}
-                        onPress={handleResetPassword}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.resetButtonText}>Send Reset Email</Text>
-                        )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.backToLoginContainer}
-                        onPress={() => navigation.navigate('Login')}
-                    >
-                        <Text style={styles.backToLoginText}>Back to Login</Text>
-                    </TouchableOpacity>
+                    <ActionButtons
+                        onCancel={() => navigation.navigate('Login')}
+                        onSave={handleResetPassword}
+                        cancelText="Back to Login"
+                        saveText="Send Reset Email"
+                        loading={loading}
+                        disabled={!email.trim()}
+                    />
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>

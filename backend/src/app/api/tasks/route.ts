@@ -2,6 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 
+const handleApiError = (error: any, message = 'Internal server error') => {
+    console.error('Tasks API error:', error);
+    return NextResponse.json(
+        { error: error.message || message },
+        { status: error.status || 500 }
+    );
+};
+
 // Helper to verify user session
 async function getUserFromRequest(request: NextRequest) {
     try {
@@ -31,8 +39,7 @@ async function getUserFromRequest(request: NextRequest) {
             return data.session.user;
         }
     } catch (error) {
-        console.error('Auth error:', error);
-        return null;
+        return handleApiError(error);
     }
 }
 
@@ -79,8 +86,7 @@ export async function GET(request: NextRequest) {
         console.log(`Found ${data?.length || 0} tasks`);
         return NextResponse.json({ tasks: data });
     } catch (error) {
-        console.error('Tasks API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return handleApiError(error);
     }
 }
 
@@ -159,8 +165,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ task: fullTask }, { status: 201 });
     } catch (error) {
-        console.error('Tasks API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return handleApiError(error);
     }
 }
 
@@ -221,8 +226,7 @@ export async function PUT(request: NextRequest) {
 
         return NextResponse.json({ task: updatedTask });
     } catch (error) {
-        console.error('Tasks API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return handleApiError(error);
     }
 }
 
@@ -265,7 +269,6 @@ export async function DELETE(request: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Tasks API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return handleApiError(error);
     }
 }

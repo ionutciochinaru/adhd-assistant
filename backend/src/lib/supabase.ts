@@ -1,27 +1,21 @@
-// backend/src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 
-// Get Supabase URL, anon key, and service role key from environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
     console.error('Missing Supabase environment variables. Please check your .env file:', {
-        url: !!supabaseUrl,
-        anonKey: !!supabaseAnonKey,
-        serviceKey: !!supabaseServiceRoleKey,
+        url: !!supabaseUrl ? 'OK' : 'MISSING',
+        anonKey: !!supabaseAnonKey ? 'OK' : 'MISSING',
+        serviceKey: !!supabaseServiceRoleKey ? 'OK' : 'MISSING',
     });
 
-    // In development, we can throw to fail fast
     if (process.env.NODE_ENV === 'development') {
         throw new Error('Missing required Supabase environment variables');
     }
 }
 
-// Create Supabase clients
-// Regular client with anonymous key for client-side operations
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     auth: {
         persistSession: true,
@@ -34,7 +28,6 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     },
 });
 
-// Admin client with service role key for server-side operations
 export const supabaseAdmin = createClient(supabaseUrl || '', supabaseServiceRoleKey || '', {
     auth: {
         persistSession: false,
@@ -47,7 +40,6 @@ export const supabaseAdmin = createClient(supabaseUrl || '', supabaseServiceRole
     },
 });
 
-// Reuse the same types defined in the frontend
 export type User = {
     id: string;
     email: string;

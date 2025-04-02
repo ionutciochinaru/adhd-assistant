@@ -128,11 +128,11 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                 <View style={styles.titleRow}>
                     <Text
                         style={[
-                            styles.title,
-                            task.status === 'completed' && styles.completedTitle,
-                            overdue && styles.overdueText
+                            styles.taskTitle,
+                            task.status === 'completed' && styles.completedTitle
                         ]}
-                        numberOfLines={1}
+                        numberOfLines={2}
+                        ellipsizeMode="tail"
                     >
                         {task.title}
                     </Text>
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#ffffff',
-        borderRadius: 12,  // More rounded corners for ADHD-friendly design
+        borderRadius: 12,
         marginHorizontal: 16,
         marginVertical: 8,
         padding: 16,
@@ -203,7 +203,14 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 3,
         elevation: 3,
-        borderLeftWidth: 0,  // Will be overridden by priority indicator
+        borderLeftWidth: 0,
+    },
+    taskTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2c3e50',
+        marginBottom: 4,
+        lineHeight: 22,
     },
     completedContainer: {
         backgroundColor: '#f8f9fa',
@@ -220,9 +227,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff8e1',
     },
     checkbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         borderWidth: 2,
         borderColor: '#3498db',
         marginRight: 12,

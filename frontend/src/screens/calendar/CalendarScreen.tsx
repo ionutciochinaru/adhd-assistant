@@ -15,6 +15,7 @@ import {supabase} from '../../utils/supabase';
 import {useAuth} from '../../context/AuthContext';
 import {Task} from '../../utils/supabase';
 import ScreenLayout from "../../components/ScreenLayout";
+import { normalizeDate, formatDate } from '../../utils/dateUtils';
 
 type MarkedDates = {
     [date: string]: {
@@ -101,40 +102,12 @@ const CalendarScreen = () => {
     // Handle date selection
     const onDateSelect = (date: DateData) => {
         const dateStr = date.dateString;
-
-        // Update the selected date
         setSelectedDate(dateStr);
 
-        // Update marked dates
-        const updatedMarkedDates = {...markedDates};
-
-        // Remove selection from previous date
-        Object.keys(updatedMarkedDates).forEach(key => {
-            if (updatedMarkedDates[key].selected) {
-                updatedMarkedDates[key].selected = false;
-                updatedMarkedDates[key].selectedColor = undefined;
-            }
-        });
-
-        // Add selection to new date
-        if (updatedMarkedDates[dateStr]) {
-            updatedMarkedDates[dateStr].selected = true;
-            updatedMarkedDates[dateStr].selectedColor = '#E1F0FE';
-        } else {
-            updatedMarkedDates[dateStr] = {
-                marked: false,
-                dotColor: '#3498db',
-                selected: true,
-                selectedColor: '#E1F0FE',
-            };
-        }
-
-        setMarkedDates(updatedMarkedDates);
-
-        // Filter tasks for the selected date
+        // Update UI with the filtered tasks for this date
         const filteredTasks = tasks.filter(task => {
             if (!task.due_date) return false;
-            return task.due_date.split('T')[0] === dateStr;
+            return normalizeDate(task.due_date) === dateStr;
         });
 
         setTasks(filteredTasks);

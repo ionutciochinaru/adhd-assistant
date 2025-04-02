@@ -19,6 +19,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Task, Subtask } from '../../utils/supabase';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
+import BackButton from "../../components/BackButton";
+import ActionButtons from "../../components/ActionButtons";
 
 // Navigation types
 type TasksStackParamList = {
@@ -246,10 +248,12 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
 
             if (error) throw error;
 
-            // Update state
-            setSubtasks([...subtasks, data]);
-            setNewSubtask('');
-        } catch (error: any) {
+            // Update state with the new data from the API
+            if (data) {
+                setSubtasks(prevSubtasks => [...prevSubtasks, data]);
+                setNewSubtask('');
+            }
+        } catch (error) {
             console.error('Error adding subtask:', error.message);
             Alert.alert('Error', 'Failed to add subtask');
         } finally {
@@ -394,41 +398,21 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
         <SafeAreaView style={styles.safeArea} edges={['top']}>
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                        disabled={updating}
-                    >
-                        <Text style={styles.backButtonText}>Back</Text>
-                    </TouchableOpacity>
+                    <BackButton onPress={() => navigation.goBack()} />
 
                     {isEditing ? (
-                        <View style={styles.editButtonsContainer}>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setEditedTitle(task.title);
-                                    setEditedDescription(task.description || '');
-                                    setEditedPriority(task.priority);
-                                    setEditedDueDate(task.due_date ? new Date(task.due_date) : null);
-                                    setIsEditing(false);
-                                }}
-                                disabled={updating}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.saveButton}
-                                onPress={saveEditedTask}
-                                disabled={updating || editedTitle.trim() === ''}
-                            >
-                                {updating ? (
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                    <Text style={styles.saveButtonText}>Save</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
+                        <ActionButtons
+                            onCancel={() => {
+                                setEditedTitle(task.title);
+                                setEditedDescription(task.description || '');
+                                setEditedPriority(task.priority);
+                                setEditedDueDate(task.due_date ? new Date(task.due_date) : null);
+                                setIsEditing(false);
+                            }}
+                            onSave={saveEditedTask}
+                            loading={updating}
+                            disabled={editedTitle.trim() === ''}
+                        />
                     ) : (
                         <View style={styles.actionsContainer}>
                             <TouchableOpacity

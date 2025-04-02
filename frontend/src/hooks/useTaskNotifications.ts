@@ -1,6 +1,6 @@
 // frontend/src/hooks/useTaskNotifications.ts
 import * as Notifications from 'expo-notifications';
-import { useEffect, useState } from 'react';
+import {useEffect, useRef, useState} from 'react';
 import { Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
@@ -10,8 +10,14 @@ import * as NotificationService from '../services/NotificationService';
 export function useTaskNotifications() {
     const { user } = useAuth();
     const [notificationMap, setNotificationMap] = useState<Record<string, string>>({});
+    const isMounted = useRef(true);
 
-    // Initialize notifications when user logs in
+    useEffect(() => {
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
     useEffect(() => {
         if (user) {
             loadNotificationSettings();
@@ -34,8 +40,6 @@ export function useTaskNotifications() {
             // Load the mapping between task IDs and notification IDs
             const storedMap = userData?.notification_preferences?.taskNotifications || {};
             setNotificationMap(storedMap);
-
-            console.log('Loaded notification settings', storedMap);
         } catch (error) {
             console.error('Error loading notification settings:', error);
         }
@@ -58,7 +62,9 @@ export function useTaskNotifications() {
 
             if (error) throw error;
 
-            setNotificationMap(updatedMap);
+            if (isMounted.current) {
+                setNotificationMap(updatedMap);
+            }
         } catch (error) {
             console.error('Error saving notification map:', error);
         }

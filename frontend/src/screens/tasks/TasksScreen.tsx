@@ -27,6 +27,7 @@ const TasksScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+    const [error, setError] = useState<string | null>(null);
 
     // Refresh tasks every time the screen comes into focus
     useFocusEffect(
@@ -76,6 +77,7 @@ const TasksScreen = () => {
 
         try {
             setRefreshing(true);
+            setError(null);
 
             // Query tasks with subtask counts
             const { data, error } = await supabase
@@ -106,7 +108,7 @@ const TasksScreen = () => {
             applyFilter(filter, tasksWithCounts);
         } catch (error: any) {
             console.error('Error fetching tasks:', error.message);
-            Alert.alert('Error', 'Failed to load tasks');
+            setError('Failed to load tasks. Pull down to retry.');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -138,35 +140,40 @@ const TasksScreen = () => {
     const toggleTaskCompletion = async (task: Task) => {
         try {
             const newStatus = task.status === 'active' ? 'completed' : 'active';
+            const newCompletedAt = newStatus === 'completed' ? new Date().toISOString() : null;
 
-            // Optimistic update
-            const updatedTasks = tasks.map(t =>
-                t.id === task.id
-                    ? {
-                        ...t,
-                        status: newStatus,
-                        completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-                    }
-                    : t
+            // Optimistic update - use functional updates for atomic changes
+            setTasks(prevTasks =>
+                prevTasks.map(t =>
+                    t.id === task.id
+                        ? {...t, status: newStatus, completed_at: newCompletedAt}
+                        : t
+                )
             );
 
-            setTasks(updatedTasks);
-            applyFilter(filter, updatedTasks);
+            // Apply filter with the updated tasks array
+            setFilteredTasks(prevFiltered =>
+                prevFiltered.map(t =>
+                    t.id === task.id
+                        ? {...t, status: newStatus, completed_at: newCompletedAt}
+                        : t
+                )
+            );
 
             // Update in database
             const { error } = await supabase
                 .from('tasks')
                 .update({
                     status: newStatus,
-                    completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+                    completed_at: newCompletedAt,
                 })
                 .eq('id', task.id);
 
             if (error) throw error;
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error updating task status:', error.message);
             Alert.alert('Error', 'Failed to update task status');
-            // Revert optimistic update
+            // Revert optimistic update by re-fetching
             fetchTasks();
         }
     };
@@ -191,6 +198,17 @@ const TasksScreen = () => {
 
     return (
         <ScreenLayout>
+            {error && !loading && (
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                    <TouchableOpacity
+                        style={styles.retryButton}
+                        onPress={fetchTasks}
+                    >
+                        <Text style={styles.retryButtonText}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
             <View style={styles.container}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Tasks</Text>
@@ -201,7 +219,6 @@ const TasksScreen = () => {
                         <Ionicons name="add" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
                 </View>
-
                 <View style={styles.filterContainer}>
                     <TouchableOpacity
                         style={[
@@ -219,7 +236,6 @@ const TasksScreen = () => {
                             All
                         </Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity
                         style={[
                             styles.filterButton,
@@ -236,7 +252,6 @@ const TasksScreen = () => {
                             Active
                         </Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity
                         style={[
                             styles.filterButton,
@@ -254,7 +269,6 @@ const TasksScreen = () => {
                         </Text>
                     </TouchableOpacity>
                 </View>
-
                 {loading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color="#3498db" />
@@ -298,6 +312,28 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: '#E5E5E5',
+    },
+    errorContainer: {
+        padding: 16,
+        backgroundColor: '#ffebee',
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    errorText: {
+        color: '#e74c3c',
+        marginBottom: 8,
+    },
+    retryButton: {
+        backgroundColor: '#e74c3c',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 4,
+    },
+    retryButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
     },
     title: {
         fontSize: 22,
@@ -343,6 +379,7 @@ const styles = StyleSheet.create({
     },
     emptyList: {
         flexGrow: 1,
+        justifyContent: 'center',
     },
     loadingContainer: {
         flex: 1,
