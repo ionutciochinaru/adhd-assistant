@@ -61,7 +61,7 @@ const LoginScreen = ({ navigation }: Props) => {
                         resizeMode="contain"
                     />
                     <Text style={styles.title}>ADHD Assistant</Text>
-                    <Text style={styles.subtitle} numberOfLines={0}>Stay focused, get things done</Text>
+                    <Text textBreakStrategy={"simple"} style={styles.subtitle} >Stay focused, get things done</Text>
                 </View>
 
                 <View style={styles.formContainer}>
@@ -91,12 +91,15 @@ const LoginScreen = ({ navigation }: Props) => {
                         />
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.forgotPasswordContainer}
-                        onPress={() => navigation.navigate('ForgotPassword')}
-                    >
-                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-                    </TouchableOpacity>
+
+                    <View style={styles.signupContainer}>
+                        <TouchableOpacity
+                            style={styles.forgotPasswordContainer}
+                            onPress={() => navigation.navigate('ForgotPassword')}
+                        >
+                            <Text textBreakStrategy={"simple"}  style={styles.forgotPasswordText}>Forgot Password?</Text>
+                        </TouchableOpacity>
+                    </View>
 
                     <TouchableOpacity
                         style={styles.loginButton}
@@ -154,6 +157,7 @@ const styles = StyleSheet.create({
         color: '#666',
         textAlign: 'center',
         marginHorizontal: 16,
+        maxWidth: '100%'
     },
     formContainer: {
         width: '100%',
@@ -184,7 +188,10 @@ const styles = StyleSheet.create({
     forgotPasswordText: {
         color: '#3498db',
         fontSize: 14,
-        textAlign: 'right',
+        alignSelf: 'stretch',
+        textAlign: 'center',
+        paddingVertical: 5,
+        paddingHorizontal: 5,
     },
     loginButton: {
         backgroundColor: '#3498db',

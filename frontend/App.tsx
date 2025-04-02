@@ -1,5 +1,5 @@
 // frontend/App.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Text, ActivityIndicator, Platform, LogBox, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from './src/services/NotificationService';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 
 // Import screens
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -25,6 +27,8 @@ import ProfileScreen from './src/screens/profile/ProfileScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import MoodJournalScreen from "./src/screens/journal/MoodJournalDetailScreen";
+
+SplashScreen.preventAutoHideAsync();
 
 // Configure notification handlers
 Notifications.setNotificationHandler({
@@ -147,6 +151,12 @@ LogBox.ignoreLogs([
 
 // Main App component with providers
 export default function App() {
+    const [fontsLoaded] = useFonts({
+        'Roboto': require('./assets/fonts/Roboto-VariableFont_wght.ttf'),
+        'Roboto-Italic': require('./assets/fonts/Roboto-Italic-VariableFont_wght.ttf'),
+    });
+
+    // Both useEffect hooks must be called in the same order every render
     useEffect(() => {
         const setupNotifications = async () => {
             try {
@@ -159,10 +169,21 @@ export default function App() {
         setupNotifications();
     }, []);
 
+    const onLayoutRootView = useCallback(async () => {
+        if (fontsLoaded) {
+            await SplashScreen.hideAsync();
+        }
+    }, [fontsLoaded]);
+
+    // Early return but after all hooks are called
+    if (!fontsLoaded) {
+        return null;
+    }
+
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
             <SafeAreaProvider>
-                {/* Configure the status bar properly for both iOS and Android */}
+                {/* Your existing components */}
                 <StatusBar
                     style="dark"
                     backgroundColor="transparent"

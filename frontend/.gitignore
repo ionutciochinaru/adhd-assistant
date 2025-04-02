@@ -36,7 +36,6 @@ frontend/.env.production.local
 
 # Build artifacts
 frontend/build/
-frontend/web-build/
 
 # TypeScript
 frontend/*.tsbuildinfo
