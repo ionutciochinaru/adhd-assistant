@@ -127,19 +127,6 @@ const CreateTaskScreen = ({ navigation }: Props) => {
         );
     };
 
-    // Render selected date and time
-    const renderSelectedDateTime = () => {
-        if (!hasDueDate) return null;
-
-        return (
-            <View style={styles.selectedDateTimeContainer}>
-                <Text style={styles.selectedDateTimeText}>
-                    {dueDate.toLocaleString()}
-                </Text>
-            </View>
-        );
-    };
-
     // Add a new subtask
     const addSubtask = () => {
         if (newSubtask.trim() === '') return;
@@ -350,16 +337,13 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
                         {hasDueDate && (
                             <>
-                                {renderSelectedDateTime()}
-
                                 <TouchableOpacity
-                                    style={styles.dateButton}
-                                    onPress={() => {
-                                        if (Platform.OS === 'ios') return; // For iOS, pickers are always visible
-                                        setShowDatePicker(true);
-                                    }}
+                                    onPress={() => setShowDatePicker(true)}
+                                    style={styles.selectedDateTimeContainer}
                                 >
-                                    <Text style={styles.dateButtonText}>Change Date and Time</Text>
+                                    <Text style={styles.selectedDateTimeText}>
+                                        {dueDate.toLocaleString()}
+                                    </Text>
                                 </TouchableOpacity>
 
                                 {renderDateTimePickers()}
