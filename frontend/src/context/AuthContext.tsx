@@ -1,5 +1,5 @@
 // frontend/src/context/AuthContext.tsx
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { Alert } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
@@ -38,24 +38,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Keep track of mounted state to prevent state updates after unmount
+    const isMounted = useRef(true);
+
     // Handle session persistence
     useEffect(() => {
         // Better session initialization
         const initializeAuth = async () => {
             try {
+                if (!isMounted.current) return;
+
                 setLoading(true);
                 console.log('Initializing auth state...');
 
                 // Get existing session
-                const { data: { session } } = await supabase.auth.getSession();
+                const { data: { session }, error } = await supabase.auth.getSession();
+
+                if (error) {
+                    console.error('Error getting session:', error.message);
+                    return;
+                }
+
                 console.log('Initial session:', session ? 'Found' : 'None');
 
-                setSession(session);
-                setUser(session?.user ?? null);
+                if (isMounted.current) {
+                    setSession(session);
+                    setUser(session?.user ?? null);
+                }
             } catch (error) {
                 console.error('Auth initialization error:', error);
             } finally {
-                setLoading(false);
+                if (isMounted.current) {
+                    setLoading(false);
+                }
             }
         };
 
@@ -63,15 +78,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Set up auth state change listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (event, session) => {
+            (event, currentSession) => {
                 console.log('Auth state changed:', event);
-                setSession(session);
-                setUser(session?.user ?? null);
+
+                if (isMounted.current) {
+                    setSession(currentSession);
+                    setUser(currentSession?.user ?? null);
+                }
             }
         );
 
-        // Clean up the subscription
+        // Clean up the subscription and set mounted state to false
         return () => {
+            isMounted.current = false;
             subscription.unsubscribe();
         };
     }, []);
@@ -94,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return {};
         } catch (error: any) {
             console.error('Error signing in:', error.message);
-            return { error: error.message };
+            return { error: error.message || 'An unknown error occurred during sign in' };
         }
     };
 
@@ -119,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return {};
         } catch (error: any) {
             console.error('Error signing up:', error.message);
-            return { error: error.message };
+            return { error: error.message || 'An unknown error occurred during sign up' };
         }
     };
 
@@ -127,11 +146,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const signOut = async () => {
         try {
             console.log('Signing out...');
+
+            // For better UX, immediately clear user state on signOut action
+            // This makes logout feel more responsive even if API call is slow
+            if (isMounted.current) {
+                setUser(null);
+                setSession(null);
+            }
+
             await supabase.auth.signOut();
             console.log('Sign out successful');
         } catch (error: any) {
             console.error('Error signing out:', error.message);
-            Alert.alert('Error', 'There was a problem signing out.');
+            Alert.alert('Error', 'There was a problem signing out. Please try again.');
+
+            // If we've already optimistically cleared the user state, we need to re-check session
+            if (isMounted.current) {
+                const { data: { session } } = await supabase.auth.getSession();
+                setSession(session);
+                setUser(session?.user ?? null);
+            }
         }
     };
 
@@ -139,13 +173,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const resetPassword = async (email: string) => {
         try {
             console.log('Requesting password reset for:', email);
-            const { error } = await supabase.auth.resetPasswordForEmail(email);
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: 'com.yourcompany.adhdassistant://reset-password',
+            });
+
             if (error) throw error;
+
             console.log('Password reset email sent');
             return {};
         } catch (error: any) {
             console.error('Error resetting password:', error.message);
-            return { error: error.message };
+            return { error: error.message || 'Failed to send password reset email' };
         }
     };
 
@@ -160,14 +198,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const { error } = await supabase
                 .from('users')
                 .update(updates)
-                .eq('id', user?.id);
+                .eq('id', user?.id)
+                .single();
 
             if (error) throw error;
+
             console.log('User profile updated successfully');
             return {};
         } catch (error: any) {
             console.error('Error updating user:', error.message);
-            return { error: error.message };
+            return { error: error.message || 'Failed to update user profile' };
         }
     };
 

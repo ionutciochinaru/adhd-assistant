@@ -1,12 +1,41 @@
 // frontend/src/utils/supabase.ts
 import { createClient } from '@supabase/supabase-js';
+import { Alert } from 'react-native';
 
 // Get Supabase URL and anon key from environment variables
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing Supabase environment variables');
+
+    // Only show alert in development to avoid crashing in production
+    if (__DEV__) {
+        Alert.alert(
+            'Configuration Error',
+            'Missing Supabase environment variables. Please check your .env file.'
+        );
+    }
+}
 
 // Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(
+    supabaseUrl || '',
+    supabaseAnonKey || '',
+    {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: false,
+        },
+        global: {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        },
+    }
+);
 
 // Database types based on your schema
 export type User = {
@@ -28,6 +57,9 @@ export type Task = {
     due_date: string | null;
     created_at: string;
     completed_at: string | null;
+    subtasks?: any[]; // Added for better typing with joined queries
+    subtasks_count?: number; // Added for count aggregation
+    subtasks_completed?: number; // Added for completed count
 };
 
 export type Subtask = {
