@@ -21,7 +21,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 import BackButton from "../../components/BackButton";
 import ActionButtons from "../../components/ActionButtons";
-
+import * as Notifications from 'expo-notifications';
 // Navigation types
 type TasksStackParamList = {
     TasksList: undefined;
@@ -315,8 +315,28 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                 ...updates
             });
 
-            // Handle notification updates if due date changed
-            if (task.due_date !== (editedDueDate ? editedDueDate.toISOString() : null)) {
+            // Only schedule a new notification if the due date has changed and is in the future
+            const oldDueDate = task.due_date ? new Date(task.due_date) : null;
+            const newDueDate = editedDueDate;
+            const hasDateChanged = (
+                (oldDueDate === null && newDueDate !== null) ||
+                (oldDueDate !== null && newDueDate === null) ||
+                (oldDueDate !== null && newDueDate !== null &&
+                    oldDueDate.getTime() !== newDueDate.getTime())
+            );
+
+            if (hasDateChanged && newDueDate && newDueDate > new Date()) {
+                // First, cancel any existing notifications for this task
+                const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+                const existingNotifications = scheduledNotifications.filter(
+                    notification => notification.content.data?.taskId === task.id
+                );
+
+                for (const notif of existingNotifications) {
+                    await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+                }
+
+                // Then schedule a new notification
                 await scheduleTaskNotification({
                     ...task,
                     ...updates

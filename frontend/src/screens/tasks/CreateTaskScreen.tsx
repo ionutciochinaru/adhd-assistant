@@ -39,6 +39,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     const [hasDueDate, setHasDueDate] = useState(false);
     const [dueDate, setDueDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
     const [subtasks, setSubtasks] = useState<string[]>([]);
     const [newSubtask, setNewSubtask] = useState('');
     const [loading, setLoading] = useState(false);
@@ -52,9 +53,31 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
     // Handle date change
     const onDateChange = (event: any, selectedDate?: Date) => {
-        setShowDatePicker(Platform.OS === 'ios'); // Keep open on iOS, close on Android
-        if (selectedDate) {
-            setDueDate(selectedDate);
+        const currentDate = selectedDate || dueDate;
+
+        // On iOS, the date picker will be dismissed automatically
+        if (Platform.OS === 'android') {
+            setShowDatePicker(false);
+            // Immediately show time picker on Android
+            setShowTimePicker(true);
+        }
+
+        setDueDate(currentDate);
+    };
+
+    // Handle time change
+    const onTimeChange = (event: any, selectedTime?: Date) => {
+        // Close time picker
+        if (Platform.OS === 'android') {
+            setShowTimePicker(false);
+        }
+
+        if (selectedTime) {
+            // Combine the selected date with the selected time
+            const newDateTime = new Date(dueDate);
+            newDateTime.setHours(selectedTime.getHours());
+            newDateTime.setMinutes(selectedTime.getMinutes());
+            setDueDate(newDateTime);
         }
     };
 
@@ -75,6 +98,46 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
+    };
+
+    // Render date and time pickers
+    const renderDateTimePickers = () => {
+        if (!hasDueDate) return null;
+
+        return (
+            <View>
+                {(showDatePicker || Platform.OS === 'ios') && (
+                    <DateTimePicker
+                        value={dueDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={onDateChange}
+                        minimumDate={new Date()}
+                    />
+                )}
+                {(showTimePicker || Platform.OS === 'ios') && (
+                    <DateTimePicker
+                        value={dueDate}
+                        mode="time"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={onTimeChange}
+                    />
+                )}
+            </View>
+        );
+    };
+
+    // Render selected date and time
+    const renderSelectedDateTime = () => {
+        if (!hasDueDate) return null;
+
+        return (
+            <View style={styles.selectedDateTimeContainer}>
+                <Text style={styles.selectedDateTimeText}>
+                    {dueDate.toLocaleString()}
+                </Text>
+            </View>
+        );
     };
 
     // Add a new subtask
@@ -169,7 +232,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                 console.log('Subtasks added successfully');
             }
 
-            // Return to the task list
+            // Schedule notification if due date is set
             if (task?.id && hasDueDate) {
                 console.log('Scheduling notification for new task:', task.id);
                 await scheduleTaskNotification(task);
@@ -271,33 +334,36 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                             <Text style={styles.label}>Due Date</Text>
                             <Switch
                                 value={hasDueDate}
-                                onValueChange={setHasDueDate}
+                                onValueChange={(value) => {
+                                    setHasDueDate(value);
+                                    if (value) {
+                                        // Set to next hour when enabling
+                                        const nextHour = new Date();
+                                        nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+                                        setDueDate(nextHour);
+                                    }
+                                }}
                                 trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
                                 thumbColor={hasDueDate ? '#3498db' : '#F4F4F4'}
                             />
                         </View>
 
                         {hasDueDate && (
-                            <View style={styles.datePickerContainer}>
+                            <>
+                                {renderSelectedDateTime()}
+
                                 <TouchableOpacity
                                     style={styles.dateButton}
-                                    onPress={() => setShowDatePicker(true)}
+                                    onPress={() => {
+                                        if (Platform.OS === 'ios') return; // For iOS, pickers are always visible
+                                        setShowDatePicker(true);
+                                    }}
                                 >
-                                    <Text style={styles.dateButtonText}>
-                                        {dueDate.toLocaleDateString()}
-                                    </Text>
+                                    <Text style={styles.dateButtonText}>Change Date and Time</Text>
                                 </TouchableOpacity>
 
-                                {showDatePicker && (
-                                    <DateTimePicker
-                                        value={dueDate}
-                                        mode="date"
-                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                        onChange={onDateChange}
-                                        minimumDate={new Date()}
-                                    />
-                                )}
-                            </View>
+                                {renderDateTimePickers()}
+                            </>
                         )}
 
                         <View style={styles.aiBreakdownContainer}>
@@ -388,6 +454,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
+    },
+    selectedDateTimeContainer: {
+        backgroundColor: '#FFFFFF',
+        padding: 12,
+        borderRadius: 8,
+        marginVertical: 10,
+        alignItems: 'center',
+    },
+    selectedDateTimeText: {
+        fontSize: 16,
+        color: '#2c3e50',
     },
     headerTitle: {
         fontSize: 18,

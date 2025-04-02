@@ -166,10 +166,14 @@ export async function scheduleTaskReminder(task: Task) {
         // Cancel any existing notifications for this task first to avoid duplicates
         const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
 
-        for (const notification of scheduledNotifications) {
-            if (notification.content.data?.taskId === task.id) {
-                await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-            }
+        const existingTaskNotifications = scheduledNotifications.filter(
+            notification =>
+                notification.content.data?.taskId === task.id &&
+                notification.content.data?.type === 'task-reminder'
+        );
+
+        for (const notification of existingTaskNotifications) {
+            await Notifications.cancelScheduledNotificationAsync(notification.identifier);
         }
 
         // Calculate notification time (1 hour before due date)
@@ -182,12 +186,27 @@ export async function scheduleTaskReminder(task: Task) {
             return null;
         }
 
+        // Prevent scheduling multiple notifications for the same task
+        const scheduledForThisTask = scheduledNotifications.some(
+            notification =>
+                notification.content.data?.taskId === task.id &&
+                notification.content.data?.type === 'task-reminder'
+        );
+
+        if (scheduledForThisTask) {
+            console.log(`Notification already scheduled for task "${task.title}"`);
+            return null;
+        }
+
         // Schedule notification with appropriate channel for Android
         const notificationId = await Notifications.scheduleNotificationAsync({
             content: {
                 title: 'Task Reminder',
                 body: `"${task.title}" is due in 1 hour`,
-                data: { taskId: task.id, type: 'task-reminder' },
+                data: {
+                    taskId: task.id,
+                    type: 'task-reminder'
+                },
                 sound: true,
                 priority: Notifications.AndroidNotificationPriority.HIGH,
                 ...(Platform.OS === 'android' ? { channelId: 'task-reminders' } : {}),
