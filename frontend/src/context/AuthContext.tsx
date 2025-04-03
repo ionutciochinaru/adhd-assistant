@@ -217,13 +217,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setSession(null);
             }
 
-            // Remove session from SecureStore
-            await SecureStore.deleteItemAsync('supabase_session');
+            // Note: DON'T delete email/password from SecureStore if rememberMe is true
+            // First check if rememberMe is enabled
+            const savedRememberMe = await SecureStore.getItemAsync('rememberMe');
 
-            // Also try to clear saved credentials if they exist
-            await SecureStore.deleteItemAsync('email');
-            await SecureStore.deleteItemAsync('password');
-            await SecureStore.setItemAsync('rememberMe', 'false');
+            if (savedRememberMe !== 'true') {
+                // Only clear saved credentials if remember me is disabled
+                await SecureStore.deleteItemAsync('email');
+                await SecureStore.deleteItemAsync('password');
+                await SecureStore.setItemAsync('rememberMe', 'false');
+                console.log('Cleared saved credentials during logout');
+            } else {
+                console.log('Kept saved credentials due to Remember Me setting');
+            }
 
             // Call supabase signOut
             await supabase.auth.signOut();
