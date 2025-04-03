@@ -1,15 +1,14 @@
 // frontend/App.tsx
-import React, { useEffect, useCallback } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { View, Text, ActivityIndicator, Platform, LogBox, StyleSheet } from 'react-native';
+import React, {useEffect, useCallback} from 'react';
+import {NavigationContainer} from '@react-navigation/native';
+import {createStackNavigator} from '@react-navigation/stack';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {Ionicons} from '@expo/vector-icons';
+import {View, Text, ActivityIndicator, Platform, LogBox, StyleSheet} from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { registerForPushNotificationsAsync } from './src/services/NotificationService';
-import { useFonts } from 'expo-font';
+import {registerForPushNotificationsAsync} from './src/services/NotificationService';
+import {useFonts} from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 
 // Import screens
@@ -24,10 +23,11 @@ import MedicationsScreen from './src/screens/medications/MedicationsScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
 
 // Import context
-import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {AuthProvider, useAuth} from './src/context/AuthContext';
+import {GestureHandlerRootView} from "react-native-gesture-handler";
 import MoodJournalScreen from "./src/screens/journal/MoodJournalDetailScreen";
-import { patchTextComponent, patchTextRender } from './src/utils/patches';
+import {patchTextComponent, patchTextRender} from './src/utils/patches';
+import StatusBarManager from './src/components/StatusBarManager';
 
 try {
     patchTextComponent();
@@ -75,10 +75,10 @@ const RootStack = createStackNavigator<RootStackParamList>();
 // Auth Navigator
 const AuthNavigator = () => {
     return (
-        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-            <AuthStack.Screen name="Login" component={LoginScreen} />
-            <AuthStack.Screen name="Signup" component={SignupScreen} />
-            <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <AuthStack.Navigator screenOptions={{headerShown: false}}>
+            <AuthStack.Screen name="Login" component={LoginScreen}/>
+            <AuthStack.Screen name="Signup" component={SignupScreen}/>
+            <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen}/>
         </AuthStack.Navigator>
     );
 };
@@ -87,8 +87,8 @@ const AuthNavigator = () => {
 const MainNavigator = () => {
     return (
         <MainTab.Navigator
-            screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
+            screenOptions={({route}) => ({
+                tabBarIcon: ({focused, color, size}) => {
                     let iconName: keyof typeof Ionicons.glyphMap;
 
                     if (route.name === 'Tasks') {
@@ -105,7 +105,7 @@ const MainNavigator = () => {
                         iconName = 'help-circle-outline';
                     }
 
-                    return <Ionicons name={iconName} size={size} color={color} />;
+                    return <Ionicons name={iconName} size={size} color={color}/>;
                 },
                 tabBarActiveTintColor: '#3498db',
                 tabBarInactiveTintColor: 'gray',
@@ -118,35 +118,35 @@ const MainNavigator = () => {
                 }
             })}
         >
-            <MainTab.Screen name="Tasks" component={TasksNavigator} />
-            <MainTab.Screen name="Calendar" component={CalendarScreen} />
-            <MainTab.Screen name="MoodJournal" component={MoodJournalScreen} />
-            <MainTab.Screen name="Medications" component={MedicationsScreen} />
-            <MainTab.Screen name="Profile" component={ProfileScreen} />
+            <MainTab.Screen name="Tasks" component={TasksNavigator}/>
+            <MainTab.Screen name="Calendar" component={CalendarScreen}/>
+            <MainTab.Screen name="MoodJournal" component={MoodJournalScreen}/>
+            <MainTab.Screen name="Medications" component={MedicationsScreen}/>
+            <MainTab.Screen name="Profile" component={ProfileScreen}/>
         </MainTab.Navigator>
     );
 };
 
 // Root Navigator with auth state
 const RootNavigator = () => {
-    const { user, loading } = useAuth();
+    const {user, loading} = useAuth();
 
     // Show loading screen while checking auth state
     if (loading) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F9FC' }}>
-                <ActivityIndicator size="large" color="#3498db" />
-                <Text style={{ marginTop: 16, fontSize: 16, color: '#666' }}>Loading...</Text>
+            <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F9FC'}}>
+                <ActivityIndicator size="large" color="#3498db"/>
+                <Text style={{marginTop: 16, fontSize: 16, color: '#666'}}>Loading...</Text>
             </View>
         );
     }
 
     return (
-        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        <RootStack.Navigator screenOptions={{headerShown: false}}>
             {user ? (
-                <RootStack.Screen name="Main" component={MainNavigator} />
+                <RootStack.Screen name="Main" component={MainNavigator}/>
             ) : (
-                <RootStack.Screen name="Auth" component={AuthNavigator} />
+                <RootStack.Screen name="Auth" component={AuthNavigator}/>
             )}
         </RootStack.Navigator>
     );
@@ -189,17 +189,11 @@ export default function App() {
     }
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
+        <GestureHandlerRootView style={{flex: 1}} onLayout={onLayoutRootView}>
             <SafeAreaProvider>
-                {/* Your existing components */}
-                <StatusBar
-                    style="dark"
-                    backgroundColor="transparent"
-                    translucent={true}
-                />
                 <AuthProvider>
                     <NavigationContainer>
-                        <RootNavigator />
+                        <RootNavigator/>
                     </NavigationContainer>
                 </AuthProvider>
             </SafeAreaProvider>

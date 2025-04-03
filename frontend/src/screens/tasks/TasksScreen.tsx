@@ -7,8 +7,6 @@ import {
     TouchableOpacity,
     FlatList,
     ActivityIndicator,
-    Platform,
-    StatusBar,
     Alert
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';

@@ -1,14 +1,14 @@
 // src/components/ScreenLayout.tsx
 import React from 'react';
-import { View, StyleSheet, Platform, StatusBar, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, Typography } from '../utils/styles';
-import { Ionicons } from '@expo/vector-icons';
+import StatusBarManager from './StatusBarManager';
 
 type ScreenLayoutProps = {
     children: React.ReactNode;
     backgroundColor?: string;
-    edges?: Array<'top' | 'right' | 'bottom' | 'left'>;
+    edges?: Array<'left' | 'right' | 'bottom'>;
     title?: string;
     leftComponent?: React.ReactNode;
     rightComponent?: React.ReactNode;
@@ -18,37 +18,32 @@ type ScreenLayoutProps = {
 const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                                                        children,
                                                        backgroundColor = COLORS.light,
-                                                       edges = ['top', 'left', 'right'],
+                                                       edges = ['left', 'right'],
                                                        title,
                                                        leftComponent,
                                                        rightComponent,
                                                        showHeader = true
                                                    }) => {
-    const statusBarHeight = StatusBar.currentHeight || 0;
-
     return (
-        <SafeAreaView
-            style={[styles.container, { backgroundColor }]}
-            edges={edges}
-        >
-            {/* Additional padding for status bar on Android when translucent */}
-            {Platform.OS === 'android' && StatusBar.currentHeight ? (
-                <View style={{ height: statusBarHeight }} />
-            ) : null}
-
-            {showHeader && (
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        {leftComponent}
+        <StatusBarManager backgroundColor={showHeader ? COLORS.white : backgroundColor}>
+            <SafeAreaView
+                style={[styles.container, { backgroundColor }]}
+                edges={edges}
+            >
+                {showHeader && (
+                    <View style={styles.header}>
+                        <View style={styles.headerLeft}>
+                            {leftComponent}
+                        </View>
+                        {title && <Text style={styles.headerTitle}>{title}</Text>}
+                        <View style={styles.headerRight}>
+                            {rightComponent}
+                        </View>
                     </View>
-                    {title && <Text style={styles.headerTitle}>{title}</Text>}
-                    <View style={styles.headerRight}>
-                        {rightComponent}
-                    </View>
-                </View>
-            )}
-            {children}
-        </SafeAreaView>
+                )}
+                {children}
+            </SafeAreaView>
+        </StatusBarManager>
     );
 };
 
@@ -63,18 +58,22 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.md,
         backgroundColor: COLORS.white,
-        borderBottomWidth: 1,
+        borderBottomWidth: 0,
         borderBottomColor: COLORS.border,
     },
     headerLeft: {
+        minWidth: 40,
         alignItems: 'flex-start',
     },
     headerTitle: {
         ...Typography.label,
         flex: 1,
         textAlign: 'center',
+        fontSize: 18,
+        fontWeight: '600',
     },
     headerRight: {
+        minWidth: 40,
         alignItems: 'flex-end',
     }
 });
