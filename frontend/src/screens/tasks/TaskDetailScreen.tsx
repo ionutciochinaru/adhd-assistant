@@ -1,5 +1,5 @@
 // frontend/src/screens/tasks/TaskDetailScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
     View,
     Text,
@@ -11,19 +11,21 @@ import {
     Switch,
     TextInput,
     Platform,
-    SafeAreaView,
+    Animated,
+    Easing,
+    KeyboardAvoidingView,
 } from 'react-native';
-import { StackScreenProps } from '@react-navigation/stack';
-import { supabase } from '../../utils/supabase';
-import { useAuth } from '../../context/AuthContext';
-import { Task, Subtask } from '../../utils/supabase';
+import {StackScreenProps} from '@react-navigation/stack';
+import {supabase} from '../../utils/supabase';
+import {useAuth} from '../../context/AuthContext';
+import {Task, Subtask} from '../../utils/supabase';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useTaskNotifications } from '../../hooks/useTaskNotifications';
+import {useTaskNotifications} from '../../hooks/useTaskNotifications';
 import BackButton from "../../components/BackButton";
 import ActionButtons from "../../components/ActionButtons";
-import * as Notifications from 'expo-notifications';
 import ScreenLayout from '../../components/ScreenLayout';
-import { COLORS, SPACING, Typography } from '../../utils/styles';
+import {COLORS, SPACING, FONTS, Typography, CommonStyles} from '../../utils/styles';
+import {Ionicons} from '@expo/vector-icons';
 
 // Navigation types
 type TasksStackParamList = {
@@ -34,9 +36,9 @@ type TasksStackParamList = {
 
 type Props = StackScreenProps<TasksStackParamList, 'TaskDetail'>;
 
-const TaskDetailScreen = ({ route, navigation }: Props) => {
-    const { taskId } = route.params;
-    const { user } = useAuth();
+const TaskDetailScreen = ({route, navigation}: Props) => {
+    const {taskId} = route.params;
+    const {user} = useAuth();
     const [task, setTask] = useState<Task | null>(null);
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const [loading, setLoading] = useState(true);
@@ -47,8 +49,113 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
     const [editedPriority, setEditedPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [newSubtask, setNewSubtask] = useState('');
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
     const [editedDueDate, setEditedDueDate] = useState<Date | null>(null);
-    const { scheduleTaskNotification, cancelTaskNotification } = useTaskNotifications();
+    const [subtaskCompletion, setSubtaskCompletion] = useState<Record<string, boolean>>({});
+    const {scheduleTaskNotification, cancelTaskNotification} = useTaskNotifications();
+
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const progressAnim = useRef(new Animated.Value(0)).current;
+    const checkboxAnim = useRef<Record<string, Animated.Value>>({});
+
+    // Helper for calculating due date status
+    const getDueStatus = () => {
+        if (!task?.due_date) return {isOverdue: false, isDueSoon: false};
+
+        const dueDate = new Date(task.due_date);
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setHours(now.getHours() + 24);
+
+        const isOverdue = dueDate < now && task.status !== 'completed';
+        const isDueSoon = dueDate >= now && dueDate <= tomorrow && task.status !== 'completed';
+
+        return {isOverdue, isDueSoon};
+    };
+
+    // Calculate remaining time in human-readable format
+    const formatRemainingTime = () => {
+        if (!task?.due_date) return null;
+
+        const dueDate = new Date(task.due_date);
+        const now = new Date();
+
+        // For completed tasks, calculate time between completion and due date
+        if (task.status === 'completed' && task.completed_at) {
+            const completedDate = new Date(task.completed_at);
+            const diffMs = dueDate.getTime() - completedDate.getTime();
+
+            if (diffMs < 0) {
+                // Completed after due date
+                const overdueDiffMs = Math.abs(diffMs);
+                const overdueDiffHrs = Math.floor(overdueDiffMs / (1000 * 60 * 60));
+
+                if (overdueDiffHrs < 24) {
+                    return `Completed ${overdueDiffHrs} hour${overdueDiffHrs !== 1 ? 's' : ''} late`;
+                } else {
+                    const overdueDiffDays = Math.floor(overdueDiffHrs / 24);
+                    return `Completed ${overdueDiffDays} day${overdueDiffDays !== 1 ? 's' : ''} late`;
+                }
+            } else {
+                // Completed before due date
+                const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+
+                if (diffHrs < 24) {
+                    return `Completed ${diffHrs} hour${diffHrs !== 1 ? 's' : ''} early`;
+                } else {
+                    const diffDays = Math.floor(diffHrs / 24);
+                    return `Completed ${diffDays} day${diffDays !== 1 ? 's' : ''} early`;
+                }
+            }
+        }
+
+        // For active tasks
+        if (dueDate < now) {
+            // Task is overdue
+            const diffMs = now.getTime() - dueDate.getTime();
+            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+
+            if (diffHrs < 24) {
+                return `${diffHrs} hour${diffHrs !== 1 ? 's' : ''} overdue`;
+            } else {
+                const diffDays = Math.floor(diffHrs / 24);
+                return `${diffDays} day${diffDays !== 1 ? 's' : ''} overdue`;
+            }
+        } else {
+            // Task is upcoming
+            const diffMs = dueDate.getTime() - now.getTime();
+            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+
+            if (diffHrs < 24) {
+                return `${diffHrs} hour${diffHrs !== 1 ? 's' : ''} remaining`;
+            } else {
+                const diffDays = Math.floor(diffHrs / 24);
+                return `${diffDays} day${diffDays !== 1 ? 's' : ''} remaining`;
+            }
+        }
+    };
+
+    // Format the due date in a human-readable way
+    const formatDueDate = (dateString?: string | null) => {
+        if (!dateString) return 'No due date';
+
+        const date = new Date(dateString);
+        return date.toLocaleString(undefined, {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    // Calculate completion percentage
+    const calculateCompletion = () => {
+        if (!subtasks.length) return 0;
+        const completed = subtasks.filter(subtask => subtask.status === 'completed').length;
+        return Math.round((completed / subtasks.length) * 100);
+    };
 
     // Set up real-time subscription for task and subtasks
     useEffect(() => {
@@ -104,13 +211,60 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
         fetchTaskDetails();
     }, [taskId]);
 
+    // Run fade-in animation when task loads
+    useEffect(() => {
+        if (task) {
+            // Animate task details fade in
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 400,
+                useNativeDriver: true,
+            }).start();
+
+            // Animate progress bar
+            Animated.timing(progressAnim, {
+                toValue: calculateCompletion(),
+                duration: 800,
+                delay: 300,
+                useNativeDriver: false,
+                easing: Easing.out(Easing.cubic),
+            }).start();
+        }
+    }, [task, subtasks]);
+
+    // Initialize checkbox animations for subtasks
+    useEffect(() => {
+        const newAnimMap: Record<string, Animated.Value> = {};
+
+        subtasks.forEach(subtask => {
+            // Create animation if not exists, or use existing
+            if (!checkboxAnim.current[subtask.id]) {
+                newAnimMap[subtask.id] = new Animated.Value(subtask.status === 'completed' ? 1 : 0);
+            } else {
+                newAnimMap[subtask.id] = checkboxAnim.current[subtask.id];
+
+                // Update animation if status changed
+                if ((subtask.status === 'completed' && newAnimMap[subtask.id].__getValue() === 0) ||
+                    (subtask.status === 'active' && newAnimMap[subtask.id].__getValue() === 1)) {
+                    Animated.timing(newAnimMap[subtask.id], {
+                        toValue: subtask.status === 'completed' ? 1 : 0,
+                        duration: 300,
+                        useNativeDriver: false,
+                    }).start();
+                }
+            }
+        });
+
+        checkboxAnim.current = newAnimMap;
+    }, [subtasks]);
+
     // Fetch task details and subtasks from Supabase
     const fetchTaskDetails = async () => {
         try {
             setLoading(true);
 
             // Fetch the task
-            const { data: taskData, error: taskError } = await supabase
+            const {data: taskData, error: taskError} = await supabase
                 .from('tasks')
                 .select('*')
                 .eq('id', taskId)
@@ -120,11 +274,11 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             if (taskError) throw taskError;
 
             // Fetch the subtasks
-            const { data: subtasksData, error: subtasksError } = await supabase
+            const {data: subtasksData, error: subtasksError} = await supabase
                 .from('subtasks')
                 .select('*')
                 .eq('task_id', taskId)
-                .order('created_at', { ascending: true });
+                .order('created_at', {ascending: true});
 
             if (subtasksError) throw subtasksError;
 
@@ -134,6 +288,13 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             setEditedDescription(taskData.description || '');
             setEditedPriority(taskData.priority);
             setEditedDueDate(taskData.due_date ? new Date(taskData.due_date) : null);
+
+            // Build subtask completion state
+            const completionState: Record<string, boolean> = {};
+            subtasksData?.forEach(subtask => {
+                completionState[subtask.id] = subtask.status === 'completed';
+            });
+            setSubtaskCompletion(completionState);
         } catch (error: any) {
             console.error('Error fetching task details:', error.message);
             Alert.alert('Error', 'Failed to load task details');
@@ -147,7 +308,30 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
     const onDateChange = (event: any, selectedDate?: Date) => {
         setShowDatePicker(Platform.OS === 'ios'); // Keep open on iOS, close on Android
         if (selectedDate) {
+            if (editedDueDate) {
+                // Preserve the time part of the existing date
+                selectedDate.setHours(editedDueDate.getHours());
+                selectedDate.setMinutes(editedDueDate.getMinutes());
+            }
             setEditedDueDate(selectedDate);
+
+            // Show time picker on Android after date is selected
+            if (Platform.OS === 'android') {
+                setShowTimePicker(true);
+            }
+        }
+    };
+
+    // Handle time change
+    const onTimeChange = (event: any, selectedTime?: Date) => {
+        setShowTimePicker(Platform.OS === 'ios'); // Keep open on iOS, close on Android
+
+        if (selectedTime && editedDueDate) {
+            // Combine the selected date with the selected time
+            const newDateTime = new Date(editedDueDate);
+            newDateTime.setHours(selectedTime.getHours());
+            newDateTime.setMinutes(selectedTime.getMinutes());
+            setEditedDueDate(newDateTime);
         }
     };
 
@@ -178,7 +362,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             }
 
             // Update in database
-            const { error } = await supabase
+            const {error} = await supabase
                 .from('tasks')
                 .update({
                     status: newStatus,
@@ -187,6 +371,14 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                 .eq('id', task.id);
 
             if (error) throw error;
+
+            // Animate progress bar
+            Animated.timing(progressAnim, {
+                toValue: calculateCompletion(),
+                duration: 600,
+                useNativeDriver: false,
+                easing: Easing.out(Easing.cubic),
+            }).start();
         } catch (error: any) {
             console.error('Error updating task status:', error.message);
             Alert.alert('Error', 'Failed to update task status');
@@ -202,7 +394,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
         try {
             const newStatus = subtask.status === 'active' ? 'completed' : 'active';
 
-            // Optimistic update
+            // Optimistic update in state
             setSubtasks(subtasks.map(st =>
                 st.id === subtask.id
                     ? {
@@ -213,8 +405,33 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                     : st
             ));
 
+            // Update completion state
+            setSubtaskCompletion({
+                ...subtaskCompletion,
+                [subtask.id]: newStatus === 'completed'
+            });
+
+            // Animate checkbox
+            if (checkboxAnim.current[subtask.id]) {
+                Animated.timing(checkboxAnim.current[subtask.id], {
+                    toValue: newStatus === 'completed' ? 1 : 0,
+                    duration: 200,
+                    useNativeDriver: false,
+                }).start();
+            }
+
+            // Animate progress bar
+            const newCompletionPercentage = calculateCompletion() +
+                (newStatus === 'completed' ? (100 / subtasks.length) : -(100 / subtasks.length));
+
+            Animated.timing(progressAnim, {
+                toValue: newCompletionPercentage,
+                duration: 300,
+                useNativeDriver: false,
+            }).start();
+
             // Update in database
-            const { error } = await supabase
+            const {error} = await supabase
                 .from('subtasks')
                 .update({
                     status: newStatus,
@@ -239,7 +456,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             setUpdating(true);
 
             // Add to database
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('subtasks')
                 .insert({
                     task_id: task.id,
@@ -253,7 +470,25 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
 
             // Update state with the new data from the API
             if (data) {
+                // Add new subtask to list
                 setSubtasks(prevSubtasks => [...prevSubtasks, data]);
+
+                // Update completion state
+                setSubtaskCompletion(prev => ({
+                    ...prev,
+                    [data.id]: false
+                }));
+
+                // Create animation for new subtask
+                checkboxAnim.current[data.id] = new Animated.Value(0);
+
+                // Update progress percentage
+                Animated.timing(progressAnim, {
+                    toValue: calculateCompletion(),
+                    duration: 300,
+                    useNativeDriver: false,
+                }).start();
+
                 setNewSubtask('');
             }
         } catch (error) {
@@ -270,10 +505,18 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             setUpdating(true);
 
             // Optimistic update
-            setSubtasks(subtasks.filter(st => st.id !== subtaskId));
+            const updatedSubtasks = subtasks.filter(st => st.id !== subtaskId);
+            setSubtasks(updatedSubtasks);
+
+            // Update progress bar
+            Animated.timing(progressAnim, {
+                toValue: calculateCompletion(),
+                duration: 300,
+                useNativeDriver: false,
+            }).start();
 
             // Delete from database
-            const { error } = await supabase
+            const {error} = await supabase
                 .from('subtasks')
                 .delete()
                 .eq('id', subtaskId);
@@ -305,7 +548,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             };
 
             // Update in database
-            const { error } = await supabase
+            const {error} = await supabase
                 .from('tasks')
                 .update(updates)
                 .eq('id', task.id);
@@ -318,32 +561,15 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                 ...updates
             });
 
-            // Only schedule a new notification if the due date has changed and is in the future
-            const oldDueDate = task.due_date ? new Date(task.due_date) : null;
-            const newDueDate = editedDueDate;
-            const hasDateChanged = (
-                (oldDueDate === null && newDueDate !== null) ||
-                (oldDueDate !== null && newDueDate === null) ||
-                (oldDueDate !== null && newDueDate !== null &&
-                    oldDueDate.getTime() !== newDueDate.getTime())
-            );
-
-            if (hasDateChanged && newDueDate && newDueDate > new Date()) {
-                // First, cancel any existing notifications for this task
-                const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-                const existingNotifications = scheduledNotifications.filter(
-                    notification => notification.content.data?.taskId === task.id
-                );
-
-                for (const notif of existingNotifications) {
-                    await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-                }
-
-                // Then schedule a new notification
+            // Schedule notification if due date is set and task is active
+            if (updates.due_date && task.status === 'active') {
                 await scheduleTaskNotification({
                     ...task,
                     ...updates
                 });
+            } else if (!updates.due_date) {
+                // Cancel notification if due date is removed
+                await cancelTaskNotification(task.id);
             }
 
             setIsEditing(false);
@@ -363,7 +589,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             'Delete Task',
             'Are you sure you want to delete this task? This cannot be undone.',
             [
-                { text: 'Cancel', style: 'cancel' },
+                {text: 'Cancel', style: 'cancel'},
                 {
                     text: 'Delete',
                     style: 'destructive',
@@ -372,7 +598,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                             setUpdating(true);
 
                             // Delete from database
-                            const { error } = await supabase
+                            const {error} = await supabase
                                 .from('tasks')
                                 .delete()
                                 .eq('id', task.id);
@@ -396,7 +622,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
     };
 
     const renderBackButton = () => (
-        <BackButton onPress={() => navigation.goBack()} />
+        <BackButton onPress={() => navigation.goBack()}/>
     );
 
     const renderActionButtons = () => (
@@ -404,10 +630,10 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
             {isEditing ? (
                 <ActionButtons
                     onCancel={() => {
-                        setEditedTitle(task.title);
-                        setEditedDescription(task.description || '');
-                        setEditedPriority(task.priority);
-                        setEditedDueDate(task.due_date ? new Date(task.due_date) : null);
+                        setEditedTitle(task?.title || '');
+                        setEditedDescription(task?.description || '');
+                        setEditedPriority(task?.priority || 'medium');
+                        setEditedDueDate(task?.due_date ? new Date(task.due_date) : null);
                         setIsEditing(false);
                     }}
                     onSave={saveEditedTask}
@@ -428,7 +654,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                         onPress={deleteTask}
                     >
                         {updating ? (
-                            <ActivityIndicator size="small" color={COLORS.white} />
+                            <ActivityIndicator size="small" color={COLORS.white}/>
                         ) : (
                             <Text style={styles.deleteButtonText}>Delete</Text>
                         )}
@@ -442,7 +668,8 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
         return (
             <ScreenLayout>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <ActivityIndicator size="large" color={COLORS.primary}/>
+                    <Text style={styles.loadingText}>Loading task details...</Text>
                 </View>
             </ScreenLayout>
         );
@@ -464,226 +691,442 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
         );
     }
 
+    const dueStatus = getDueStatus();
+    const completionPercentage = calculateCompletion();
+    const formattedDueDate = formatDueDate(task.due_date);
+    const timeRemaining = formatRemainingTime();
+
     return (
         <ScreenLayout
             leftComponent={renderBackButton()}
             rightComponent={renderActionButtons()}
-            title={task.title}
+            title={isEditing ? "Edit Task" : "Task Details"}
         >
+            <KeyboardAvoidingView
+                style={{flex: 1}}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.contentContainer}
+                >
+                    <Animated.View style={[
+                        styles.container,
+                        {opacity: fadeAnim}
+                    ]}>
+                        {isEditing ? (
+                            // Edit Mode
+                            <View style={styles.editFormContainer}>
+                                <Text style={styles.label}>Title:</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={editedTitle}
+                                    onChangeText={setEditedTitle}
+                                    placeholder="Task title"
+                                    autoCapitalize="sentences"
+                                    maxLength={100}
+                                />
 
-                <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-                    {isEditing ? (
-                        <View style={styles.editFormContainer}>
-                            <Text style={styles.label}>Title:</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editedTitle}
-                                onChangeText={setEditedTitle}
-                                placeholder="Task title"
-                                autoCapitalize="sentences"
-                            />
+                                <Text style={styles.label}>Description:</Text>
+                                <TextInput
+                                    style={[styles.input, styles.textArea]}
+                                    value={editedDescription}
+                                    onChangeText={setEditedDescription}
+                                    placeholder="Add details about this task..."
+                                    multiline
+                                    numberOfLines={4}
+                                    textAlignVertical="top"
+                                />
 
-                            <Text style={styles.label}>Description:</Text>
-                            <TextInput
-                                style={[styles.input, styles.textArea]}
-                                value={editedDescription}
-                                onChangeText={setEditedDescription}
-                                placeholder="Task description (optional)"
-                                multiline
-                                numberOfLines={4}
-                                textAlignVertical="top"
-                            />
-
-                            <Text style={styles.label}>Priority:</Text>
-                            <View style={styles.priorityPickerContainer}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.priorityOption,
-                                        editedPriority === 'low' && styles.selectedPriorityOption,
-                                        { backgroundColor: editedPriority === 'low' ? '#27ae60' : '#ecf0f1' }
-                                    ]}
-                                    onPress={() => setEditedPriority('low')}
-                                >
-                                    <Text style={[
-                                        styles.priorityOptionText,
-                                        editedPriority === 'low' && styles.selectedPriorityOptionText
-                                    ]}>Low</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.priorityOption,
-                                        editedPriority === 'medium' && styles.selectedPriorityOption,
-                                        { backgroundColor: editedPriority === 'medium' ? '#f39c12' : '#ecf0f1' }
-                                    ]}
-                                    onPress={() => setEditedPriority('medium')}
-                                >
-                                    <Text style={[
-                                        styles.priorityOptionText,
-                                        editedPriority === 'medium' && styles.selectedPriorityOptionText
-                                    ]}>Medium</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.priorityOption,
-                                        editedPriority === 'high' && styles.selectedPriorityOption,
-                                        { backgroundColor: editedPriority === 'high' ? '#e74c3c' : '#ecf0f1' }
-                                    ]}
-                                    onPress={() => setEditedPriority('high')}
-                                >
-                                    <Text style={[
-                                        styles.priorityOptionText,
-                                        editedPriority === 'high' && styles.selectedPriorityOptionText
-                                    ]}>High</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <Text style={styles.label}>Due Date (Optional):</Text>
-                            <View style={styles.dueDateContainer}>
-                                <TouchableOpacity
-                                    style={styles.datePickerButton}
-                                    onPress={() => setShowDatePicker(true)}
-                                >
-                                    <Text style={styles.datePickerButtonText}>
-                                        {editedDueDate ? editedDueDate.toLocaleDateString() : 'Select a date'}
-                                    </Text>
-                                </TouchableOpacity>
-                                {editedDueDate && (
+                                <Text style={styles.label}>Priority:</Text>
+                                <View style={styles.priorityPickerContainer}>
                                     <TouchableOpacity
-                                        style={styles.clearDateButton}
-                                        onPress={() => setEditedDueDate(null)}
+                                        style={[
+                                            styles.priorityOption,
+                                            editedPriority === 'low' && styles.selectedPriorityOption,
+                                            {backgroundColor: editedPriority === 'low' ? COLORS.lowPriority : COLORS.lightGray}
+                                        ]}
+                                        onPress={() => setEditedPriority('low')}
                                     >
-                                        <Text style={styles.clearDateButtonText}>Clear</Text>
+                                        <Ionicons
+                                            name="checkmark-circle"
+                                            size={16}
+                                            color={editedPriority === 'low' ? COLORS.white : COLORS.dark}
+                                        />
+                                        <Text style={[
+                                            styles.priorityOptionText,
+                                            editedPriority === 'low' && styles.selectedPriorityOptionText
+                                        ]}>Low</Text>
                                     </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.priorityOption,
+                                            editedPriority === 'medium' && styles.selectedPriorityOption,
+                                            {backgroundColor: editedPriority === 'medium' ? COLORS.mediumPriority : COLORS.lightGray}
+                                        ]}
+                                        onPress={() => setEditedPriority('medium')}
+                                    >
+                                        <Ionicons
+                                            name="alert"
+                                            size={16}
+                                            color={editedPriority === 'medium' ? COLORS.white : COLORS.dark}
+                                        />
+                                        <Text style={[
+                                            styles.priorityOptionText,
+                                            editedPriority === 'medium' && styles.selectedPriorityOptionText
+                                        ]}>Medium</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.priorityOption,
+                                            editedPriority === 'high' && styles.selectedPriorityOption,
+                                            {backgroundColor: editedPriority === 'high' ? COLORS.highPriority : COLORS.lightGray}
+                                        ]}
+                                        onPress={() => setEditedPriority('high')}
+                                    >
+                                        <Ionicons
+                                            name="alert-circle"
+                                            size={16}
+                                            color={editedPriority === 'high' ? COLORS.white : COLORS.dark}
+                                        />
+                                        <Text style={[
+                                            styles.priorityOptionText,
+                                            editedPriority === 'high' && styles.selectedPriorityOptionText
+                                        ]}>High</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={styles.label}>Due Date:</Text>
+                                <View style={styles.dueDateContainer}>
+                                    <TouchableOpacity
+                                        style={styles.datePickerButton}
+                                        onPress={() => setShowDatePicker(true)}
+                                    >
+                                        <Ionicons name="calendar" size={18} color={COLORS.primary}
+                                                  style={styles.datePickerIcon}/>
+                                        <Text style={styles.datePickerButtonText}>
+                                            {editedDueDate ? editedDueDate.toLocaleDateString() : 'Select a date'}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {editedDueDate && (
+                                        <View style={styles.dateTimeActions}>
+                                            <TouchableOpacity
+                                                style={styles.timePickerButton}
+                                                onPress={() => setShowTimePicker(true)}
+                                            >
+                                                <Ionicons name="time" size={18} color={COLORS.primary}/>
+                                                <Text style={styles.timePickerButtonText}>
+                                                    {editedDueDate.toLocaleTimeString([], {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                style={styles.clearDateButton}
+                                                onPress={() => setEditedDueDate(null)}
+                                            >
+                                                <Ionicons name="close-circle" size={18} color={COLORS.danger}/>
+                                                <Text style={styles.clearDateButtonText}>Clear</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {showDatePicker && (
+                                    <DateTimePicker
+                                        value={editedDueDate || new Date()}
+                                        mode="date"
+                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                        onChange={onDateChange}
+                                        minimumDate={new Date()}
+                                    />
+                                )}
+
+                                {showTimePicker && (
+                                    <DateTimePicker
+                                        value={editedDueDate || new Date()}
+                                        mode="time"
+                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                        onChange={onTimeChange}
+                                    />
                                 )}
                             </View>
+                        ) : (
+                            // View Mode
+                            <View style={styles.taskDetailsContainer}>
+                                {/* Task Header with Status */}
+                                <View style={styles.taskHeader}>
+                                    <View style={styles.taskTitleSection}>
+                                        <Text style={styles.taskTitle}>
+                                            {task.title}
+                                        </Text>
 
-                            {showDatePicker && (
-                                <DateTimePicker
-                                    value={editedDueDate || new Date()}
-                                    mode="date"
-                                    display="default"
-                                    onChange={onDateChange}
-                                    minimumDate={new Date()}
-                                />
-                            )}
-                        </View>
-                    ) : (
-                        <View style={styles.taskDetailsContainer}>
-                            <View style={styles.taskHeaderContainer}>
-                                <View style={styles.taskTitleContainer}>
-                                    <Text style={[
-                                        styles.taskTitle,
-                                        task.status === 'completed' && styles.completedTaskTitle
-                                    ]}>
-                                        {task.title}
-                                    </Text>
+                                        <View style={[
+                                            styles.statusBadge,
+                                            task.status === 'completed' ? styles.completedBadge :
+                                                dueStatus.isOverdue ? styles.overdueBadge :
+                                                    dueStatus.isDueSoon ? styles.dueSoonBadge : styles.activeBadge
+                                        ]}>
+                                            <Ionicons
+                                                name={
+                                                    task.status === 'completed' ? 'checkmark-circle' :
+                                                        dueStatus.isOverdue ? 'alert-circle' :
+                                                            dueStatus.isDueSoon ? 'time' : 'checkbox-outline'
+                                                }
+                                                size={16}
+                                                color={COLORS.white}
+                                            />
+                                            <Text style={styles.statusBadgeText}>
+                                                {task.status === 'completed' ? 'Completed' :
+                                                    dueStatus.isOverdue ? 'Overdue' :
+                                                        dueStatus.isDueSoon ? 'Due Soon' : 'Active'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Priority Badge */}
                                     <View style={[
                                         styles.priorityBadge,
-                                        task.priority === 'low' && styles.lowPriorityBadge,
-                                        task.priority === 'medium' && styles.mediumPriorityBadge,
-                                        task.priority === 'high' && styles.highPriorityBadge,
+                                        task.priority === 'high' ? styles.highPriorityBadge :
+                                            task.priority === 'medium' ? styles.mediumPriorityBadge : styles.lowPriorityBadge
                                     ]}>
+                                        <Ionicons
+                                            name={
+                                                task.priority === 'high' ? 'alert-circle' :
+                                                    task.priority === 'medium' ? 'alert' : 'checkmark-circle'
+                                            }
+                                            size={14}
+                                            color={COLORS.white}
+                                        />
                                         <Text style={styles.priorityBadgeText}>
-                                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
                                         </Text>
                                     </View>
                                 </View>
 
-                                <View style={styles.completionContainer}>
-                                    <Text style={styles.completionLabel}>
-                                        {task.status === 'completed' ? 'Completed' : 'Mark Complete'}
+                                {/* Progress Bar for Subtasks */}
+                                {subtasks.length > 0 && (
+                                    <View style={styles.progressSection}>
+                                        <View style={styles.progressHeader}>
+                                            <Text style={styles.progressTitle}>
+                                                Progress: {completionPercentage}%
+                                            </Text>
+                                            <Text style={styles.progressSubtitle}>
+                                                {subtasks.filter(s => s.status === 'completed').length} of {subtasks.length} subtasks
+                                                completed
+                                            </Text>
+                                        </View>
+
+                                        <View style={styles.progressBarContainer}>
+                                            <Animated.View
+                                                style={[
+                                                    styles.progressBar,
+                                                    {
+                                                        width: progressAnim.interpolate({
+                                                            inputRange: [0, 100],
+                                                            outputRange: ['0%', '100%']
+                                                        })
+                                                    },
+                                                    completionPercentage === 100 ? styles.completedProgressBar : null
+                                                ]}
+                                            />
+                                        </View>
+                                    </View>
+                                )}
+
+                                {/* Time Section */}
+                                {task.due_date && (
+                                    <View style={[
+                                        styles.timeSection,
+                                        dueStatus.isOverdue ? styles.overdueTimeSection :
+                                            dueStatus.isDueSoon ? styles.dueSoonTimeSection : null
+                                    ]}>
+                                        <View style={styles.dueDateRow}>
+                                            <Ionicons
+                                                name="calendar"
+                                                size={20}
+                                                color={
+                                                    dueStatus.isOverdue ? COLORS.danger :
+                                                        dueStatus.isDueSoon ? COLORS.warning : COLORS.gray
+                                                }
+                                            />
+                                            <Text style={[
+                                                styles.dueDateText,
+                                                dueStatus.isOverdue ? styles.overdueText :
+                                                    dueStatus.isDueSoon ? styles.dueSoonText : null
+                                            ]}>
+                                                {formattedDueDate}
+                                            </Text>
+                                        </View>
+
+                                        {timeRemaining && (
+                                            <View style={styles.timeRemainingRow}>
+                                                <Ionicons
+                                                    name={task.status === 'completed' ? 'checkmark-done-circle' : dueStatus.isOverdue ? 'hourglass' : 'time'}
+                                                    size={20}
+                                                    color={
+                                                        task.status === 'completed' ? COLORS.success :
+                                                            dueStatus.isOverdue ? COLORS.danger :
+                                                                dueStatus.isDueSoon ? COLORS.warning : COLORS.gray
+                                                    }
+                                                />
+                                                <Text style={[
+                                                    styles.timeRemainingText,
+                                                    task.status === 'completed' ? styles.completedTimeText :
+                                                        dueStatus.isOverdue ? styles.overdueText :
+                                                            dueStatus.isDueSoon ? styles.dueSoonText : null
+                                                ]}>
+                                                    {timeRemaining}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+
+                                {/* Task Completion Toggle */}
+                                <View style={styles.completionToggle}>
+                                    <Text style={styles.completionToggleLabel}>
+                                        {task.status === 'completed'
+                                            ? 'Mark as incomplete'
+                                            : 'Mark task as complete'}
                                     </Text>
                                     <Switch
                                         value={task.status === 'completed'}
                                         onValueChange={toggleTaskCompletion}
                                         disabled={updating}
-                                        trackColor={{ false: '#bdc3c7', true: '#2ecc71' }}
-                                        thumbColor={task.status === 'completed' ? '#27ae60' : '#ecf0f1'}
+                                        trackColor={{
+                                            false: COLORS.lightGray,
+                                            true: COLORS.primaryLight
+                                        }}
+                                        thumbColor={task.status === 'completed' ? COLORS.success : '#f4f3f4'}
+                                        ios_backgroundColor={COLORS.lightGray}
                                     />
                                 </View>
-                            </View>
 
-                            {task.due_date && (
-                                <View style={styles.dueDateDisplay}>
-                                    <Text style={styles.dueDateLabel}>Due Date:</Text>
-                                    <Text style={styles.dueDateText}>
-                                        {new Date(task.due_date).toLocaleDateString()}
-                                    </Text>
-                                </View>
-                            )}
-
-                            {task.description && (
-                                <View style={styles.descriptionContainer}>
-                                    <Text style={styles.descriptionTitle}>Description:</Text>
-                                    <Text style={styles.descriptionText}>{task.description}</Text>
-                                </View>
-                            )}
-
-                            <View style={styles.subtasksContainer}>
-                                <Text style={styles.subtasksTitle}>Subtasks:</Text>
-
-                                {subtasks.length === 0 ? (
-                                    <Text style={styles.noSubtasksText}>No subtasks yet</Text>
-                                ) : (
-                                    subtasks.map(subtask => (
-                                        <View key={subtask.id} style={styles.subtaskItem}>
-                                            <View style={styles.subtaskContent}>
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.checkbox,
-                                                        subtask.status === 'completed' && styles.checkedCheckbox
-                                                    ]}
-                                                    onPress={() => toggleSubtaskCompletion(subtask)}
-                                                >
-                                                    {subtask.status === 'completed' && (
-                                                        <Text style={styles.checkmark}>✓</Text>
-                                                    )}
-                                                </TouchableOpacity>
-                                                <Text style={[
-                                                    styles.subtaskText,
-                                                    subtask.status === 'completed' && styles.completedSubtaskText
-                                                ]}>
-                                                    {subtask.title}
-                                                </Text>
-                                            </View>
-                                            <TouchableOpacity
-                                                style={styles.deleteSubtaskButton}
-                                                onPress={() => deleteSubtask(subtask.id)}
-                                            >
-                                                <Text style={styles.deleteSubtaskButtonText}>×</Text>
-                                            </TouchableOpacity>
+                                {/* Description Section */}
+                                {task.description && (
+                                    <View style={styles.descriptionSection}>
+                                        <Text style={styles.sectionTitle}>Description</Text>
+                                        <View style={styles.descriptionContainer}>
+                                            <Text style={styles.descriptionText}>
+                                                {task.description}
+                                            </Text>
                                         </View>
-                                    ))
+                                    </View>
                                 )}
 
-                                <View style={styles.addSubtaskContainer}>
-                                    <TextInput
-                                        style={styles.addSubtaskInput}
-                                        value={newSubtask}
-                                        onChangeText={setNewSubtask}
-                                        placeholder="Add a new subtask"
-                                        returnKeyType="done"
-                                        onSubmitEditing={addSubtask}
-                                    />
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.addSubtaskButton,
-                                            newSubtask.trim() === '' && styles.disabledAddSubtaskButton
-                                        ]}
-                                        onPress={addSubtask}
-                                        disabled={newSubtask.trim() === '' || updating}
-                                    >
-                                        {updating ? (
-                                            <ActivityIndicator size="small" color="#FFFFFF" />
-                                        ) : (
-                                            <Text style={styles.addSubtaskButtonText}>Add</Text>
-                                        )}
-                                    </TouchableOpacity>
+                                {/* Dates Section */}
+                                <View style={styles.datesSection}>
+                                    <View style={styles.dateItem}>
+                                        <Text style={styles.dateLabel}>Created:</Text>
+                                        <Text style={styles.dateValue}>
+                                            {new Date(task.created_at).toLocaleString()}
+                                        </Text>
+                                    </View>
+
+                                    {task.completed_at && (
+                                        <View style={styles.dateItem}>
+                                            <Text style={styles.dateLabel}>Completed:</Text>
+                                            <Text style={styles.dateValue}>
+                                                {new Date(task.completed_at).toLocaleString()}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             </View>
+                        )}
+
+                        {/* Subtasks Section */}
+                        <View style={styles.subtasksContainer}>
+                            <Text style={styles.sectionTitle}>
+                                Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+                            </Text>
+
+                            {subtasks.length === 0 ? (
+                                <Text style={styles.noSubtasksText}>No subtasks yet</Text>
+                            ) : (
+                                subtasks.map(subtask => (
+                                    <View key={subtask.id} style={styles.subtaskItem}>
+                                        <TouchableOpacity
+                                            style={styles.subtaskCheckboxContainer}
+                                            onPress={() => toggleSubtaskCompletion(subtask)}
+                                            disabled={updating}
+                                        >
+                                            <Animated.View
+                                                style={[
+                                                    styles.subtaskCheckbox,
+                                                    {
+                                                        backgroundColor: checkboxAnim.current[subtask.id]?.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [COLORS.white, COLORS.primary]
+                                                        }),
+                                                        borderColor: checkboxAnim.current[subtask.id]?.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [COLORS.gray, COLORS.primary]
+                                                        })
+                                                    }
+                                                ]}
+                                            >
+                                                {subtask.status === 'completed' && (
+                                                    <Ionicons name="checkmark" size={16} color={COLORS.white}/>
+                                                )}
+                                            </Animated.View>
+
+                                            <Text
+                                                style={[
+                                                    styles.subtaskText,
+                                                    subtask.status === 'completed' && styles.completedSubtaskText
+                                                ]}
+                                            >
+                                                {subtask.title}
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.deleteSubtaskButton}
+                                            onPress={() => deleteSubtask(subtask.id)}
+                                            disabled={updating}
+                                        >
+                                            <Ionicons name="trash-outline" size={18} color={COLORS.danger}/>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))
+                            )}
+
+                            {/* Add Subtask Input */}
+                            <View style={styles.addSubtaskContainer}>
+                                <TextInput
+                                    style={styles.addSubtaskInput}
+                                    value={newSubtask}
+                                    onChangeText={setNewSubtask}
+                                    placeholder="Add a new subtask..."
+                                    returnKeyType="done"
+                                    onSubmitEditing={addSubtask}
+                                />
+                                <TouchableOpacity
+                                    style={[
+                                        styles.addSubtaskButton,
+                                        newSubtask.trim() === '' && styles.disabledAddSubtaskButton
+                                    ]}
+                                    onPress={addSubtask}
+                                    disabled={newSubtask.trim() === '' || updating}
+                                >
+                                    {updating ? (
+                                        <ActivityIndicator size="small" color={COLORS.white}/>
+                                    ) : (
+                                        <Ionicons name="add" size={24} color={COLORS.white}/>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    )}
+                    </Animated.View>
                 </ScrollView>
+            </KeyboardAvoidingView>
         </ScreenLayout>
     );
 };
@@ -691,373 +1134,431 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: COLORS.light,
     },
-    safeArea: {
+    scrollView: {
         flex: 1,
-        backgroundColor: '#f8f9fa',
+    },
+    contentContainer: {
+        padding: SPACING.md,
+        paddingBottom: SPACING.xxl,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    loadingText: {
+        ...Typography.bodyMedium,
+        color: COLORS.gray,
+        marginTop: SPACING.md,
+    },
     errorContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        padding: SPACING.xl,
     },
     errorText: {
-        fontSize: 18,
-        color: '#e74c3c',
-        marginBottom: 20,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#ffffff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        ...Typography.h3,
+        color: COLORS.danger,
+        marginBottom: SPACING.md,
     },
     backButton: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        backgroundColor: COLORS.primary,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        borderRadius: SPACING.xs,
     },
     backButtonText: {
-        fontSize: 16,
-        color: '#3498db',
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     actionsContainer: {
         flexDirection: 'row',
     },
     editButton: {
-        backgroundColor: '#3498db',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 4,
-        marginRight: 8,
+        backgroundColor: COLORS.primary,
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.md,
+        borderRadius: SPACING.xs,
+        marginRight: SPACING.sm,
     },
     editButtonText: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '600',
+        color: COLORS.white,
+        fontSize: FONTS.size.sm,
+        fontWeight: FONTS.weight.semiBold,
     },
     deleteButton: {
-        backgroundColor: '#e74c3c',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 4,
+        backgroundColor: COLORS.danger,
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.md,
+        borderRadius: SPACING.xs,
     },
     deleteButtonText: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '600',
+        color: COLORS.white,
+        fontSize: FONTS.size.sm,
+        fontWeight: FONTS.weight.semiBold,
     },
-    editButtonsContainer: {
-        flexDirection: 'row',
-    },
-    cancelButton: {
-        backgroundColor: '#95a5a6',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 4,
-        marginRight: 8,
-    },
-    cancelButtonText: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    saveButton: {
-        backgroundColor: '#2ecc71',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 4,
-    },
-    saveButtonText: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    scrollView: {
-        flex: 1,
-    },
-    contentContainer: {
-        padding: 16,
-    },
+
+    // Task Details View Styles
     taskDetailsContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        backgroundColor: COLORS.white,
+        borderRadius: SPACING.md,
+        padding: SPACING.md,
+        marginBottom: SPACING.md,
+        ...CommonStyles.card,
     },
-    taskHeaderContainer: {
+    taskHeader: {
+        marginBottom: SPACING.md,
+    },
+    taskTitleSection: {
+        marginBottom: SPACING.sm,
+    },
+    taskTitle: {
+        ...Typography.h2,
+        fontSize: 22,
+        marginBottom: SPACING.xs,
+    },
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: 16,
+        alignSelf: 'flex-start',
+        marginBottom: SPACING.xs,
+    },
+    statusBadgeText: {
+        color: COLORS.white,
+        fontSize: FONTS.size.xs,
+        fontWeight: FONTS.weight.semiBold,
+        marginLeft: SPACING.xs,
+    },
+    completedBadge: {
+        backgroundColor: COLORS.success,
+    },
+    overdueBadge: {
+        backgroundColor: COLORS.danger,
+    },
+    dueSoonBadge: {
+        backgroundColor: COLORS.warning,
+    },
+    activeBadge: {
+        backgroundColor: COLORS.info,
+    },
+    priorityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: 16,
+        alignSelf: 'flex-start',
+    },
+    priorityBadgeText: {
+        color: COLORS.white,
+        fontSize: FONTS.size.xs,
+        fontWeight: FONTS.weight.semiBold,
+        marginLeft: SPACING.xs,
+    },
+    highPriorityBadge: {
+        backgroundColor: COLORS.highPriority,
+    },
+    mediumPriorityBadge: {
+        backgroundColor: COLORS.mediumPriority,
+    },
+    lowPriorityBadge: {
+        backgroundColor: COLORS.lowPriority,
+    },
+    progressSection: {
+        marginBottom: SPACING.md,
+    },
+    progressHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: SPACING.xs,
     },
-    taskTitleContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
+    progressTitle: {
+        ...Typography.bodyMedium,
+        fontWeight: FONTS.weight.semiBold,
     },
-    taskTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#2c3e50',
-        flex: 1,
+    progressSubtitle: {
+        ...Typography.caption,
     },
-    completedTaskTitle: {
-        textDecorationLine: 'line-through',
-        color: '#95a5a6',
-    },
-    priorityBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+    progressBarContainer: {
+        height: 8,
+        backgroundColor: COLORS.lightGray,
         borderRadius: 4,
-        marginLeft: 8,
+        overflow: 'hidden',
     },
-    lowPriorityBadge: {
-        backgroundColor: '#e8f5e9',
+    progressBar: {
+        height: '100%',
+        backgroundColor: COLORS.primary,
+        borderRadius: 4,
     },
-    mediumPriorityBadge: {
-        backgroundColor: '#fff8e1',
+    completedProgressBar: {
+        backgroundColor: COLORS.success,
     },
-    highPriorityBadge: {
-        backgroundColor: '#ffebee',
+    timeSection: {
+        backgroundColor: COLORS.lightGray,
+        borderRadius: SPACING.sm,
+        padding: SPACING.sm,
+        marginBottom: SPACING.md,
     },
-    priorityBadgeText: {
-        fontSize: 12,
-        fontWeight: '600',
+    overdueTimeSection: {
+        backgroundColor: '#ffebee', // Light red
     },
-    completionContainer: {
+    dueSoonTimeSection: {
+        backgroundColor: '#fff8e1', // Light yellow
+    },
+    dueDateRow: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    completionLabel: {
-        fontSize: 14,
-        marginRight: 8,
-        color: '#7f8c8d',
-    },
-    dueDateDisplay: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ecf0f1',
-    },
-    dueDateLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#7f8c8d',
-        marginRight: 8,
+        marginBottom: SPACING.xs,
     },
     dueDateText: {
-        fontSize: 14,
-        color: '#34495e',
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.sm,
+    },
+    timeRemainingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    timeRemainingText: {
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.sm,
+    },
+    overdueText: {
+        color: COLORS.danger,
+        fontWeight: FONTS.weight.semiBold,
+    },
+    dueSoonText: {
+        color: COLORS.warning,
+        fontWeight: FONTS.weight.semiBold,
+    },
+    completedTimeText: {
+        color: COLORS.success,
+        fontWeight: FONTS.weight.semiBold,
+    },
+    completionToggle: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        padding: SPACING.sm,
+        borderRadius: SPACING.sm,
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    completionToggleLabel: {
+        ...Typography.bodyMedium,
+    },
+    descriptionSection: {
+        marginBottom: SPACING.md,
+    },
+    sectionTitle: {
+        ...Typography.h3,
+        fontSize: FONTS.size.lg,
+        marginBottom: SPACING.sm,
     },
     descriptionContainer: {
-        marginBottom: 16,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ecf0f1',
-    },
-    descriptionTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#2c3e50',
-        marginBottom: 8,
+        backgroundColor: COLORS.white,
+        borderRadius: SPACING.sm,
+        padding: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     descriptionText: {
-        fontSize: 14,
-        color: '#34495e',
-        lineHeight: 20,
+        ...Typography.bodyRegular,
+        lineHeight: 22,
     },
+    datesSection: {
+        marginBottom: SPACING.md,
+    },
+    dateItem: {
+        flexDirection: 'row',
+        marginBottom: SPACING.xs,
+    },
+    dateLabel: {
+        ...Typography.bodyMedium,
+        fontWeight: FONTS.weight.semiBold,
+        width: 80,
+    },
+    dateValue: {
+        ...Typography.bodyRegular,
+        flex: 1,
+    },
+
+    // Subtasks Section
     subtasksContainer: {
-        marginBottom: 16,
-    },
-    subtasksTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#2c3e50',
-        marginBottom: 12,
+        backgroundColor: COLORS.white,
+        borderRadius: SPACING.md,
+        padding: SPACING.md,
+        ...CommonStyles.card,
     },
     noSubtasksText: {
-        fontSize: 14,
-        color: '#7f8c8d',
+        ...Typography.bodyRegular,
+        color: COLORS.gray,
         fontStyle: 'italic',
-        marginBottom: 16,
+        marginBottom: SPACING.md,
     },
     subtaskItem: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 8,
+        paddingVertical: SPACING.sm,
         borderBottomWidth: 1,
-        borderBottomColor: '#ecf0f1',
+        borderBottomColor: COLORS.border,
     },
-    subtaskContent: {
+    subtaskCheckboxContainer: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
     },
-    checkbox: {
-        width: 22,
-        height: 22,
-        borderRadius: 4,
+    subtaskCheckbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
         borderWidth: 2,
-        borderColor: '#bdc3c7',
-        marginRight: 12,
+        borderColor: COLORS.gray,
+        marginRight: SPACING.sm,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    checkedCheckbox: {
-        backgroundColor: '#3498db',
-        borderColor: '#3498db',
-    },
-    checkmark: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
     subtaskText: {
-        fontSize: 14,
-        color: '#34495e',
+        ...Typography.bodyRegular,
         flex: 1,
     },
     completedSubtaskText: {
         textDecorationLine: 'line-through',
-        color: '#95a5a6',
+        color: COLORS.gray,
     },
     deleteSubtaskButton: {
-        padding: 8,
-    },
-    deleteSubtaskButtonText: {
-        fontSize: 18,
-        color: '#e74c3c',
-        fontWeight: 'bold',
+        padding: SPACING.sm,
     },
     addSubtaskContainer: {
         flexDirection: 'row',
-        marginTop: 12,
+        marginTop: SPACING.md,
     },
     addSubtaskInput: {
         flex: 1,
-        height: 40,
+        backgroundColor: COLORS.white,
         borderWidth: 1,
-        borderColor: '#bdc3c7',
-        borderRadius: 4,
-        paddingHorizontal: 12,
-        marginRight: 8,
-        backgroundColor: '#ffffff',
+        borderColor: COLORS.border,
+        borderRadius: SPACING.xs,
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: SPACING.sm,
+        marginRight: SPACING.sm,
+        ...Typography.bodyRegular,
     },
     addSubtaskButton: {
-        backgroundColor: '#3498db',
-        paddingHorizontal: 16,
+        backgroundColor: COLORS.primary,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 4,
     },
     disabledAddSubtaskButton: {
-        backgroundColor: '#95a5a6',
+        backgroundColor: COLORS.gray,
+        opacity: 0.5,
     },
-    addSubtaskButtonText: {
-        color: '#ffffff',
-        fontWeight: '600',
-    },
+
+    // Edit Mode Styles
     editFormContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        backgroundColor: COLORS.white,
+        borderRadius: SPACING.md,
+        padding: SPACING.md,
+        marginBottom: SPACING.md,
+        ...CommonStyles.card,
     },
     label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#2c3e50',
-        marginBottom: 8,
+        ...Typography.label,
+        marginBottom: SPACING.xs,
     },
     input: {
-        borderWidth: 1,
-        borderColor: '#bdc3c7',
-        borderRadius: 4,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        marginBottom: 16,
-        backgroundColor: '#ffffff',
-        fontSize: 14,
+        ...CommonStyles.input,
+        marginBottom: SPACING.md,
     },
     textArea: {
         height: 100,
+        textAlignVertical: 'top',
     },
     priorityPickerContainer: {
         flexDirection: 'row',
-        marginBottom: 16,
+        justifyContent: 'space-between',
+        marginBottom: SPACING.md,
     },
     priorityOption: {
         flex: 1,
-        paddingVertical: 8,
-        borderRadius: 4,
-        marginRight: 8,
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        padding: SPACING.sm,
+        borderRadius: SPACING.xs,
+        marginHorizontal: SPACING.xxs,
     },
     selectedPriorityOption: {
         borderWidth: 0,
     },
     priorityOptionText: {
-        fontSize: 14,
-        color: '#34495e',
-        fontWeight: '500',
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.xs,
     },
     selectedPriorityOptionText: {
-        color: '#ffffff',
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     dueDateContainer: {
-        flexDirection: 'row',
-        marginBottom: 16,
+        marginBottom: SPACING.md,
     },
     datePickerButton: {
-        flex: 1,
-        height: 40,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
         borderWidth: 1,
-        borderColor: '#bdc3c7',
-        borderRadius: 4,
-        paddingHorizontal: 12,
-        justifyContent: 'center',
-        backgroundColor: '#ffffff',
-        marginRight: 8,
+        borderColor: COLORS.border,
+        borderRadius: SPACING.xs,
+        padding: SPACING.sm,
+        marginBottom: SPACING.sm,
+    },
+    datePickerIcon: {
+        marginRight: SPACING.sm,
     },
     datePickerButtonText: {
-        color: '#34495e',
-        fontSize: 14,
+        ...Typography.bodyRegular,
+    },
+    dateTimeActions: {
+        flexDirection: 'row',
+    },
+    timePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: SPACING.xs,
+        padding: SPACING.sm,
+        flex: 1,
+        marginRight: SPACING.sm,
+    },
+    timePickerButtonText: {
+        ...Typography.bodyRegular,
+        marginLeft: SPACING.xs,
     },
     clearDateButton: {
-        backgroundColor: '#95a5a6',
-        paddingHorizontal: 16,
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 4,
+        backgroundColor: COLORS.lightGray,
+        borderRadius: SPACING.xs,
+        padding: SPACING.sm,
     },
     clearDateButtonText: {
-        color: '#ffffff',
-        fontWeight: '600',
+        ...Typography.bodyRegular,
+        color: COLORS.danger,
+        marginLeft: SPACING.xs,
     },
 });
 

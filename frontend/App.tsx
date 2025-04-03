@@ -168,7 +168,44 @@ export default function App() {
     useEffect(() => {
         const setupNotifications = async () => {
             try {
+                // Register for push notifications
                 await registerForPushNotificationsAsync();
+
+                // Set up notification handlers for when the app is in foreground
+                Notifications.setNotificationHandler({
+                    handleNotification: async () => ({
+                        shouldShowAlert: true,
+                        shouldPlaySound: true,
+                        shouldSetBadge: true,
+                        // Customize iOS presentation options
+                        ...(Platform.OS === 'ios' && {
+                            presentationOptions: [
+                                Notifications.PresentationOption.BANNER,
+                                Notifications.PresentationOption.SOUND,
+                                Notifications.PresentationOption.BADGE,
+                            ],
+                        }),
+                    }),
+                });
+
+                // Handle notification when app is opened from a notification
+                const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+                    // Extract data from the notification
+                    const data = response.notification.request.content.data;
+
+                    // Handle different notification types
+                    if (data.type === 'task-reminder' && data.taskId) {
+                        // Navigate to task detail - you'll need to wrap this in a setTimeout
+                        // and use a navigation ref to make this work from outside React components
+                        console.log('Should navigate to task:', data.taskId);
+                        // navigationRef.current?.navigate('TaskDetail', { taskId: data.taskId });
+                    }
+                });
+
+                // Clean up listener when the component unmounts
+                return () => {
+                    Notifications.removeNotificationSubscription(responseListener);
+                };
             } catch (error) {
                 console.error('Error setting up notifications:', error);
             }

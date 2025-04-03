@@ -5,12 +5,20 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { Task } from '../utils/supabase';
 
-// Configure notifications with more robust handling
+// Configure notifications with improved handling and customized appearance
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
+        // Customize iOS presentation options
+        ...(Platform.OS === 'ios' && {
+            presentationOptions: [
+                Notifications.PresentationOption.BADGE,
+                Notifications.PresentationOption.SOUND,
+                Notifications.PresentationOption.BANNER,
+            ],
+        }),
     }),
 });
 
@@ -155,61 +163,66 @@ async function getPushToken(projectId: string): Promise<string | undefined> {
 }
 
 /**
+ * Check if a notification should be scheduled for a task
+ * @param task The task to check
+ * @returns Boolean indicating if notification should be scheduled
+ */
+function shouldScheduleNotification(task: Task): boolean {
+    if (!task.due_date || task.status === 'completed') return false;
+
+    const dueDate = new Date(task.due_date);
+    const notificationDate = new Date(dueDate.getTime() - 60 * 60 * 1000); // 1 hour before
+    const now = new Date();
+
+    return notificationDate > now;
+}
+
+/**
  * Schedule a task reminder notification
  * @param task The task to create a reminder for
  * @returns Notification ID if scheduled, null otherwise
  */
 export async function scheduleTaskReminder(task: Task) {
-    if (!task.due_date) return null;
+    if (!shouldScheduleNotification(task)) {
+        console.log(`Not scheduling notification for task "${task.title}": Invalid conditions`);
+        return null;
+    }
 
     try {
         // Cancel any existing notifications for this task first to avoid duplicates
-        const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-
-        const existingTaskNotifications = scheduledNotifications.filter(
-            notification =>
-                notification.content.data?.taskId === task.id &&
-                notification.content.data?.type === 'task-reminder'
-        );
-
-        for (const notification of existingTaskNotifications) {
-            await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-        }
+        await cancelTaskNotificationsByTaskId(task.id);
 
         // Calculate notification time (1 hour before due date)
-        const dueDate = new Date(task.due_date);
+        const dueDate = new Date(task.due_date!);
         const notificationDate = new Date(dueDate.getTime() - 60 * 60 * 1000); // 1 hour before
 
-        // Don't schedule notifications for past dates
-        if (notificationDate <= new Date()) {
-            console.log(`Task "${task.title}" due date is in the past, not scheduling notification`);
-            return null;
-        }
+        // Format the due time for better readability in the notification
+        const dueTimeStr = dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // Prevent scheduling multiple notifications for the same task
-        const scheduledForThisTask = scheduledNotifications.some(
-            notification =>
-                notification.content.data?.taskId === task.id &&
-                notification.content.data?.type === 'task-reminder'
-        );
+        // Get priority color as emoji
+        let priorityEmoji = "🔵"; // default blue for medium
+        if (task.priority === 'high') priorityEmoji = "🔴";
+        if (task.priority === 'low') priorityEmoji = "🟢";
 
-        if (scheduledForThisTask) {
-            console.log(`Notification already scheduled for task "${task.title}"`);
-            return null;
-        }
-
-        // Schedule notification with appropriate channel for Android
+        // Schedule notification with appropriate channel for Android and custom styling
         const notificationId = await Notifications.scheduleNotificationAsync({
             content: {
-                title: 'Task Reminder',
-                body: `"${task.title}" is due in 1 hour`,
+                title: `${priorityEmoji} Task Reminder: ${task.title}`,
+                body: `Due at ${dueTimeStr}. Time to focus on this task!`,
                 data: {
                     taskId: task.id,
-                    type: 'task-reminder'
+                    type: 'task-reminder',
+                    priority: task.priority
                 },
+                // Custom sound if available
                 sound: true,
-                priority: Notifications.AndroidNotificationPriority.HIGH,
-                ...(Platform.OS === 'android' ? { channelId: 'task-reminders' } : {}),
+                // Android specific
+                ...(Platform.OS === 'android' ? {
+                    channelId: 'task-reminders',
+                    color: task.priority === 'high' ? '#e74c3c' :
+                        task.priority === 'medium' ? '#f39c12' : '#2ecc71',
+                    priority: Notifications.AndroidNotificationPriority.HIGH,
+                } : {}),
             },
             trigger: {
                 date: notificationDate,
@@ -221,6 +234,33 @@ export async function scheduleTaskReminder(task: Task) {
     } catch (error) {
         console.error('Error scheduling task notification:', error);
         return null;
+    }
+}
+
+/**
+ * Cancel notifications for a specific task by task ID
+ * @param taskId ID of the task
+ * @returns true if successful, false otherwise
+ */
+export async function cancelTaskNotificationsByTaskId(taskId: string) {
+    try {
+        const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+
+        // Find all notifications for this task
+        const taskNotifications = scheduledNotifications.filter(
+            notification => notification.content.data?.taskId === taskId
+        );
+
+        // Cancel each notification
+        for (const notification of taskNotifications) {
+            await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+            console.log(`Canceled notification for task ID ${taskId}: ${notification.identifier}`);
+        }
+
+        return true;
+    } catch (error) {
+        console.error(`Error canceling notifications for task ${taskId}:`, error);
+        return false;
     }
 }
 
@@ -265,10 +305,13 @@ export async function scheduleDailyDigest(hour: number = 8, minute: number = 0) 
         // Schedule the notification with a daily repeating trigger
         const notificationId = await Notifications.scheduleNotificationAsync({
             content: {
-                title: 'Daily Task Digest',
-                body: 'Check your tasks for today',
+                title: '📋 Daily Task Digest',
+                body: 'Review your tasks for today and plan your day',
                 data: { type: 'dailyDigest' },
-                ...(Platform.OS === 'android' ? { channelId: 'task-reminders' } : {}),
+                ...(Platform.OS === 'android' ? {
+                    channelId: 'task-reminders',
+                    color: '#3498db', // App primary color
+                } : {}),
             },
             trigger: {
                 hour,
@@ -305,56 +348,6 @@ async function cancelNotificationsByType(type: string) {
     } catch (error) {
         console.error(`Error canceling ${type} notifications:`, error);
         return false;
-    }
-}
-
-/**
- * Schedule a medication reminder
- * @param medicationName Name of the medication
- * @param hour Hour to schedule the notification (0-23)
- * @param minute Minute to schedule the notification (0-59)
- * @param daysOfWeek Days of the week to schedule (1-7, where 1 is Monday)
- * @returns Array of notification IDs if scheduled, null otherwise
- */
-export async function scheduleMedicationReminder(
-    medicationName: string,
-    hour: number,
-    minute: number,
-    daysOfWeek: number[] = [1, 2, 3, 4, 5, 6, 7] // All days by default
-) {
-    try {
-        const notificationIds: string[] = [];
-
-        // Cancel any existing reminders for this medication first
-        await cancelNotificationsByData({ medicationName });
-
-        // Schedule a notification for each day of the week
-        for (const day of daysOfWeek) {
-            const notificationId = await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: 'Medication Reminder',
-                    body: `Time to take your ${medicationName}`,
-                    data: { type: 'medication', name: medicationName },
-                    sound: true,
-                    priority: Notifications.AndroidNotificationPriority.HIGH,
-                    ...(Platform.OS === 'android' ? { channelId: 'medication-reminders' } : {}),
-                },
-                trigger: {
-                    hour,
-                    minute,
-                    weekday: day,
-                    repeats: true,
-                },
-            });
-
-            notificationIds.push(notificationId);
-            console.log(`Scheduled medication reminder for ${medicationName} on day ${day} at ${hour}:${minute}`);
-        }
-
-        return notificationIds;
-    } catch (error) {
-        console.error('Error scheduling medication reminder:', error);
-        return null;
     }
 }
 
@@ -419,42 +412,6 @@ export async function showNotification(title: string, body: string, data: any = 
 }
 
 /**
- * Schedule a notification after a time interval
- * @param title Notification title
- * @param body Notification body
- * @param seconds Seconds to wait before showing
- * @param data Optional data to include
- * @returns Notification ID if scheduled, null otherwise
- */
-export async function scheduleNotificationAfterInterval(
-    title: string,
-    body: string,
-    seconds: number,
-    data: any = {},
-    channelId: string = 'default'
-) {
-    try {
-        const notificationId = await Notifications.scheduleNotificationAsync({
-            content: {
-                title,
-                body,
-                data,
-                ...(Platform.OS === 'android' ? { channelId } : {}),
-            },
-            trigger: {
-                seconds,
-            },
-        });
-
-        console.log(`Scheduled notification after ${seconds} seconds: ${title}`);
-        return notificationId;
-    } catch (error) {
-        console.error('Error scheduling interval notification:', error);
-        return null;
-    }
-}
-
-/**
  * Get all scheduled notifications
  * @returns Array of scheduled notifications
  */
@@ -500,57 +457,6 @@ export function setupNotificationListeners(
         Notifications.removeNotificationSubscription(notificationListener);
         Notifications.removeNotificationSubscription(responseListener);
     };
-}
-
-/**
- * Schedule a weekly mood check-in notification
- * @param dayOfWeek Day of the week to schedule (1-7, where 1 is Monday)
- * @param hour Hour to schedule the notification (0-23)
- * @param minute Minute to schedule the notification (0-59)
- * @returns Notification ID if scheduled, null otherwise
- */
-export async function scheduleWeeklyMoodCheckIn(dayOfWeek: number = 5, hour: number = 18, minute: number = 0) {
-    try {
-        // Cancel any existing mood check-ins
-        await cancelNotificationsByType('moodCheckIn');
-
-        // Schedule the notification with a weekly repeating trigger
-        const notificationId = await Notifications.scheduleNotificationAsync({
-            content: {
-                title: 'Weekly Mood Check-In',
-                body: 'Take a moment to reflect on your week and log your mood.',
-                data: { type: 'moodCheckIn' },
-                ...(Platform.OS === 'android' ? { channelId: 'mood-journal' } : {}),
-            },
-            trigger: {
-                weekday: dayOfWeek,
-                hour,
-                minute,
-                repeats: true,
-            },
-        });
-
-        console.log(`Scheduled weekly mood check-in for day ${dayOfWeek} at ${hour}:${minute}`);
-        return notificationId;
-    } catch (error) {
-        console.error('Error scheduling weekly mood check-in:', error);
-        return null;
-    }
-}
-
-/**
- * Set or update the notification badge count
- * @param count The number to display on the app icon badge
- * @returns true if successful, false otherwise
- */
-export async function setBadgeCount(count: number) {
-    try {
-        await Notifications.setBadgeCountAsync(count);
-        return true;
-    } catch (error) {
-        console.error('Error setting badge count:', error);
-        return false;
-    }
 }
 
 /**

@@ -1,5 +1,5 @@
 // frontend/src/screens/tasks/TasksScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,7 +7,10 @@ import {
     TouchableOpacity,
     FlatList,
     ActivityIndicator,
-    Alert
+    Alert,
+    Animated,
+    SectionList,
+    RefreshControl
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { supabase } from '../../utils/supabase';
@@ -16,17 +19,24 @@ import TaskItem from '../../components/TaskItem';
 import { Task } from '../../utils/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../../components/ScreenLayout';
-import { COLORS, SPACING, Typography } from '../../utils/styles';
+import { COLORS, SPACING, FONTS, Typography, CommonStyles } from '../../utils/styles';
+
+// For smooth animations
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const TasksScreen = () => {
     const navigation = useNavigation();
     const { user, session } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
+    const [sectionsData, setSectionsData] = useState<{title: string, data: Task[]}[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+    const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'overdue' | 'upcoming'>('all');
     const [error, setError] = useState<string | null>(null);
+
+    // Animation values
+    const filterBarOpacity = useRef(new Animated.Value(1)).current;
+    const addButtonScale = useRef(new Animated.Value(1)).current;
 
     // Refresh tasks every time the screen comes into focus
     useFocusEffect(
@@ -34,6 +44,20 @@ const TasksScreen = () => {
             if (user) {
                 console.log('Screen focused, refreshing tasks for user:', user.id);
                 fetchTasks();
+
+                // Button animation on screen focus
+                Animated.sequence([
+                    Animated.timing(addButtonScale, {
+                        toValue: 1.2,
+                        duration: 200,
+                        useNativeDriver: true
+                    }),
+                    Animated.timing(addButtonScale, {
+                        toValue: 1,
+                        duration: 200,
+                        useNativeDriver: true
+                    })
+                ]).start();
             }
         }, [user])
     );
@@ -70,6 +94,24 @@ const TasksScreen = () => {
         };
     }, [user]);
 
+    // Function to check if a task is overdue
+    const isTaskOverdue = (task: Task) => {
+        if (!task.due_date || task.status === 'completed') return false;
+        const dueDate = new Date(task.due_date);
+        const now = new Date();
+        return dueDate < now;
+    };
+
+    // Function to check if a task is upcoming within 24 hours
+    const isTaskUpcoming = (task: Task) => {
+        if (!task.due_date || task.status === 'completed') return false;
+        const dueDate = new Date(task.due_date);
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setHours(now.getHours() + 24);
+        return dueDate > now && dueDate <= tomorrow;
+    };
+
     // Fetch tasks from Supabase
     const fetchTasks = async () => {
         if (!user) return;
@@ -104,7 +146,7 @@ const TasksScreen = () => {
 
             console.log(`Fetched ${tasksWithCounts.length} tasks`);
             setTasks(tasksWithCounts);
-            applyFilter(filter, tasksWithCounts);
+            updateSections(tasksWithCounts, filter);
         } catch (error: any) {
             console.error('Error fetching tasks:', error.message);
             setError('Failed to load tasks. Pull down to retry.');
@@ -114,20 +156,88 @@ const TasksScreen = () => {
         }
     };
 
-    // Apply filter to tasks
-    const applyFilter = (filterType: 'all' | 'active' | 'completed', taskList = tasks) => {
+    // Update sections based on filter and tasks
+    const updateSections = (taskList = tasks, filterType: string) => {
+        let filteredTasks: Task[] = [];
+        let sections: {title: string, data: Task[]}[] = [];
+
         switch (filterType) {
             case 'active':
-                setFilteredTasks(taskList.filter(task => task.status === 'active'));
+                filteredTasks = taskList.filter(task => task.status === 'active');
                 break;
             case 'completed':
-                setFilteredTasks(taskList.filter(task => task.status === 'completed'));
+                filteredTasks = taskList.filter(task => task.status === 'completed');
                 break;
-            default:
-                setFilteredTasks(taskList);
+            case 'overdue':
+                filteredTasks = taskList.filter(task => isTaskOverdue(task));
+                break;
+            case 'upcoming':
+                filteredTasks = taskList.filter(task => isTaskUpcoming(task));
+                break;
+            default: // 'all'
+                filteredTasks = taskList;
                 break;
         }
+
+        // For 'all' view, organize tasks into logical sections
+        if (filterType === 'all') {
+            const overdueTasks = taskList.filter(task => isTaskOverdue(task));
+            const dueTodayTasks = taskList.filter(task => {
+                if (task.due_date && task.status === 'active') {
+                    const dueDate = new Date(task.due_date);
+                    const now = new Date();
+                    return dueDate.toDateString() === now.toDateString();
+                }
+                return false;
+            });
+            const upcomingTasks = taskList.filter(task => {
+                if (task.due_date && task.status === 'active') {
+                    const dueDate = new Date(task.due_date);
+                    const now = new Date();
+                    const today = new Date(now);
+                    today.setHours(23, 59, 59, 999);
+                    return dueDate > today && !isTaskOverdue(task) && !dueTodayTasks.includes(task);
+                }
+                return false;
+            });
+            const noDueDateTasks = taskList.filter(task => {
+                return !task.due_date && task.status === 'active';
+            });
+            const completedTasks = taskList.filter(task => task.status === 'completed');
+
+            sections = [
+                { title: 'Overdue', data: overdueTasks },
+                { title: 'Due Today', data: dueTodayTasks },
+                { title: 'Upcoming', data: upcomingTasks },
+                { title: 'No Due Date', data: noDueDateTasks },
+                { title: 'Completed', data: completedTasks }
+            ].filter(section => section.data.length > 0); // Only include non-empty sections
+        } else {
+            // For other views, just use the filtered tasks as a single section
+            sections = [{ title: filterType.charAt(0).toUpperCase() + filterType.slice(1) + ' Tasks', data: filteredTasks }];
+        }
+
+        setSectionsData(sections);
+    };
+
+    // Apply filter to tasks
+    const applyFilter = (filterType: 'all' | 'active' | 'completed' | 'overdue' | 'upcoming') => {
+        updateSections(tasks, filterType);
         setFilter(filterType);
+
+        // Animate filter change
+        Animated.sequence([
+            Animated.timing(filterBarOpacity, {
+                toValue: 0.7,
+                duration: 150,
+                useNativeDriver: true
+            }),
+            Animated.timing(filterBarOpacity, {
+                toValue: 1,
+                duration: 150,
+                useNativeDriver: true
+            })
+        ]).start();
     };
 
     // Navigate to the task detail screen
@@ -150,13 +260,14 @@ const TasksScreen = () => {
                 )
             );
 
-            // Apply filter with the updated tasks array
-            setFilteredTasks(prevFiltered =>
-                prevFiltered.map(t =>
+            // Also update the sections
+            updateSections(
+                tasks.map(t =>
                     t.id === task.id
                         ? {...t, status: newStatus, completed_at: newCompletedAt}
                         : t
-                )
+                ),
+                filter
             );
 
             // Update in database
@@ -180,24 +291,65 @@ const TasksScreen = () => {
     // Render empty state when no tasks are available
     const renderEmpty = () => (
         <View style={styles.emptyContainer}>
-            <Ionicons name="checkbox-outline" size={64} color="#bdc3c7" />
+            <Ionicons name="checkbox-outline" size={64} color={COLORS.lightGray} />
             <Text style={styles.emptyTitle}>No tasks found</Text>
             <Text style={styles.emptySubtitle}>
                 {filter === 'all'
                     ? 'Tap the + button to create your first task'
                     : `No ${filter} tasks found`}
             </Text>
+            <TouchableOpacity
+                style={styles.emptyAddButton}
+                onPress={() => navigation.navigate('CreateTask' as any)}
+            >
+                <Ionicons name="add-circle" size={24} color={COLORS.white} />
+                <Text style={styles.emptyAddButtonText}>Add Task</Text>
+            </TouchableOpacity>
         </View>
     );
 
     const renderAddButton = () => (
-        <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('CreateTask' as any)}
+        <AnimatedTouchable
+            style={[
+                styles.addButton,
+                { transform: [{ scale: addButtonScale }] }
+            ]}
+            onPress={() => {
+                // Button press animation
+                Animated.sequence([
+                    Animated.timing(addButtonScale, {
+                        toValue: 0.8,
+                        duration: 100,
+                        useNativeDriver: true
+                    }),
+                    Animated.timing(addButtonScale, {
+                        toValue: 1,
+                        duration: 100,
+                        useNativeDriver: true
+                    })
+                ]).start();
+
+                navigation.navigate('CreateTask' as any);
+            }}
             accessibilityLabel="Add new task"
         >
             <Ionicons name="add" size={24} color={COLORS.white} />
-        </TouchableOpacity>
+        </AnimatedTouchable>
+    );
+
+    // Render section header
+    const renderSectionHeader = ({ section }: { section: { title: string, data: Task[] } }) => (
+        <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>
+                {section.title} {section.data.length > 0 && `(${section.data.length})`}
+            </Text>
+            {section.title === 'Overdue' && section.data.length > 0 && (
+                <View style={styles.overdueBadge}>
+                    <Ionicons name="alert-circle" size={14} color={COLORS.white} />
+                    <Text style={styles.overdueBadgeText}>Needs Attention</Text>
+                </View>
+            )}
+        </View>
     );
 
     // Handle pull-to-refresh
@@ -222,63 +374,27 @@ const TasksScreen = () => {
                 </View>
             )}
             <View style={styles.container}>
-                <View style={styles.filterContainer}>
-                    <TouchableOpacity
-                        style={[
-                            styles.filterButton,
-                            filter === 'all' && styles.activeFilterButton,
-                        ]}
-                        onPress={() => applyFilter('all')}
-                    >
-                        <Text
-                            style={[
-                                styles.filterButtonText,
-                                filter === 'all' && styles.activeFilterButtonText,
-                            ]}
-                        >
-                            All
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[
-                            styles.filterButton,
-                            filter === 'active' && styles.activeFilterButton,
-                        ]}
-                        onPress={() => applyFilter('active')}
-                    >
-                        <Text
-                            style={[
-                                styles.filterButtonText,
-                                filter === 'active' && styles.activeFilterButtonText,
-                            ]}
-                        >
-                            Active
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[
-                            styles.filterButton,
-                            filter === 'completed' && styles.activeFilterButton,
-                        ]}
-                        onPress={() => applyFilter('completed')}
-                    >
-                        <Text
-                            style={[
-                                styles.filterButtonText,
-                                filter === 'completed' && styles.activeFilterButtonText,
-                            ]}
-                        >
-                            Completed
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                <Animated.View
+                    style={[
+                        styles.filterContainer,
+                        { opacity: filterBarOpacity }
+                    ]}
+                >
+                    <ScrollableFilterBar
+                        currentFilter={filter}
+                        onFilterChange={applyFilter}
+                    />
+                </Animated.View>
+
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#3498db" />
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                        <Text style={styles.loadingText}>Loading your tasks...</Text>
                     </View>
                 ) : (
-                    <FlatList
-                        data={filteredTasks}
+                    <SectionList
+                        sections={sectionsData}
+                        keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <TaskItem
                                 task={item}
@@ -286,18 +402,69 @@ const TasksScreen = () => {
                                 onToggleCompletion={toggleTaskCompletion}
                             />
                         )}
-                        keyExtractor={(item) => item.id}
+                        renderSectionHeader={renderSectionHeader}
                         contentContainerStyle={[
                             styles.tasksList,
-                            filteredTasks.length === 0 && styles.emptyList,
+                            sectionsData.every(section => section.data.length === 0) && styles.emptyList,
                         ]}
                         ListEmptyComponent={renderEmpty}
-                        onRefresh={handleRefresh}
-                        refreshing={refreshing}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={handleRefresh}
+                                colors={[COLORS.primary]}
+                                tintColor={COLORS.primary}
+                            />
+                        }
+                        stickySectionHeadersEnabled={true}
                     />
                 )}
             </View>
         </ScreenLayout>
+    );
+};
+
+// Scrollable Filter Bar Component
+const ScrollableFilterBar = ({
+                                 currentFilter,
+                                 onFilterChange
+                             }: {
+    currentFilter: string;
+    onFilterChange: (filter: any) => void
+}) => {
+    const filters = [
+        { key: 'all', label: 'All', icon: 'list' },
+        { key: 'overdue', label: 'Overdue', icon: 'alert-circle' },
+        { key: 'upcoming', label: 'Upcoming', icon: 'time' },
+        { key: 'active', label: 'Active', icon: 'checkmark-circle-outline' },
+        { key: 'completed', label: 'Completed', icon: 'checkmark-circle' }
+    ];
+
+    return (
+        <View style={styles.scrollableFilterContainer}>
+            {filters.map(filter => (
+                <TouchableOpacity
+                    key={filter.key}
+                    style={[
+                        styles.filterButton,
+                        currentFilter === filter.key && styles.activeFilterButton
+                    ]}
+                    onPress={() => onFilterChange(filter.key)}
+                >
+                    <Ionicons
+                        name={filter.icon}
+                        size={16}
+                        color={currentFilter === filter.key ? COLORS.white : COLORS.dark}
+                    />
+                    <Text style={[
+                        styles.filterButtonText,
+                        currentFilter === filter.key && styles.activeFilterButtonText
+                    ]}>
+                        {filter.label}
+                    </Text>
+                </TouchableOpacity>
+            ))}
+        </View>
     );
 };
 
@@ -313,100 +480,151 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
+        shadowColor: COLORS.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 4,
     },
     errorContainer: {
-        padding: 16,
+        padding: SPACING.md,
         backgroundColor: '#ffebee',
-        marginHorizontal: 16,
-        marginTop: 16,
+        marginHorizontal: SPACING.md,
+        marginTop: SPACING.md,
         borderRadius: 8,
         alignItems: 'center',
     },
     errorText: {
-        color: '#e74c3c',
-        marginBottom: 8,
+        color: COLORS.danger,
+        marginBottom: SPACING.sm,
+        ...Typography.bodyMedium,
     },
     retryButton: {
-        backgroundColor: '#e74c3c',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
+        backgroundColor: COLORS.danger,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
         borderRadius: 4,
     },
     retryButtonText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
-    },
-    title: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#333',
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     filterContainer: {
-        flexDirection: 'row',
-        padding: 16,
-        justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
+        padding: SPACING.sm,
+        backgroundColor: COLORS.white,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
+        borderBottomColor: COLORS.border,
+        zIndex: 2, // Ensure filter bar is above content
+    },
+    scrollableFilterContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: SPACING.xs,
     },
     filterButton: {
-        paddingVertical: 8,
-        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
         borderRadius: 20,
-        marginHorizontal: 8,
-        backgroundColor: '#F2F2F2',
+        backgroundColor: COLORS.lightGray,
+        marginRight: SPACING.xs,
     },
     activeFilterButton: {
-        backgroundColor: '#3498db',
+        backgroundColor: COLORS.primary,
     },
     filterButtonText: {
-        color: '#666',
-        fontWeight: '500',
+        ...Typography.caption,
+        fontWeight: FONTS.weight.medium,
+        marginLeft: SPACING.xs,
+        color: COLORS.dark,
     },
     activeFilterButtonText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     tasksList: {
-        paddingVertical: 8,
+        paddingBottom: SPACING.xxl,
     },
     emptyList: {
         flexGrow: 1,
         justifyContent: 'center',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        backgroundColor: 'rgba(248, 249, 250, 0.95)',
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    sectionHeaderText: {
+        ...Typography.bodyMedium,
+        color: COLORS.dark,
+        fontWeight: FONTS.weight.semiBold,
+    },
+    overdueBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.danger,
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: 12,
+        marginLeft: SPACING.sm,
+    },
+    overdueBadgeText: {
+        color: COLORS.white,
+        fontSize: FONTS.size.xs,
+        fontWeight: FONTS.weight.medium,
+        marginLeft: SPACING.xs,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    loadingText: {
+        ...Typography.bodyMedium,
+        color: COLORS.gray,
+        marginTop: SPACING.md,
+    },
     emptyContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 64,
-        padding: 20,
+        padding: SPACING.xl,
     },
     emptyTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#7f8c8d',
-        marginTop: 16,
+        ...Typography.h3,
+        color: COLORS.gray,
+        marginTop: SPACING.md,
     },
     emptySubtitle: {
-        fontSize: 14,
-        color: '#95a5a6',
+        ...Typography.bodyRegular,
+        color: COLORS.gray,
         textAlign: 'center',
-        marginTop: 8,
+        marginTop: SPACING.sm,
+        marginBottom: SPACING.lg,
+    },
+    emptyAddButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.primary,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.lg,
+        borderRadius: 20,
+        shadowColor: COLORS.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    emptyAddButtonText: {
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
+        marginLeft: SPACING.xs,
     },
 });
 

@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Task } from '../utils/supabase';
+import { COLORS, SPACING, FONTS, Typography } from '../utils/styles';
 
 // Extended Task type that includes optional subtask counts
 interface ExtendedTask extends Task {
@@ -17,7 +18,7 @@ type TaskItemProps = {
 };
 
 const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
-    // Format the due date if present
+    // Format the due date if present with time details
     const formatDueDate = (dateString?: string | null) => {
         if (!dateString) return null;
 
@@ -26,30 +27,49 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
         const tomorrow = new Date(now);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
+        // Get time part formatted nicely
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
         // Check if the date is today, tomorrow, or another day
         if (date.toDateString() === now.toDateString()) {
-            return 'Today';
+            return `Today, ${timeStr}`;
         } else if (date.toDateString() === tomorrow.toDateString()) {
-            return 'Tomorrow';
+            return `Tomorrow, ${timeStr}`;
         } else {
             return date.toLocaleDateString('en-US', {
                 month: 'short',
-                day: 'numeric'
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
             });
         }
     };
 
-    // Get priority color
+    // Get priority color from app colors
     const getPriorityColor = (priority: string) => {
         switch (priority) {
             case 'high':
-                return '#e74c3c';
+                return COLORS.highPriority;
             case 'medium':
-                return '#f39c12';
+                return COLORS.mediumPriority;
             case 'low':
-                return '#27ae60';
+                return COLORS.lowPriority;
             default:
-                return '#95a5a6';
+                return COLORS.gray;
+        }
+    };
+
+    // Get priority icon
+    const getPriorityIcon = (priority: string) => {
+        switch (priority) {
+            case 'high':
+                return 'alert-circle';
+            case 'medium':
+                return 'alert';
+            case 'low':
+                return 'checkmark-circle';
+            default:
+                return 'help-circle';
         }
     };
 
@@ -60,10 +80,6 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
         const dueDate = new Date(task.due_date);
         const now = new Date();
 
-        // Reset time components for date comparison
-        dueDate.setHours(23, 59, 59, 999);
-        now.setHours(0, 0, 0, 0);
-
         return dueDate < now;
     };
 
@@ -73,16 +89,48 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
 
         const dueDate = new Date(task.due_date);
         const now = new Date();
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        const twentyFourHoursLater = new Date(now);
+        twentyFourHoursLater.setHours(now.getHours() + 24);
 
-        // If due date is today
-        return dueDate.toDateString() === now.toDateString();
+        return dueDate > now && dueDate <= twentyFourHoursLater;
+    };
+
+    // Calculate remaining time in a human-readable format
+    const getRemainingTime = () => {
+        if (!task.due_date || task.status === 'completed') return null;
+
+        const dueDate = new Date(task.due_date);
+        const now = new Date();
+
+        if (dueDate < now) {
+            // Task is overdue
+            const diffMs = now.getTime() - dueDate.getTime();
+            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+
+            if (diffHrs < 24) {
+                return `${diffHrs} hr${diffHrs !== 1 ? 's' : ''} overdue`;
+            } else {
+                const diffDays = Math.floor(diffHrs / 24);
+                return `${diffDays} day${diffDays !== 1 ? 's' : ''} overdue`;
+            }
+        } else {
+            // Task is upcoming
+            const diffMs = dueDate.getTime() - now.getTime();
+            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+
+            if (diffHrs < 24) {
+                return `${diffHrs} hr${diffHrs !== 1 ? 's' : ''} left`;
+            } else {
+                const diffDays = Math.floor(diffHrs / 24);
+                return `${diffDays} day${diffDays !== 1 ? 's' : ''} left`;
+            }
+        }
     };
 
     const dueDate = formatDueDate(task.due_date);
     const overdue = isOverdue();
     const dueSoon = isDueSoon();
+    const remainingTime = getRemainingTime();
 
     // Handle task completion toggle
     const handleToggleCompletion = () => {
@@ -90,6 +138,14 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
             onToggleCompletion(task);
         }
     };
+
+    // Calculate progress for subtasks
+    const calculateProgress = () => {
+        if (!task.subtasks_count || task.subtasks_count === 0) return 0;
+        return ((task.subtasks_completed || 0) / task.subtasks_count) * 100;
+    };
+
+    const subtaskProgress = calculateProgress();
 
     return (
         <TouchableOpacity
@@ -107,25 +163,30 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                 <TouchableOpacity
                     style={[
                         styles.checkbox,
-                        task.status === 'completed' ? styles.checkboxChecked : null
+                        task.status === 'completed' ? styles.checkboxChecked : null,
+                        { borderColor: getPriorityColor(task.priority) }
                     ]}
                     onPress={handleToggleCompletion}
                 >
                     {task.status === 'completed' ? (
-                        <Ionicons name="checkmark" size={16} color="#fff" />
+                        <Ionicons name="checkmark" size={16} color={COLORS.white} />
                     ) : null}
                 </TouchableOpacity>
             ) : null}
 
-            <View
-                style={[
-                    styles.priorityIndicator,
-                    { backgroundColor: getPriorityColor(task.priority) }
-                ]}
-            />
-
             <View style={styles.contentContainer}>
                 <View style={styles.titleRow}>
+                    <View style={styles.priorityBadge}>
+                        <Ionicons
+                            name={getPriorityIcon(task.priority)}
+                            size={14}
+                            color={getPriorityColor(task.priority)}
+                        />
+                        <Text style={[styles.priorityText, { color: getPriorityColor(task.priority) }]}>
+                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                        </Text>
+                    </View>
+
                     <Text
                         style={[
                             styles.taskTitle,
@@ -136,10 +197,6 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                     >
                         {task.title}
                     </Text>
-
-                    {task.status === 'completed' ? (
-                        <Ionicons name="checkmark-circle" size={20} color="#2ecc71" style={styles.checkIcon} />
-                    ) : null}
                 </View>
 
                 {task.description ? (
@@ -156,35 +213,73 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
 
                 <View style={styles.metadataContainer}>
                     {dueDate ? (
-                        <View style={styles.dueDateContainer}>
+                        <View style={[
+                            styles.dueDateContainer,
+                            overdue ? styles.overdueIndicator : dueSoon ? styles.dueSoonIndicator : null
+                        ]}>
                             <Ionicons
-                                name="calendar-outline"
-                                size={14}
-                                color={overdue ? "#e74c3c" : dueSoon ? "#f39c12" : "#7f8c8d"}
+                                name={overdue ? "alert-circle" : dueSoon ? "time" : "calendar-outline"}
+                                size={16}
+                                color={overdue ? COLORS.white : dueSoon ? COLORS.white : COLORS.gray}
                             />
                             <Text style={[
                                 styles.dueDate,
-                                overdue ? styles.overdueText : null,
-                                dueSoon ? styles.dueSoonText : null
+                                overdue ? styles.overdueText : dueSoon ? styles.dueSoonText : null
                             ]}>
-                                {overdue ? `Overdue: ${dueDate}` : dueDate}
+                                {dueDate}
                             </Text>
                         </View>
                     ) : null}
 
-                    {/* Show subtask count if any */}
-                    {(task.subtasks_count && task.subtasks_count > 0) ? (
-                        <View style={styles.subtaskContainer}>
-                            <Ionicons name="list-outline" size={14} color="#7f8c8d" />
-                            <Text style={styles.subtaskText}>
-                                {task.subtasks_completed || 0}/{task.subtasks_count}
+                    {remainingTime && (
+                        <View style={[
+                            styles.timeRemainingContainer,
+                            overdue ? styles.overdueIndicator : dueSoon ? styles.dueSoonIndicator : null
+                        ]}>
+                            <Ionicons
+                                name={overdue ? "hourglass" : "stopwatch"}
+                                size={16}
+                                color={overdue ? COLORS.white : dueSoon ? COLORS.white : COLORS.gray}
+                            />
+                            <Text style={[
+                                styles.timeRemainingText,
+                                overdue ? styles.overdueText : dueSoon ? styles.dueSoonText : null
+                            ]}>
+                                {remainingTime}
                             </Text>
                         </View>
-                    ) : null}
+                    )}
                 </View>
+
+                {/* Subtask progress bar */}
+                {(task.subtasks_count && task.subtasks_count > 0) ? (
+                    <View style={styles.subtaskSection}>
+                        <View style={styles.subtaskHeader}>
+                            <Ionicons name="list-outline" size={14} color={COLORS.gray} />
+                            <Text style={styles.subtaskText}>
+                                {task.subtasks_completed || 0}/{task.subtasks_count} subtasks
+                            </Text>
+                        </View>
+                        <View style={styles.progressBarContainer}>
+                            <View
+                                style={[
+                                    styles.progressBar,
+                                    { width: `${subtaskProgress}%` },
+                                    task.status === 'completed' ? styles.completedProgressBar : null
+                                ]}
+                            />
+                        </View>
+                    </View>
+                ) : null}
             </View>
 
-            <Ionicons name="chevron-forward" size={20} color="#bdc3c7" />
+            <View style={styles.chevronContainer}>
+                <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={task.status === 'completed' ? COLORS.lightGray : COLORS.primary}
+                />
+            </View>
         </TouchableOpacity>
     );
 };
@@ -192,128 +287,176 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#ffffff',
-        borderRadius: 12,
-        marginHorizontal: 16,
-        marginVertical: 8,
-        padding: 16,
-        shadowColor: '#000',
+        alignItems: 'flex-start',
+        backgroundColor: COLORS.white,
+        borderRadius: 14,
+        marginHorizontal: SPACING.md,
+        marginVertical: SPACING.sm,
+        padding: SPACING.md,
+        shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
+        shadowRadius: 6,
+        elevation: 4,
         borderLeftWidth: 0,
     },
     taskTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#2c3e50',
-        marginBottom: 4,
+        ...Typography.bodyMedium,
+        fontSize: FONTS.size.md,
+        fontWeight: FONTS.weight.semiBold,
+        color: COLORS.dark,
+        marginBottom: SPACING.xs,
         lineHeight: 22,
+        flex: 1,
     },
     completedContainer: {
-        backgroundColor: '#f8f9fa',
-        opacity: 0.8,
+        backgroundColor: COLORS.light,
+        opacity: 0.85,
+        borderColor: COLORS.border,
+        borderWidth: 1,
     },
     overdueContainer: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#e74c3c',
-        backgroundColor: '#ffebee',
+        borderLeftWidth: 6,
+        borderLeftColor: COLORS.danger,
+        backgroundColor: '#fef2f1', // Light red background
     },
     dueSoonContainer: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#f39c12',
-        backgroundColor: '#fff8e1',
+        borderLeftWidth: 6,
+        borderLeftColor: COLORS.warning,
+        backgroundColor: '#fef9e7', // Light yellow background
     },
     checkbox: {
         width: 28,
         height: 28,
-        borderRadius: 14,
+        borderRadius: 8,
         borderWidth: 2,
-        borderColor: '#3498db',
-        marginRight: 12,
+        borderColor: COLORS.primary,
+        marginRight: SPACING.md,
+        marginTop: 2,
         justifyContent: 'center',
         alignItems: 'center',
     },
     checkboxChecked: {
-        backgroundColor: '#3498db',
-        borderColor: '#3498db',
-    },
-    priorityIndicator: {
-        width: 6,
-        height: '80%',
-        borderRadius: 3,
-        marginRight: 12,
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
     },
     contentContainer: {
         flex: 1,
-        marginRight: 8,
+        marginRight: SPACING.sm,
     },
     titleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#2c3e50',
-        flex: 1,
+        marginBottom: SPACING.xs,
     },
     completedTitle: {
         textDecorationLine: 'line-through',
-        color: '#95a5a6',
+        color: COLORS.gray,
+    },
+    priorityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.xs,
+    },
+    priorityText: {
+        fontSize: FONTS.size.xs,
+        fontWeight: FONTS.weight.semiBold,
+        marginLeft: SPACING.xs,
     },
     overdueText: {
-        color: '#e74c3c',
-        fontWeight: '600',
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     dueSoonText: {
-        color: '#f39c12',
-        fontWeight: '500',
+        color: COLORS.white,
+        fontWeight: FONTS.weight.medium,
     },
     checkIcon: {
-        marginLeft: 8,
+        marginLeft: SPACING.sm,
     },
     description: {
-        fontSize: 14,
-        color: '#7f8c8d',
-        marginTop: 4,
+        ...Typography.caption,
+        fontSize: FONTS.size.sm,
+        color: COLORS.gray,
+        marginBottom: SPACING.sm,
+        lineHeight: 18,
     },
     completedDescription: {
-        color: '#bdc3c7',
+        color: COLORS.lightGray,
     },
     metadataContainer: {
         flexDirection: 'row',
-        marginTop: 8,
-        alignItems: 'center',
+        marginTop: SPACING.xs,
+        marginBottom: SPACING.sm,
+        flexWrap: 'wrap',
     },
     dueDateContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 16,
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        marginRight: SPACING.sm,
+        backgroundColor: COLORS.lightGray,
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: SPACING.xs,
         borderRadius: 12,
+        marginBottom: SPACING.xs,
     },
     dueDate: {
-        fontSize: 12,
-        color: '#7f8c8d',
-        marginLeft: 4,
+        fontSize: FONTS.size.xs,
+        color: COLORS.gray,
+        marginLeft: SPACING.xs,
+        fontWeight: FONTS.weight.medium,
     },
-    subtaskContainer: {
+    timeRemainingContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        backgroundColor: COLORS.lightGray,
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: SPACING.xs,
         borderRadius: 12,
+        marginBottom: SPACING.xs,
+    },
+    timeRemainingText: {
+        fontSize: FONTS.size.xs,
+        color: COLORS.gray,
+        marginLeft: SPACING.xs,
+        fontWeight: FONTS.weight.medium,
+    },
+    overdueIndicator: {
+        backgroundColor: COLORS.danger,
+    },
+    dueSoonIndicator: {
+        backgroundColor: COLORS.warning,
+    },
+    subtaskSection: {
+        marginTop: SPACING.xs,
+    },
+    subtaskHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.xs,
     },
     subtaskText: {
-        fontSize: 12,
-        color: '#7f8c8d',
-        marginLeft: 4,
+        fontSize: FONTS.size.xs,
+        color: COLORS.gray,
+        marginLeft: SPACING.xs,
+        fontWeight: FONTS.weight.medium,
+    },
+    progressBarContainer: {
+        height: 6,
+        backgroundColor: COLORS.lightGray,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: COLORS.primary,
+        borderRadius: 3,
+    },
+    completedProgressBar: {
+        backgroundColor: COLORS.success,
+    },
+    chevronContainer: {
+        justifyContent: 'center',
+        paddingLeft: SPACING.xs,
+        height: '100%',
     }
 });
 

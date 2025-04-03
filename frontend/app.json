@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "adhd-assistant",
-    "slug": "adhd-assistant",
+    "slug": "adhd-assistent",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -35,8 +35,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "23ae686a-244c-4dd0-83e6-5d0baad04359"
       }
-    }
+    },
+    "owner": "cjohnd"
   }
 }

@@ -1,6 +1,6 @@
 // frontend/src/hooks/useTaskNotifications.ts
 import * as Notifications from 'expo-notifications';
-import {useEffect, useRef, useState} from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
@@ -11,6 +11,7 @@ export function useTaskNotifications() {
     const { user } = useAuth();
     const [notificationMap, setNotificationMap] = useState<Record<string, string>>({});
     const isMounted = useRef(true);
+    const initialSyncDone = useRef(false);
 
     useEffect(() => {
         return () => {
@@ -19,9 +20,11 @@ export function useTaskNotifications() {
     }, []);
 
     useEffect(() => {
-        if (user) {
+        if (user && !initialSyncDone.current) {
+            initialSyncDone.current = true;
             loadNotificationSettings();
-            syncTaskNotifications();
+            // We'll only do a full sync when the app starts or when explicitly requested
+            // This prevents constant re-syncing when navigating between screens
         }
     }, [user]);
 
@@ -39,7 +42,10 @@ export function useTaskNotifications() {
 
             // Load the mapping between task IDs and notification IDs
             const storedMap = userData?.notification_preferences?.taskNotifications || {};
-            setNotificationMap(storedMap);
+
+            if (isMounted.current) {
+                setNotificationMap(storedMap);
+            }
         } catch (error) {
             console.error('Error loading notification settings:', error);
         }
@@ -73,25 +79,27 @@ export function useTaskNotifications() {
     // Schedule a notification for a task
     const scheduleTaskNotification = async (task: Task) => {
         try {
-            // Cancel any existing notification for this task
-            if (notificationMap[task.id]) {
-                await NotificationService.cancelTaskReminder(notificationMap[task.id]);
+            // Only proceed if the task is valid for notification
+            if (!task.due_date || task.status === 'completed') {
+                // If this task has notifications, cancel them
+                if (notificationMap[task.id]) {
+                    await NotificationService.cancelTaskReminder(notificationMap[task.id]);
+
+                    // Remove from notification map
+                    const updatedMap = { ...notificationMap };
+                    delete updatedMap[task.id];
+                    await saveNotificationMap(updatedMap);
+                }
+                return false;
             }
 
-            // Only schedule notifications for active tasks with a due date
-            if (task.status === 'active' && task.due_date) {
-                const notificationId = await NotificationService.scheduleTaskReminder(task);
+            // Schedule the notification
+            const notificationId = await NotificationService.scheduleTaskReminder(task);
 
-                if (notificationId) {
-                    const updatedMap = { ...notificationMap, [task.id]: notificationId };
-                    await saveNotificationMap(updatedMap);
-                    return true;
-                }
-            } else if (task.status === 'completed' && notificationMap[task.id]) {
-                // If task is completed, remove its notification
-                const updatedMap = { ...notificationMap };
-                delete updatedMap[task.id];
+            if (notificationId) {
+                const updatedMap = { ...notificationMap, [task.id]: notificationId };
                 await saveNotificationMap(updatedMap);
+                return true;
             }
 
             return false;
@@ -120,9 +128,11 @@ export function useTaskNotifications() {
         }
     };
 
-    // Sync notifications for all active tasks
+    // Sync notifications for all active tasks - only call this explicitly when needed
     const syncTaskNotifications = async () => {
         try {
+            console.log('Starting full notification sync');
+
             // Get all active tasks with due dates
             const { data: tasks, error } = await supabase
                 .from('tasks')
@@ -133,7 +143,10 @@ export function useTaskNotifications() {
 
             if (error) throw error;
 
-            if (!tasks || tasks.length === 0) return;
+            if (!tasks || tasks.length === 0) {
+                console.log('No active tasks with due dates');
+                return;
+            }
 
             console.log(`Syncing notifications for ${tasks.length} tasks`);
 
@@ -145,11 +158,19 @@ export function useTaskNotifications() {
 
             // Schedule notifications for each task
             for (const task of tasks) {
-                if (task.due_date) {
-                    const notificationId = await NotificationService.scheduleTaskReminder(task);
-                    if (notificationId) {
-                        newNotificationMap[task.id] = notificationId;
-                    }
+                // Skip tasks that don't need notifications (due date in past)
+                const dueDate = new Date(task.due_date!);
+                const notificationDate = new Date(dueDate.getTime() - 60 * 60 * 1000); // 1 hour before
+                const now = new Date();
+
+                if (notificationDate <= now) {
+                    console.log(`Skipping notification for past task: ${task.title}`);
+                    continue;
+                }
+
+                const notificationId = await NotificationService.scheduleTaskReminder(task);
+                if (notificationId) {
+                    newNotificationMap[task.id] = notificationId;
                 }
             }
 

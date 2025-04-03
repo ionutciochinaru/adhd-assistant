@@ -1,5 +1,5 @@
 // frontend/src/screens/tasks/CreateTaskScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,8 +12,9 @@ import {
     Alert,
     Platform,
     KeyboardAvoidingView,
+    Animated,
+    Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -21,7 +22,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 import BackButton from "../../components/BackButton";
 import ScreenLayout from '../../components/ScreenLayout';
-import { COLORS, SPACING, Typography } from '../../utils/styles';
+import { COLORS, SPACING, FONTS, Typography, CommonStyles } from '../../utils/styles';
+import { Ionicons } from '@expo/vector-icons';
 
 // Navigation types
 type TasksStackParamList = {
@@ -45,12 +47,69 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     const [newSubtask, setNewSubtask] = useState('');
     const [loading, setLoading] = useState(false);
     const [useAI, setUseAI] = useState(false);
+    const [showKeyboardTips, setShowKeyboardTips] = useState(false);
     const { scheduleTaskNotification } = useTaskNotifications();
+
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim = useRef(new Animated.Value(0.95)).current;
+    const tipsHeight = useRef(new Animated.Value(0)).current;
 
     const [errors, setErrors] = useState<{
         title?: string;
         subtasks?: string;
     }>({});
+
+    // Animation on mount
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            })
+        ]).start();
+
+        // Set initial due date to next hour
+        const nextHour = new Date();
+        nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+        setDueDate(nextHour);
+
+        // Keyboard listeners for showing/hiding tips
+        const keyboardDidShowListener = Keyboard.addListener(
+            'keyboardDidShow',
+            () => {
+                setShowKeyboardTips(true);
+                Animated.timing(tipsHeight, {
+                    toValue: 90,
+                    duration: 300,
+                    useNativeDriver: false
+                }).start();
+            }
+        );
+
+        const keyboardDidHideListener = Keyboard.addListener(
+            'keyboardDidHide',
+            () => {
+                setShowKeyboardTips(false);
+                Animated.timing(tipsHeight, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: false
+                }).start();
+            }
+        );
+
+        return () => {
+            keyboardDidShowListener.remove();
+            keyboardDidHideListener.remove();
+        };
+    }, []);
 
     // Handle date change
     const onDateChange = (event: any, selectedDate?: Date) => {
@@ -131,6 +190,21 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     // Add a new subtask
     const addSubtask = () => {
         if (newSubtask.trim() === '') return;
+
+        // Animate the addition
+        Animated.sequence([
+            Animated.timing(scaleAnim, {
+                toValue: 0.98,
+                duration: 100,
+                useNativeDriver: true
+            }),
+            Animated.timing(scaleAnim, {
+                toValue: 1,
+                duration: 100,
+                useNativeDriver: true
+            })
+        ]).start();
+
         setSubtasks([...subtasks, newSubtask.trim()]);
         setNewSubtask('');
     };
@@ -160,6 +234,20 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                 ];
                 setSubtasks(aiGeneratedSubtasks);
                 setLoading(false);
+
+                // Show success animation
+                Animated.sequence([
+                    Animated.timing(scaleAnim, {
+                        toValue: 1.05,
+                        duration: 200,
+                        useNativeDriver: true
+                    }),
+                    Animated.timing(scaleAnim, {
+                        toValue: 1,
+                        duration: 200,
+                        useNativeDriver: true
+                    })
+                ]).start();
             }, 1500);
         } catch (error) {
             console.error('Error in AI breakdown:', error);
@@ -226,11 +314,15 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                 await scheduleTaskNotification(task);
             }
 
-            navigation.goBack();
+            // Show success feedback before navigating back
+            Alert.alert(
+                'Success!',
+                'Your task has been created',
+                [{ text: 'OK', onPress: () => navigation.goBack() }]
+            );
         } catch (error: any) {
             console.error('Error creating task:', error.message);
             Alert.alert('Error', 'Failed to create task: ' + error.message);
-        } finally {
             setLoading(false);
         }
     };
@@ -241,7 +333,10 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
     const renderCreateButton = () => (
         <TouchableOpacity
-            style={styles.createButton}
+            style={[
+                styles.createButton,
+                (loading || title.trim() === '') && styles.disabledButton
+            ]}
             onPress={createTask}
             disabled={loading || title.trim() === ''}
         >
@@ -257,392 +352,588 @@ const CreateTaskScreen = ({ navigation }: Props) => {
         <ScreenLayout
             leftComponent={renderBackButton()}
             rightComponent={renderCreateButton()}
+            title="Create Task"
         >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <ScrollView style={styles.container}>
-                    <View style={styles.formContainer}>
-                        <Text style={styles.label}>Title</Text>
-                        <TextInput
-                            style={[styles.titleInput, errors.title && styles.inputError]}
-                            placeholder="Enter task title"
-                            value={title}
-                            onChangeText={(text) => {
-                                setTitle(text);
-                                if (errors.title) {
-                                    setErrors({...errors, title: undefined});
-                                }
-                            }}
-                            maxLength={100}
-                        />
-                        {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
-
-                        <Text style={styles.label}>Description (optional)</Text>
-                        <TextInput
-                            style={styles.descriptionInput}
-                            placeholder="Enter task description"
-                            value={description}
-                            onChangeText={setDescription}
-                            multiline
-                            numberOfLines={4}
-                        />
-
-                        <Text style={styles.label}>Priority</Text>
-                        <View style={styles.priorityButtons}>
-                            <TouchableOpacity
+                    <Animated.View
+                        style={[
+                            styles.formContainer,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ scale: scaleAnim }]
+                            }
+                        ]}
+                    >
+                        {/* Title Input */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>
+                                Task Title <Text style={styles.requiredStar}>*</Text>
+                            </Text>
+                            <TextInput
                                 style={[
-                                    styles.priorityButton,
-                                    styles.lowPriorityButton,
-                                    priority === 'low' && styles.selectedPriorityButton,
+                                    styles.titleInput,
+                                    errors.title && styles.inputError
                                 ]}
-                                onPress={() => setPriority('low')}
-                            >
-                                <Text style={styles.priorityButtonText}>Low</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[
-                                    styles.priorityButton,
-                                    styles.mediumPriorityButton,
-                                    priority === 'medium' && styles.selectedPriorityButton,
-                                ]}
-                                onPress={() => setPriority('medium')}
-                            >
-                                <Text style={styles.priorityButtonText}>Medium</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[
-                                    styles.priorityButton,
-                                    styles.highPriorityButton,
-                                    priority === 'high' && styles.selectedPriorityButton,
-                                ]}
-                                onPress={() => setPriority('high')}
-                            >
-                                <Text style={styles.priorityButtonText}>High</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.dueDateContainer}>
-                            <Text style={styles.label}>Due Date</Text>
-                            <Switch
-                                value={hasDueDate}
-                                onValueChange={(value) => {
-                                    setHasDueDate(value);
-                                    if (value) {
-                                        // Set to next hour when enabling
-                                        const nextHour = new Date();
-                                        nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
-                                        setDueDate(nextHour);
+                                placeholder="What do you need to do?"
+                                value={title}
+                                onChangeText={(text) => {
+                                    setTitle(text);
+                                    if (errors.title) {
+                                        setErrors({...errors, title: undefined});
                                     }
                                 }}
-                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                                thumbColor={hasDueDate ? '#3498db' : '#F4F4F4'}
+                                maxLength={100}
+                                autoFocus
+                            />
+                            {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+
+                            {title.length > 0 && (
+                                <Text style={styles.charCount}>
+                                    {title.length}/100 characters
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Description Input */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Description (optional)</Text>
+                            <TextInput
+                                style={styles.descriptionInput}
+                                placeholder="Add more details about this task..."
+                                value={description}
+                                onChangeText={setDescription}
+                                multiline
+                                numberOfLines={4}
+                                textAlignVertical="top"
                             />
                         </View>
 
-                        {hasDueDate && (
-                            <>
-                                <TouchableOpacity
-                                    onPress={() => setShowDatePicker(true)}
-                                    style={styles.selectedDateTimeContainer}
-                                >
-                                    <Text style={styles.selectedDateTimeText}>
-                                        {dueDate.toLocaleString()}
-                                    </Text>
-                                </TouchableOpacity>
-
-                                {renderDateTimePickers()}
-                            </>
-                        )}
-
-                        <View style={styles.aiBreakdownContainer}>
-                            <Text style={styles.label}>AI Task Breakdown</Text>
-                            <Switch
-                                value={useAI}
-                                onValueChange={setUseAI}
-                                trackColor={{ false: '#D1D1D6', true: '#BFE9FF' }}
-                                thumbColor={useAI ? '#3498db' : '#F4F4F4'}
-                            />
-                        </View>
-
-                        {useAI && (
-                            <TouchableOpacity
-                                style={styles.aiBreakdownButton}
-                                onPress={requestAIBreakdown}
-                                disabled={loading || title.trim() === ''}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                    <Text style={styles.aiBreakdownButtonText}>
-                                        Generate Subtasks
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
-                        )}
-
-                        <Text style={styles.label}>Subtasks</Text>
-                        <View style={styles.subtasksContainer}>
-                            {subtasks.map((subtask, index) => (
-                                <View key={index} style={styles.subtaskItem}>
-                                    <Text style={styles.subtaskText} numberOfLines={1}>
-                                        {subtask}
-                                    </Text>
-                                    <TouchableOpacity
-                                        style={styles.subtaskRemoveButton}
-                                        onPress={() => removeSubtask(index)}
-                                    >
-                                        <Text style={styles.subtaskRemoveButtonText}>×</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-
-                            <View style={styles.addSubtaskContainer}>
-                                <TextInput
-                                    style={styles.subtaskInput}
-                                    placeholder="Add a subtask"
-                                    value={newSubtask}
-                                    onChangeText={setNewSubtask}
-                                    returnKeyType="done"
-                                    onSubmitEditing={addSubtask}
-                                />
+                        {/* Priority Selection */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Priority</Text>
+                            <View style={styles.priorityButtons}>
                                 <TouchableOpacity
                                     style={[
-                                        styles.addSubtaskButton,
-                                        newSubtask.trim() === '' && styles.disabledAddSubtaskButton,
+                                        styles.priorityButton,
+                                        styles.lowPriorityButton,
+                                        priority === 'low' && styles.selectedPriorityButton,
                                     ]}
-                                    onPress={addSubtask}
-                                    disabled={newSubtask.trim() === ''}
+                                    onPress={() => setPriority('low')}
                                 >
-                                    <Text style={styles.addSubtaskButtonText}>Add</Text>
+                                    <Ionicons
+                                        name="arrow-down"
+                                        size={16}
+                                        color={priority === 'low' ? COLORS.white : COLORS.lowPriority}
+                                    />
+                                    <Text style={[
+                                        styles.priorityButtonText,
+                                        priority === 'low' && styles.selectedPriorityButtonText,
+                                    ]}>Low</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.priorityButton,
+                                        styles.mediumPriorityButton,
+                                        priority === 'medium' && styles.selectedPriorityButton,
+                                    ]}
+                                    onPress={() => setPriority('medium')}
+                                >
+                                    <Ionicons
+                                        name="remove"
+                                        size={16}
+                                        color={priority === 'medium' ? COLORS.white : COLORS.mediumPriority}
+                                    />
+                                    <Text style={[
+                                        styles.priorityButtonText,
+                                        priority === 'medium' && styles.selectedPriorityButtonText,
+                                    ]}>Medium</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.priorityButton,
+                                        styles.highPriorityButton,
+                                        priority === 'high' && styles.selectedPriorityButton,
+                                    ]}
+                                    onPress={() => setPriority('high')}
+                                >
+                                    <Ionicons
+                                        name="arrow-up"
+                                        size={16}
+                                        color={priority === 'high' ? COLORS.white : COLORS.highPriority}
+                                    />
+                                    <Text style={[
+                                        styles.priorityButtonText,
+                                        priority === 'high' && styles.selectedPriorityButtonText,
+                                    ]}>High</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
-                    </View>
+
+                        {/* Due Date Toggle */}
+                        <View style={styles.inputGroup}>
+                            <View style={styles.dueDateContainer}>
+                                <Text style={styles.label}>Due Date</Text>
+                                <Switch
+                                    value={hasDueDate}
+                                    onValueChange={(value) => {
+                                        setHasDueDate(value);
+                                        if (value) {
+                                            // Set to next hour when enabling
+                                            const nextHour = new Date();
+                                            nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+                                            setDueDate(nextHour);
+                                        }
+                                    }}
+                                    trackColor={{ false: COLORS.lightGray, true: COLORS.primaryLight }}
+                                    thumbColor={hasDueDate ? COLORS.primary : '#f4f3f4'}
+                                    ios_backgroundColor={COLORS.lightGray}
+                                />
+                            </View>
+
+                            {hasDueDate && (
+                                <View style={styles.dateTimeContainer}>
+                                    <View style={styles.datePreview}>
+                                        <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                                        <Text style={styles.dateTimeText}>
+                                            {dueDate.toLocaleDateString()}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={styles.dateTimeButton}
+                                            onPress={() => setShowDatePicker(true)}
+                                        >
+                                            <Text style={styles.dateTimeButtonText}>Change</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={styles.timePreview}>
+                                        <Ionicons name="time" size={20} color={COLORS.primary} />
+                                        <Text style={styles.dateTimeText}>
+                                            {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={styles.dateTimeButton}
+                                            onPress={() => setShowTimePicker(true)}
+                                        >
+                                            <Text style={styles.dateTimeButtonText}>Change</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {renderDateTimePickers()}
+                                </View>
+                            )}
+                        </View>
+
+                        {/* AI Task Breakdown */}
+                        <View style={styles.inputGroup}>
+                            <View style={styles.aiBreakdownContainer}>
+                                <View style={styles.aiBreakdownHeader}>
+                                    <Ionicons name="bulb" size={18} color={COLORS.warning} />
+                                    <Text style={styles.aiBreakdownTitle}>AI Task Breakdown</Text>
+                                </View>
+                                <Switch
+                                    value={useAI}
+                                    onValueChange={setUseAI}
+                                    trackColor={{ false: COLORS.lightGray, true: COLORS.primaryLight }}
+                                    thumbColor={useAI ? COLORS.primary : '#f4f3f4'}
+                                    ios_backgroundColor={COLORS.lightGray}
+                                />
+                            </View>
+
+                            {useAI && (
+                                <View style={styles.aiInfoContainer}>
+                                    <Text style={styles.aiInfoText}>
+                                        Let AI help break down your task into manageable subtasks
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.aiBreakdownButton,
+                                            (loading || title.trim() === '') && styles.disabledAiButton
+                                        ]}
+                                        onPress={requestAIBreakdown}
+                                        disabled={loading || title.trim() === ''}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+                                                <Text style={styles.aiBreakdownButtonText}>
+                                                    Generate Subtasks
+                                                </Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Subtasks Section */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>
+                                Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+                            </Text>
+
+                            <View style={styles.subtasksContainer}>
+                                {subtasks.map((subtask, index) => (
+                                    <View key={index} style={styles.subtaskItem}>
+                                        <View style={styles.subtaskBullet}>
+                                            <Ionicons name="radio-button-on" size={12} color={COLORS.primary} />
+                                        </View>
+                                        <Text style={styles.subtaskText} numberOfLines={1}>
+                                            {subtask}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={styles.subtaskRemoveButton}
+                                            onPress={() => removeSubtask(index)}
+                                        >
+                                            <Ionicons name="close-circle" size={18} color={COLORS.danger} />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+
+                                <View style={styles.addSubtaskContainer}>
+                                    <TextInput
+                                        style={styles.subtaskInput}
+                                        placeholder="Add a subtask"
+                                        value={newSubtask}
+                                        onChangeText={setNewSubtask}
+                                        returnKeyType="done"
+                                        onSubmitEditing={addSubtask}
+                                    />
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.addSubtaskButton,
+                                            newSubtask.trim() === '' && styles.disabledAddSubtaskButton,
+                                        ]}
+                                        onPress={addSubtask}
+                                        disabled={newSubtask.trim() === ''}
+                                    >
+                                        <Ionicons name="add" size={24} color={COLORS.white} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {errors.subtasks && (
+                                    <Text style={styles.errorText}>{errors.subtasks}</Text>
+                                )}
+                            </View>
+                        </View>
+
+                        {/* Tips for ADHD users */}
+                        <View style={styles.tipsContainer}>
+                            <View style={styles.tipHeader}>
+                                <Ionicons name="information-circle" size={20} color={COLORS.info} />
+                                <Text style={styles.tipTitle}>Tips for Success</Text>
+                            </View>
+                            <Text style={styles.tipText}>
+                                • Break complex tasks into smaller subtasks
+                            </Text>
+                            <Text style={styles.tipText}>
+                                • Set realistic due dates and times
+                            </Text>
+                            <Text style={styles.tipText}>
+                                • Use priority levels to focus on what matters most
+                            </Text>
+                        </View>
+                    </Animated.View>
                 </ScrollView>
+
+                {/* Keyboard tips */}
+                <Animated.View style={[
+                    styles.keyboardTipsContainer,
+                    {height: tipsHeight}
+                ]}>
+                    {showKeyboardTips && (
+                        <View style={styles.keyboardTips}>
+                            <Text style={styles.keyboardTipTitle}>Keyboard Shortcuts</Text>
+                            <Text style={styles.keyboardTipText}>• Tab + Enter: Add a subtask</Text>
+                            <Text style={styles.keyboardTipText}>• Shift + Enter: Create task</Text>
+                        </View>
+                    )}
+                </Animated.View>
             </KeyboardAvoidingView>
         </ScreenLayout>
     );
 };
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: '#f8f9fa',
-    },
     container: {
         flex: 1,
         backgroundColor: COLORS.light,
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        backgroundColor: '#ffffff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-    },
-    selectedDateTimeContainer: {
-        backgroundColor: '#FFFFFF',
-        padding: 12,
-        borderRadius: 8,
-        marginVertical: 10,
-        alignItems: 'center',
-    },
-    selectedDateTimeText: {
-        fontSize: 16,
-        color: '#2c3e50',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#2c3e50',
-    },
-    cancelButton: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-    },
-    cancelButtonText: {
-        fontSize: 16,
-        color: '#95a5a6',
+    formContainer: {
+        padding: SPACING.md,
     },
     createButton: {
-        backgroundColor: '#3498db',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 4,
+        backgroundColor: COLORS.primary,
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.md,
+        borderRadius: SPACING.xs,
+    },
+    disabledButton: {
+        backgroundColor: COLORS.gray,
+        opacity: 0.6,
     },
     createButtonText: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '600',
+        color: COLORS.white,
+        fontSize: FONTS.size.sm,
+        fontWeight: FONTS.weight.semiBold,
     },
-    formContainer: {
-        padding: 16,
-    },
-    inputError: {
-        borderColor: '#e74c3c',
-    },
-    errorText: {
-        color: '#e74c3c',
-        fontSize: 12,
-        marginTop: 4,
-        marginBottom: 8,
+    inputGroup: {
+        marginBottom: SPACING.lg,
     },
     label: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#2c3e50',
-        marginBottom: 8,
+        ...Typography.label,
+        marginBottom: SPACING.xs,
+    },
+    requiredStar: {
+        color: COLORS.danger,
+    },
+    charCount: {
+        ...Typography.caption,
+        textAlign: 'right',
+        marginTop: SPACING.xs,
     },
     titleInput: {
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        marginBottom: 16,
+        ...CommonStyles.input,
+        fontSize: FONTS.size.md,
+        fontWeight: FONTS.weight.medium,
+    },
+    inputError: {
+        borderColor: COLORS.danger,
+    },
+    errorText: {
+        color: COLORS.danger,
+        fontSize: FONTS.size.xs,
+        marginTop: SPACING.xs,
     },
     descriptionInput: {
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        height: 100,
+        ...CommonStyles.input,
+        minHeight: 100,
         textAlignVertical: 'top',
-        marginBottom: 16,
     },
     priorityButtons: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 16,
     },
     priorityButton: {
         flex: 1,
-        paddingVertical: 10,
-        borderRadius: 8,
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: 4,
+        justifyContent: 'center',
+        paddingVertical: SPACING.sm,
+        borderRadius: SPACING.xs,
+        marginHorizontal: SPACING.xxs,
+        borderWidth: 1,
     },
     selectedPriorityButton: {
-        borderWidth: 2,
+        borderWidth: 0,
     },
     priorityButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.xs,
+    },
+    selectedPriorityButtonText: {
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     lowPriorityButton: {
-        backgroundColor: '#e8f5e9',
-        borderColor: '#27ae60',
+        borderColor: COLORS.lowPriority,
+        backgroundColor: 'rgba(39, 174, 96, 0.1)',
     },
     mediumPriorityButton: {
-        backgroundColor: '#fff8e1',
-        borderColor: '#f39c12',
+        borderColor: COLORS.mediumPriority,
+        backgroundColor: 'rgba(243, 156, 18, 0.1)',
     },
     highPriorityButton: {
-        backgroundColor: '#ffebee',
-        borderColor: '#e74c3c',
+        borderColor: COLORS.highPriority,
+        backgroundColor: 'rgba(231, 76, 60, 0.1)',
     },
     dueDateContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
     },
-    datePickerContainer: {
-        marginBottom: 16,
-    },
-    dateButton: {
-        backgroundColor: '#ffffff',
+    dateTimeContainer: {
+        marginTop: SPACING.sm,
+        backgroundColor: COLORS.white,
+        borderRadius: SPACING.xs,
         borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
+        borderColor: COLORS.border,
+        padding: SPACING.sm,
     },
-    dateButtonText: {
-        fontSize: 16,
-        color: '#2c3e50',
+    datePreview: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: SPACING.sm,
+        paddingBottom: SPACING.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    timePreview: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    dateTimeText: {
+        ...Typography.bodyMedium,
+        flex: 1,
+        marginLeft: SPACING.sm,
+    },
+    dateTimeButton: {
+        backgroundColor: COLORS.primaryLight,
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: SPACING.xs,
+    },
+    dateTimeButtonText: {
+        color: COLORS.primary,
+        fontSize: FONTS.size.xs,
+        fontWeight: FONTS.weight.medium,
     },
     aiBreakdownContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: SPACING.sm,
+    },
+    aiBreakdownHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    aiBreakdownTitle: {
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.xs,
+        fontWeight: FONTS.weight.medium,
+    },
+    aiInfoContainer: {
+        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+        padding: SPACING.sm,
+        borderRadius: SPACING.xs,
+        borderLeftWidth: 3,
+        borderLeftColor: COLORS.primary,
+    },
+    aiInfoText: {
+        ...Typography.caption,
+        color: COLORS.dark,
+        marginBottom: SPACING.sm,
     },
     aiBreakdownButton: {
-        backgroundColor: '#3498db',
-        borderRadius: 8,
-        padding: 12,
+        backgroundColor: COLORS.primary,
+        borderRadius: SPACING.xs,
+        padding: SPACING.sm,
         alignItems: 'center',
-        marginBottom: 16,
+        flexDirection: 'row',
+        justifyContent: 'center',
+    },
+    disabledAiButton: {
+        backgroundColor: COLORS.gray,
+        opacity: 0.6,
     },
     aiBreakdownButtonText: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: '600',
+        color: COLORS.white,
+        fontSize: FONTS.size.sm,
+        fontWeight: FONTS.weight.semiBold,
+        marginLeft: SPACING.xs,
     },
     subtasksContainer: {
-        marginBottom: 20,
+        marginBottom: SPACING.md,
     },
     subtaskItem: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#ffffff',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
+        backgroundColor: COLORS.white,
+        padding: SPACING.sm,
+        borderRadius: SPACING.xs,
+        marginBottom: SPACING.xs,
+        shadowColor: COLORS.black,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    subtaskBullet: {
+        marginRight: SPACING.xs,
     },
     subtaskText: {
+        ...Typography.bodyRegular,
         flex: 1,
-        fontSize: 14,
-        color: '#2c3e50',
     },
     subtaskRemoveButton: {
-        padding: 4,
-    },
-    subtaskRemoveButtonText: {
-        fontSize: 18,
-        color: '#e74c3c',
-        fontWeight: 'bold',
+        padding: SPACING.xs,
     },
     addSubtaskContainer: {
         flexDirection: 'row',
-        marginBottom: 20,
+        marginBottom: SPACING.xs,
     },
     subtaskInput: {
         flex: 1,
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 14,
-        marginRight: 8,
+        ...CommonStyles.input,
+        marginRight: SPACING.sm,
     },
     addSubtaskButton: {
-        backgroundColor: '#3498db',
-        paddingHorizontal: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 8,
     },
     disabledAddSubtaskButton: {
-        backgroundColor: '#bdc3c7',
+        backgroundColor: COLORS.gray,
+        opacity: 0.6,
     },
-    addSubtaskButtonText: {
-        color: '#ffffff',
-        fontWeight: '600',
+    tipsContainer: {
+        backgroundColor: COLORS.info + '15', // Light version of info color
+        padding: SPACING.md,
+        borderRadius: SPACING.xs,
+        marginTop: SPACING.md,
+        marginBottom: SPACING.xxl,
+        borderLeftWidth: 3,
+        borderLeftColor: COLORS.info,
+    },
+    tipHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.sm,
+    },
+    tipTitle: {
+        ...Typography.bodyMedium,
+        fontWeight: FONTS.weight.semiBold,
+        marginLeft: SPACING.xs,
+        color: COLORS.info,
+    },
+    tipText: {
+        ...Typography.caption,
+        color: COLORS.dark,
+        marginBottom: SPACING.xs,
+        lineHeight: 18,
+    },
+    keyboardTipsContainer: {
+        backgroundColor: 'rgba(236, 240, 241, 0.97)',
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        overflow: 'hidden',
+    },
+    keyboardTips: {
+        padding: SPACING.md,
+    },
+    keyboardTipTitle: {
+        ...Typography.bodyMedium,
+        fontWeight: FONTS.weight.semiBold,
+        marginBottom: SPACING.xs,
+    },
+    keyboardTipText: {
+        ...Typography.caption,
+        color: COLORS.dark,
+        marginBottom: SPACING.xs,
     },
 });
 
