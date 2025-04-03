@@ -5,12 +5,12 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    FlatList,
+    SectionList,
     ActivityIndicator,
     Alert,
     Animated,
-    SectionList,
-    RefreshControl
+    RefreshControl,
+    Image
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { supabase } from '../../utils/supabase';
@@ -19,14 +19,14 @@ import TaskItem from '../../components/TaskItem';
 import { Task } from '../../utils/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../../components/ScreenLayout';
-import { COLORS, SPACING, FONTS, Typography, CommonStyles } from '../../utils/styles';
+import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
 
 // For smooth animations
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const TasksScreen = () => {
     const navigation = useNavigation();
-    const { user, session } = useAuth();
+    const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [sectionsData, setSectionsData] = useState<{title: string, data: Task[], icon?: string}[]>([]);
     const [loading, setLoading] = useState(true);
@@ -37,6 +37,8 @@ const TasksScreen = () => {
     // Animation values
     const filterBarOpacity = useRef(new Animated.Value(1)).current;
     const addButtonScale = useRef(new Animated.Value(1)).current;
+    const headerHeight = useRef(new Animated.Value(180)).current;
+    const headerOpacity = useRef(new Animated.Value(1)).current;
 
     // Refresh tasks every time the screen comes into focus
     useFocusEffect(
@@ -108,30 +110,6 @@ const TasksScreen = () => {
         const dueDate = new Date(task.due_date);
         const now = new Date();
         return dueDate.toDateString() === now.toDateString();
-    };
-
-    // Function to get time period of the day (morning, afternoon, evening, night)
-    const getTimePeriod = (dateString?: string | null) => {
-        if (!dateString) return 'any';
-
-        const date = new Date(dateString);
-        const hours = date.getHours();
-
-        if (hours >= 5 && hours < 12) return 'morning';
-        if (hours >= 12 && hours < 17) return 'afternoon';
-        if (hours >= 17 && hours < 21) return 'evening';
-        return 'night';
-    };
-
-    // Get icon for time period
-    const getTimeIcon = (period: string) => {
-        switch (period) {
-            case 'morning': return 'sunny-outline';
-            case 'afternoon': return 'partly-sunny-outline';
-            case 'evening': return 'moon-outline';
-            case 'night': return 'cloudy-night-outline';
-            default: return 'time-outline';
-        }
     };
 
     // Fetch tasks from Supabase
@@ -209,14 +187,8 @@ const TasksScreen = () => {
             // Overdue tasks get top priority
             const overdueTasks = taskList.filter(task => isTaskOverdue(task));
 
-            // Get today's tasks and group by time of day
+            // Get today's tasks
             const todaysTasks = taskList.filter(task => isTaskDueToday(task) && task.status === 'active');
-
-            // Group today's tasks by time period
-            const morningTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'morning');
-            const afternoonTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'afternoon');
-            const eveningTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'evening');
-            const nightTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'night');
 
             // Tasks without a due date
             const noDueDateTasks = taskList.filter(task =>
@@ -243,46 +215,8 @@ const TasksScreen = () => {
                 });
             }
 
-            // Morning section for today
-            if (morningTasks.length > 0) {
-                sections.push({
-                    title: 'Morning',
-                    data: morningTasks,
-                    icon: 'sunny-outline'
-                });
-            }
-
-            // Afternoon section for today
-            if (afternoonTasks.length > 0) {
-                sections.push({
-                    title: 'Afternoon',
-                    data: afternoonTasks,
-                    icon: 'partly-sunny-outline'
-                });
-            }
-
-            // Evening section for today
-            if (eveningTasks.length > 0) {
-                sections.push({
-                    title: 'Evening',
-                    data: eveningTasks,
-                    icon: 'moon-outline'
-                });
-            }
-
-            // Night section for today
-            if (nightTasks.length > 0) {
-                sections.push({
-                    title: 'Night',
-                    data: nightTasks,
-                    icon: 'cloudy-night-outline'
-                });
-            }
-
-            // If no time-based sections were created but we have today's tasks, group them together
-            if (morningTasks.length === 0 && afternoonTasks.length === 0 &&
-                eveningTasks.length === 0 && nightTasks.length === 0 &&
-                todaysTasks.length > 0) {
+            // Today's tasks
+            if (todaysTasks.length > 0) {
                 sections.push({
                     title: 'Today',
                     data: todaysTasks,
@@ -409,19 +343,23 @@ const TasksScreen = () => {
     // Render empty state when no tasks are available
     const renderEmpty = () => (
         <View style={styles.emptyContainer}>
-            <Ionicons name="checkbox-outline" size={64} color={COLORS.lightGray} />
+            <Image
+                source={require('../../../assets/adaptive-icon.png')}
+                style={styles.emptyImage}
+                resizeMode="contain"
+            />
             <Text style={styles.emptyTitle}>No tasks found</Text>
             <Text style={styles.emptySubtitle}>
                 {filter === 'all'
-                    ? 'Tap the + button to create your first task'
+                    ? 'Get started by adding your first task'
                     : `No ${filter} tasks found`}
             </Text>
             <TouchableOpacity
                 style={styles.emptyAddButton}
                 onPress={() => navigation.navigate('CreateTask' as any)}
             >
-                <Ionicons name="add-circle" size={24} color={COLORS.white} />
-                <Text style={styles.emptyAddButtonText}>Add Task</Text>
+                <Ionicons name="add" size={24} color={COLORS.white} />
+                <Text style={styles.emptyAddButtonText}>Add New Task</Text>
             </TouchableOpacity>
         </View>
     );
@@ -459,12 +397,13 @@ const TasksScreen = () => {
     const renderSectionHeader = ({ section }: { section: { title: string, data: Task[], icon?: string } }) => (
         <View style={styles.sectionHeader}>
             {section.icon && (
-                <Ionicons
-                    name={section.icon as any}
-                    size={18}
-                    color={COLORS.primary}
-                    style={styles.sectionIcon}
-                />
+                <View style={styles.sectionIconContainer}>
+                    <Ionicons
+                        name={section.icon as any}
+                        size={16}
+                        color={COLORS.white}
+                    />
+                </View>
             )}
             <Text style={styles.sectionHeaderText}>
                 {section.title} {section.data.length > 0 && `(${section.data.length})`}
@@ -472,7 +411,7 @@ const TasksScreen = () => {
 
             {section.title === 'Overdue' && section.data.length > 0 && (
                 <View style={styles.overdueBadge}>
-                    <Ionicons name="alert-circle" size={14} color={COLORS.white} />
+                    <Ionicons name="alert-circle" size={12} color={COLORS.white} />
                     <Text style={styles.overdueBadgeText}>Action Needed</Text>
                 </View>
             )}
@@ -484,23 +423,46 @@ const TasksScreen = () => {
         fetchTasks();
     };
 
+    // Get total active tasks count
+    const activeTasks = tasks.filter(task => task.status === 'active').length;
+
+    // Get completed tasks percentage
+    const completedPercentage = tasks.length > 0
+        ? Math.round((tasks.filter(task => task.status === 'completed').length / tasks.length) * 100)
+        : 0;
+
     return (
         <ScreenLayout
             title="Tasks"
             rightComponent={renderAddButton()}
+            showHeader={false}
         >
-            {error && !loading && (
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <TouchableOpacity
-                        style={styles.retryButton}
-                        onPress={fetchTasks}
-                    >
-                        <Text style={styles.retryButtonText}>Retry</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
             <View style={styles.container}>
+                {/* Custom header with greeting and summary */}
+                <Animated.View style={[styles.customHeader, { height: headerHeight, opacity: headerOpacity }]}>
+                    <Text style={styles.greeting}>Hello!</Text>
+                    <Text style={styles.welcomeText}>Let's organize your tasks</Text>
+
+                    <View style={styles.summaryCards}>
+                        <View style={[styles.summaryCard, { backgroundColor: COLORS.cardBlue }]}>
+                            <View style={styles.summaryIconContainer}>
+                                <Ionicons name="checkbox-outline" size={20} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.summaryValue}>{activeTasks}</Text>
+                            <Text style={styles.summaryLabel}>Active Tasks</Text>
+                        </View>
+
+                        <View style={[styles.summaryCard, { backgroundColor: COLORS.cardGreen }]}>
+                            <View style={[styles.summaryIconContainer, { backgroundColor: COLORS.lowPriority }]}>
+                                <Ionicons name="pie-chart-outline" size={20} color={COLORS.white} />
+                            </View>
+                            <Text style={styles.summaryValue}>{completedPercentage}%</Text>
+                            <Text style={styles.summaryLabel}>Completed</Text>
+                        </View>
+                    </View>
+                </Animated.View>
+
+                {/* Task filters */}
                 <Animated.View
                     style={[
                         styles.filterContainer,
@@ -513,12 +475,27 @@ const TasksScreen = () => {
                     />
                 </Animated.View>
 
+                {/* Error message */}
+                {error && !loading && (
+                    <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>{error}</Text>
+                        <TouchableOpacity
+                            style={styles.retryButton}
+                            onPress={fetchTasks}
+                        >
+                            <Text style={styles.retryButtonText}>Retry</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* Loading state */}
                 {loading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={COLORS.primary} />
                         <Text style={styles.loadingText}>Loading your tasks...</Text>
                     </View>
                 ) : (
+                    /* Task list */
                     <SectionList
                         sections={sectionsData}
                         keyExtractor={(item) => item.id}
@@ -544,6 +521,16 @@ const TasksScreen = () => {
                             />
                         }
                         stickySectionHeadersEnabled={true}
+                        onScroll={(event) => {
+                            // Collapse header on scroll
+                            const scrollY = event.nativeEvent.contentOffset.y;
+                            const newHeight = Math.max(0, 180 - scrollY);
+                            const newOpacity = Math.max(0, 1 - (scrollY / 180));
+
+                            headerHeight.setValue(newHeight);
+                            headerOpacity.setValue(newOpacity);
+                        }}
+                        scrollEventThrottle={16}
                     />
                 )}
             </View>
@@ -563,29 +550,30 @@ const ScrollableFilterBar = ({
         { key: 'all', label: 'All', icon: 'list' },
         { key: 'overdue', label: 'Overdue', icon: 'alert-circle' },
         { key: 'upcoming', label: 'Upcoming', icon: 'time' },
-        { key: 'active', label: 'Active', icon: 'checkmark-circle-outline' },
+        { key: 'active', label: 'Active', icon: 'checkbox-outline' },
         { key: 'completed', label: 'Completed', icon: 'checkmark-circle' }
     ];
 
     return (
-        <View style={styles.scrollableFilterContainer}>
+        <View style={styles.tabBar}>
             {filters.map(filter => (
                 <TouchableOpacity
                     key={filter.key}
                     style={[
-                        styles.filterButton,
-                        currentFilter === filter.key && styles.activeFilterButton
+                        styles.tab,
+                        currentFilter === filter.key && styles.activeTab
                     ]}
                     onPress={() => onFilterChange(filter.key)}
                 >
                     <Ionicons
-                        name={filter.icon}
+                        name={filter.icon as any}
                         size={16}
-                        color={currentFilter === filter.key ? COLORS.white : COLORS.dark}
+                        color={currentFilter === filter.key ? COLORS.primary : COLORS.textSecondary}
+                        style={styles.tabIcon}
                     />
                     <Text style={[
-                        styles.filterButtonText,
-                        currentFilter === filter.key && styles.activeFilterButtonText
+                        styles.tabText,
+                        currentFilter === filter.key && styles.activeTabText
                     ]}>
                         {filter.label}
                     </Text>
@@ -598,165 +586,209 @@ const ScrollableFilterBar = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.light,
+        backgroundColor: COLORS.background,
     },
-    addButton: {
+    customHeader: {
+        backgroundColor: COLORS.white,
+        paddingHorizontal: SPACING.md,
+        paddingTop: SPACING.xl,
+        paddingBottom: SPACING.md,
+        ...SHADOWS.small,
+    },
+    greeting: {
+        ...Typography.h2,
+        marginBottom: SPACING.xs,
+    },
+    welcomeText: {
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.lg,
+    },
+    summaryCards: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    summaryCard: {
+        flex: 1,
+        padding: SPACING.md,
+        borderRadius: RADIUS.lg,
+        marginRight: SPACING.sm,
+        ...SHADOWS.small,
+    },
+    summaryIconContainer: {
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: RADIUS.sm,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: COLORS.primaryLight,
+        marginBottom: SPACING.sm,
+    },
+    summaryValue: {
+        ...Typography.h3,
+        marginBottom: SPACING.xxs,
+    },
+    summaryLabel: {
+        ...Typography.bodySmall,
+    },
+    addButton: {
+        width: 48,
+        height: 48,
+        borderRadius: RADIUS.round,
         backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4,
+        ...SHADOWS.medium,
     },
     errorContainer: {
-        padding: SPACING.sm,
-        backgroundColor: '#ffebee',
+        backgroundColor: COLORS.cardRed,
         marginHorizontal: SPACING.md,
         marginTop: SPACING.sm,
-        borderRadius: 6,
+        padding: SPACING.sm,
+        borderRadius: RADIUS.md,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
     },
     errorText: {
+        ...Typography.bodySmall,
         color: COLORS.danger,
-        marginBottom: SPACING.xs,
-        ...Typography.bodyMedium,
-        fontSize: 13,
+        flex: 1,
     },
     retryButton: {
         backgroundColor: COLORS.danger,
         paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.sm,
-        borderRadius: 4,
+        borderRadius: RADIUS.sm,
     },
     retryButtonText: {
+        ...Typography.captionBold,
         color: COLORS.white,
-        fontWeight: FONTS.weight.semiBold,
-        fontSize: 12,
+    },
+    tabBar: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.white,
+        marginHorizontal: SPACING.md,
+        marginVertical: SPACING.sm,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.xs,
+        ...SHADOWS.small,
+    },
+    tab: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: SPACING.sm,
+        borderRadius: RADIUS.md,
+        flexDirection: 'row',
+    },
+    tabIcon: {
+        marginRight: SPACING.xxs,
+    },
+    activeTab: {
+        backgroundColor: COLORS.primaryLight,
+    },
+    tabText: {
+        ...Typography.caption,
+        color: COLORS.textSecondary,
+    },
+    activeTabText: {
+        ...Typography.captionBold,
+        color: COLORS.primary,
     },
     filterContainer: {
-        padding: SPACING.xs,
-        backgroundColor: COLORS.white,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-        zIndex: 2, // Ensure filter bar is above content
-    },
-    scrollableFilterContainer: {
-        flexDirection: 'row',
-        paddingVertical: 2,
-    },
-    filterButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: SPACING.xs,
-        paddingHorizontal: SPACING.sm,
-        borderRadius: 16,
-        backgroundColor: COLORS.lightGray,
-        marginRight: SPACING.xs,
-    },
-    activeFilterButton: {
-        backgroundColor: COLORS.primary,
-    },
-    filterButtonText: {
-        ...Typography.caption,
-        fontWeight: FONTS.weight.medium,
-        marginLeft: SPACING.xs,
-        color: COLORS.dark,
-    },
-    activeFilterButtonText: {
-        color: COLORS.white,
-        fontWeight: FONTS.weight.semiBold,
+        marginBottom: SPACING.sm,
     },
     tasksList: {
-        paddingBottom: SPACING.md,
+        paddingBottom: SPACING.xl,
     },
     emptyList: {
         flexGrow: 1,
-        justifyContent: 'center',
     },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: SPACING.xs,
+        paddingVertical: SPACING.sm,
         paddingHorizontal: SPACING.md,
-        backgroundColor: 'rgba(248, 249, 250, 0.95)',
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        backgroundColor: COLORS.background,
+        marginVertical: SPACING.xs,
     },
-    sectionIcon: {
+    sectionIconContainer: {
+        width: 24,
+        height: 24,
+        borderRadius: RADIUS.sm,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginRight: SPACING.xs,
     },
     sectionHeaderText: {
         ...Typography.bodyMedium,
-        color: COLORS.dark,
-        fontWeight: FONTS.weight.semiBold,
-        fontSize: 14,
+        fontWeight: '600',
     },
     overdueBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.danger,
-        paddingVertical: 2,
-        paddingHorizontal: SPACING.xs,
-        borderRadius: 10,
+        paddingVertical: SPACING.xxs,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: RADIUS.round,
         marginLeft: SPACING.sm,
     },
     overdueBadgeText: {
+        ...Typography.tiny,
         color: COLORS.white,
-        fontSize: 10,
-        fontWeight: FONTS.weight.medium,
+        fontWeight: '500',
         marginLeft: 2,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingBottom: SPACING.xxl,
     },
     loadingText: {
         ...Typography.bodyMedium,
-        color: COLORS.gray,
+        color: COLORS.textSecondary,
         marginTop: SPACING.md,
     },
     emptyContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 64,
         padding: SPACING.xl,
+    },
+    emptyImage: {
+        width: 120,
+        height: 120,
+        marginBottom: SPACING.md,
+        opacity: 0.7,
     },
     emptyTitle: {
         ...Typography.h3,
-        color: COLORS.gray,
-        marginTop: SPACING.md,
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.sm,
     },
     emptySubtitle: {
-        ...Typography.bodyRegular,
-        color: COLORS.gray,
+        ...Typography.bodyMedium,
+        color: COLORS.textTertiary,
         textAlign: 'center',
-        marginTop: SPACING.sm,
-        marginBottom: SPACING.lg,
+        marginBottom: SPACING.xl,
     },
     emptyAddButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.primary,
-        paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.lg,
-        borderRadius: 20,
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4,
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.xl,
+        borderRadius: RADIUS.round,
+        ...SHADOWS.medium,
     },
     emptyAddButtonText: {
+        ...Typography.bodyMedium,
         color: COLORS.white,
-        fontWeight: FONTS.weight.semiBold,
-        marginLeft: SPACING.xs,
+        fontWeight: '600',
+        marginLeft: SPACING.sm,
     },
 });
 

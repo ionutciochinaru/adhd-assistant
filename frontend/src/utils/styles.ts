@@ -2,27 +2,58 @@
 import { StyleSheet, Platform } from 'react-native';
 
 export const COLORS = {
-    primary: '#3498db',
+    // Primary brand colors
+    primary: '#3498db',  // Bright blue
     primaryLight: '#E1F0FE',
     primaryDark: '#2980b9',
-    success: '#2ecc71',
-    warning: '#f39c12',
-    danger: '#e74c3c',
-    info: '#9b59b6',
-    light: '#f8f9fa',
-    dark: '#2c3e50',
-    gray: '#7f8c8d',
-    lightGray: '#ecf0f1',
+
+    // Accent colors
+    accent1: '#FF3B30', // Vibrant red for high priority
+    accent2: '#FF9500', // Orange for medium priority
+    accent3: '#34C759', // Green for low priority/success
+
+    // UI colors
+    background: '#F7F9FC',   // Light background
+    card: '#FFFFFF',         // Card background
+    cardShadow: '#E2E8F0',   // Soft shadow for cards
+
+    // Status colors
+    success: '#34C759',
+    warning: '#FF9500',
+    danger: '#FF3B30',
+    info: '#5856D6',         // Purple for info
+
+    // Text colors
+    textPrimary: '#1C1C1E',  // Almost black
+    textSecondary: '#6C6C70', // Dark gray
+    textTertiary: '#9A9A9E',  // Medium gray
+    textLight: '#FFFFFF',     // White text
+
+    // Specific UI elements
     border: '#E5E5E5',
+    divider: '#E5E5E5',
+    inputBackground: '#F2F2F7',
+
+    // Task priority colors
+    lowPriority: '#34C759',   // Green
+    mediumPriority: '#FF9500', // Orange
+    highPriority: '#FF3B30',   // Red
+
+    // Basic colors
     white: '#FFFFFF',
     black: '#000000',
     transparent: 'transparent',
-    lowPriority: '#27ae60',
-    mediumPriority: '#f39c12',
-    highPriority: '#e74c3c',
+
+    // Card backgrounds with opacity
+    cardRed: '#FFEBE9',    // Light red
+    cardOrange: '#FFF6E9', // Light orange
+    cardGreen: '#E9FFF1',  // Light green
+    cardBlue: '#E9F5FF',   // Light blue
+    cardPurple: '#F2EAFF', // Light purple
 };
 
 export const SPACING = {
+    xxs: 2,
     xs: 4,
     sm: 8,
     md: 16,
@@ -31,25 +62,60 @@ export const SPACING = {
     xxl: 48,
 };
 
-// Font configuration for variable font
+export const RADIUS = {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
+    xxl: 32,
+    round: 999, // For fully rounded elements
+};
+
+export const SHADOWS = {
+    small: {
+        shadowColor: COLORS.black,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    medium: {
+        shadowColor: COLORS.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    large: {
+        shadowColor: COLORS.black,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+};
+
+// Font configuration based on inspiration
 export const FONTS = {
     // Font families
     family: {
-        base: 'Roboto',
+        base: 'Roboto', // Using the available font
         italic: 'Roboto-Italic',
     },
-    // Font weights
+    // Font weights - using proper TypeScript types for React Native
     weight: {
-        thin: Platform.OS === 'ios' ? '100' : '100',
-        light: Platform.OS === 'ios' ? '300' : '300',
-        regular: Platform.OS === 'ios' ? '400' : 'normal',
-        medium: Platform.OS === 'ios' ? '500' : '500',
-        semiBold: Platform.OS === 'ios' ? '600' : '600',
-        bold: Platform.OS === 'ios' ? '700' : 'bold',
-        black: Platform.OS === 'ios' ? '900' : '900',
+        thin: '100' as const,
+        light: '300' as const,
+        regular: 'normal' as const,
+        medium: '500' as const,
+        semiBold: '600' as const,
+        bold: 'bold' as const,
+        black: '900' as const,
     },
     // Font sizes
     size: {
+        xxs: 10,
         xs: 12,
         sm: 14,
         md: 16,
@@ -57,6 +123,12 @@ export const FONTS = {
         xl: 20,
         xxl: 24,
         xxxl: 32,
+    },
+    // Line heights
+    lineHeight: {
+        tight: 1.2,
+        normal: 1.5,
+        loose: 1.8,
     },
 };
 
@@ -67,39 +139,66 @@ export const Typography = StyleSheet.create({
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.bold,
         fontSize: FONTS.size.xxxl,
-        color: COLORS.dark,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.xxxl * 1.2,
     },
     h2: {
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.bold,
         fontSize: FONTS.size.xxl,
-        color: COLORS.dark,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.xxl * 1.2,
     },
     h3: {
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.semiBold,
         fontSize: FONTS.size.xl,
-        color: COLORS.dark,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.xl * 1.2,
+    },
+    h4: {
+        fontFamily: FONTS.family.base,
+        fontWeight: FONTS.weight.semiBold,
+        fontSize: FONTS.size.lg,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.lg * 1.2,
     },
 
     // Body text
+    bodyLarge: {
+        fontFamily: FONTS.family.base,
+        fontWeight: FONTS.weight.regular,
+        fontSize: FONTS.size.lg,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.lg * 1.5,
+    },
     bodyRegular: {
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.regular,
         fontSize: FONTS.size.md,
-        color: COLORS.dark,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.md * 1.5,
     },
     bodyMedium: {
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.medium,
         fontSize: FONTS.size.md,
-        color: COLORS.dark,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.md * 1.5,
+    },
+    bodySmall: {
+        fontFamily: FONTS.family.base,
+        fontWeight: FONTS.weight.regular,
+        fontSize: FONTS.size.sm,
+        color: COLORS.textSecondary,
+        lineHeight: FONTS.size.sm * 1.5,
     },
     bodyBold: {
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.bold,
         fontSize: FONTS.size.md,
-        color: COLORS.dark,
+        color: COLORS.textPrimary,
+        lineHeight: FONTS.size.md * 1.5,
     },
 
     // Caption/small text
@@ -107,7 +206,22 @@ export const Typography = StyleSheet.create({
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.regular,
         fontSize: FONTS.size.xs,
-        color: COLORS.gray,
+        color: COLORS.textTertiary,
+        lineHeight: FONTS.size.xs * 1.5,
+    },
+    captionBold: {
+        fontFamily: FONTS.family.base,
+        fontWeight: FONTS.weight.medium,
+        fontSize: FONTS.size.xs,
+        color: COLORS.textTertiary,
+        lineHeight: FONTS.size.xs * 1.5,
+    },
+    tiny: {
+        fontFamily: FONTS.family.base,
+        fontWeight: FONTS.weight.regular,
+        fontSize: FONTS.size.xxs,
+        color: COLORS.textTertiary,
+        lineHeight: FONTS.size.xxs * 1.2,
     },
 
     // Links
@@ -116,7 +230,7 @@ export const Typography = StyleSheet.create({
         fontWeight: FONTS.weight.medium,
         fontSize: FONTS.size.md,
         color: COLORS.primary,
-        textDecorationLine: 'underline',
+        textDecorationLine: 'none',
     },
 
     // Label for form inputs
@@ -124,8 +238,8 @@ export const Typography = StyleSheet.create({
         fontFamily: FONTS.family.base,
         fontWeight: FONTS.weight.medium,
         fontSize: FONTS.size.sm,
-        color: COLORS.dark,
-        marginBottom: 8,
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.xs,
     },
 });
 
@@ -133,7 +247,14 @@ export const Typography = StyleSheet.create({
 export const CommonStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.light,
+        backgroundColor: COLORS.background,
+    },
+    safeArea: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    content: {
+        padding: SPACING.md,
     },
     header: {
         flexDirection: 'row',
@@ -142,47 +263,218 @@ export const CommonStyles = StyleSheet.create({
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.md,
         backgroundColor: COLORS.white,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        ...SHADOWS.small,
     },
     headerTitle: {
-        fontFamily: FONTS.family.base,
-        fontWeight: FONTS.weight.semiBold,
-        fontSize: FONTS.size.lg,
-        color: COLORS.dark,
+        ...Typography.h3,
     },
+
+    // Card styles based on the inspiration images
     card: {
-        backgroundColor: COLORS.white,
-        borderRadius: 12,
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.md,
+        marginVertical: SPACING.sm,
+        ...SHADOWS.small,
+    },
+    taskCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.lg,
         padding: SPACING.md,
         marginVertical: SPACING.sm,
         marginHorizontal: SPACING.md,
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        ...SHADOWS.small,
+        borderLeftWidth: 4,  // For priority indicator
     },
+    listCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.lg,
+        marginVertical: SPACING.sm,
+        marginHorizontal: SPACING.md,
+        ...SHADOWS.small,
+    },
+
+    // Button styles
     button: {
         backgroundColor: COLORS.primary,
-        borderRadius: 8,
-        padding: SPACING.md,
+        borderRadius: RADIUS.md,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
         alignItems: 'center',
         justifyContent: 'center',
+        flexDirection: 'row',
+        ...SHADOWS.small,
     },
     buttonText: {
-        fontFamily: FONTS.family.base,
-        fontWeight: FONTS.weight.medium,
-        fontSize: FONTS.size.md,
+        ...Typography.bodyMedium,
         color: COLORS.white,
     },
+    buttonLarge: {
+        backgroundColor: COLORS.primary,
+        borderRadius: RADIUS.md,
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        ...SHADOWS.small,
+    },
+    buttonTextLarge: {
+        ...Typography.bodyBold,
+        color: COLORS.white,
+    },
+
+    // Input styles inspired by the clean forms in your references
     input: {
-        backgroundColor: COLORS.white,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        borderRadius: 8,
+        backgroundColor: COLORS.inputBackground,
+        borderRadius: RADIUS.md,
         padding: SPACING.md,
-        fontFamily: FONTS.family.base,
         fontSize: FONTS.size.md,
+        color: COLORS.textPrimary,
+        marginBottom: SPACING.md,
+    },
+    textArea: {
+        backgroundColor: COLORS.inputBackground,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        fontSize: FONTS.size.md,
+        color: COLORS.textPrimary,
+        marginBottom: SPACING.md,
+        height: 120,
+        textAlignVertical: 'top',
+    },
+
+    // Badge styles for statuses and tags
+    badge: {
+        paddingVertical: SPACING.xxs,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: RADIUS.round,
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    badgeText: {
+        ...Typography.tiny,
+        fontWeight: FONTS.weight.medium,
+        color: COLORS.white,
+    },
+
+    // Floating action button (FAB)
+    fab: {
+        position: 'absolute',
+        bottom: SPACING.xl,
+        right: SPACING.xl,
+        width: 60,
+        height: 60,
+        borderRadius: RADIUS.round,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.medium,
+    },
+
+    // Progress bar
+    progressBarContainer: {
+        height: 8,
+        backgroundColor: COLORS.cardShadow,
+        borderRadius: RADIUS.round,
+        overflow: 'hidden',
+        marginVertical: SPACING.sm,
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: COLORS.primary,
+        borderRadius: RADIUS.round,
+    },
+
+    // Checkbox
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: RADIUS.sm,
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.sm,
+    },
+    checkboxChecked: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+
+    // Tab styles
+    tabBar: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.white,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.xs,
+        borderRadius: RADIUS.lg,
+        marginHorizontal: SPACING.md,
+        marginVertical: SPACING.sm,
+        ...SHADOWS.small,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: SPACING.sm,
+        alignItems: 'center',
+        borderRadius: RADIUS.md,
+    },
+    activeTab: {
+        backgroundColor: COLORS.primaryLight,
+    },
+    tabText: {
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
+    },
+    activeTabText: {
+        ...Typography.bodyMedium,
+        color: COLORS.primary,
+    },
+
+    // Calendar day styles
+    calendarDay: {
+        width: 36,
+        height: 36,
+        borderRadius: RADIUS.sm,
+        justifyContent: 'center',
+        alignItems: 'center',
+        margin: SPACING.xxs,
+    },
+    calendarDayText: {
+        ...Typography.bodySmall,
+    },
+    calendarDayActive: {
+        backgroundColor: COLORS.primary,
+    },
+    calendarDayActiveText: {
+        color: COLORS.white,
+        fontWeight: FONTS.weight.bold,
+    },
+
+    // Task priority styles
+    priorityLow: {
+        borderLeftColor: COLORS.lowPriority,
+    },
+    priorityMedium: {
+        borderLeftColor: COLORS.mediumPriority,
+    },
+    priorityHigh: {
+        borderLeftColor: COLORS.highPriority,
+    },
+
+    // Empty state
+    emptyState: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: SPACING.xl,
+    },
+    emptyStateText: {
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginTop: SPACING.md,
     },
 });

@@ -14,15 +14,16 @@ import {
     KeyboardAvoidingView,
     Animated,
     Keyboard,
+    Image,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 import BackButton from "../../components/BackButton";
 import ScreenLayout from '../../components/ScreenLayout';
-import { COLORS, SPACING, FONTS, Typography, CommonStyles } from '../../utils/styles';
+import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
 import { Ionicons } from '@expo/vector-icons';
 
 // Navigation types
@@ -47,13 +48,12 @@ const CreateTaskScreen = ({ navigation }: Props) => {
     const [newSubtask, setNewSubtask] = useState('');
     const [loading, setLoading] = useState(false);
     const [useAI, setUseAI] = useState(false);
-    const [showKeyboardTips, setShowKeyboardTips] = useState(false);
     const { scheduleTaskNotification } = useTaskNotifications();
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(50)).current;
     const scaleAnim = useRef(new Animated.Value(0.95)).current;
-    const tipsHeight = useRef(new Animated.Value(0)).current;
 
     const [errors, setErrors] = useState<{
         title?: string;
@@ -65,12 +65,17 @@ const CreateTaskScreen = ({ navigation }: Props) => {
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
-                duration: 300,
+                duration: 400,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 400,
                 useNativeDriver: true,
             }),
             Animated.timing(scaleAnim, {
                 toValue: 1,
-                duration: 300,
+                duration: 400,
                 useNativeDriver: true,
             })
         ]).start();
@@ -79,66 +84,42 @@ const CreateTaskScreen = ({ navigation }: Props) => {
         const nextHour = new Date();
         nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
         setDueDate(nextHour);
-
-        // Keyboard listeners for showing/hiding tips
-        const keyboardDidShowListener = Keyboard.addListener(
-            'keyboardDidShow',
-            () => {
-                setShowKeyboardTips(true);
-                Animated.timing(tipsHeight, {
-                    toValue: 90,
-                    duration: 300,
-                    useNativeDriver: false
-                }).start();
-            }
-        );
-
-        const keyboardDidHideListener = Keyboard.addListener(
-            'keyboardDidHide',
-            () => {
-                setShowKeyboardTips(false);
-                Animated.timing(tipsHeight, {
-                    toValue: 0,
-                    duration: 300,
-                    useNativeDriver: false
-                }).start();
-            }
-        );
-
-        return () => {
-            keyboardDidShowListener.remove();
-            keyboardDidHideListener.remove();
-        };
     }, []);
 
-    // Handle date change
-    const onDateChange = (event: any, selectedDate?: Date) => {
-        const currentDate = selectedDate || dueDate;
+    // Handle date picking
+    const handleDateConfirm = (selectedDate: Date) => {
+        setShowDatePicker(false);
 
-        // On iOS, the date picker will be dismissed automatically
+        // Preserve time from existing due date
+        if (hasDueDate) {
+            selectedDate.setHours(
+                dueDate.getHours(),
+                dueDate.getMinutes(),
+                dueDate.getSeconds()
+            );
+        }
+
+        setDueDate(selectedDate);
+
+        // Show time picker automatically after date is selected
         if (Platform.OS === 'android') {
-            setShowDatePicker(false);
-            // Immediately show time picker on Android
             setShowTimePicker(true);
         }
-
-        setDueDate(currentDate);
     };
 
-    // Handle time change
-    const onTimeChange = (event: any, selectedTime?: Date) => {
-        // Close time picker
-        if (Platform.OS === 'android') {
-            setShowTimePicker(false);
-        }
+    // Handle time picking
+    const handleTimeConfirm = (selectedTime: Date) => {
+        setShowTimePicker(false);
 
-        if (selectedTime) {
-            // Combine the selected date with the selected time
-            const newDateTime = new Date(dueDate);
-            newDateTime.setHours(selectedTime.getHours());
-            newDateTime.setMinutes(selectedTime.getMinutes());
-            setDueDate(newDateTime);
-        }
+        // Create a new date object combining the selected date and time
+        const newDate = new Date(dueDate);
+        newDate.setHours(
+            selectedTime.getHours(),
+            selectedTime.getMinutes(),
+            selectedTime.getSeconds()
+        );
+
+        setDueDate(newDate);
     };
 
     const validateForm = (): boolean => {
@@ -146,7 +127,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
         // Validate title
         if (title.trim() === '') {
-            newErrors.title = 'Task title is required';
+            newErrors.title = 'Please enter a task title';
         } else if (title.length > 100) {
             newErrors.title = 'Title must be less than 100 characters';
         }
@@ -158,33 +139,6 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    };
-
-    // Render date and time pickers
-    const renderDateTimePickers = () => {
-        if (!hasDueDate) return null;
-
-        return (
-            <View>
-                {(showDatePicker || Platform.OS === 'ios') && (
-                    <DateTimePicker
-                        value={dueDate}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={onDateChange}
-                        minimumDate={new Date()}
-                    />
-                )}
-                {(showTimePicker || Platform.OS === 'ios') && (
-                    <DateTimePicker
-                        value={dueDate}
-                        mode="time"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={onTimeChange}
-                    />
-                )}
-            </View>
-        );
     };
 
     // Add a new subtask
@@ -223,15 +177,18 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
         setLoading(true);
         try {
-            // Simulate AI breakdown with a timeout
+            // This is a simulated AI breakdown
             // In a real app, this would call your backend API that uses an AI service
             setTimeout(() => {
+                // Example subtasks based on the task title
                 const aiGeneratedSubtasks = [
-                    `Start working on ${title}`,
-                    `Prepare materials for ${title}`,
+                    `Research "${title}" requirements`,
+                    `Gather materials for ${title}`,
+                    `Draft outline for ${title}`,
                     `Review progress on ${title}`,
                     `Finalize ${title}`,
                 ];
+
                 setSubtasks(aiGeneratedSubtasks);
                 setLoading(false);
 
@@ -280,10 +237,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                 .select()
                 .single();
 
-            if (taskError) {
-                console.error('Error creating task:', taskError);
-                throw taskError;
-            }
+            if (taskError) throw taskError;
 
             console.log('Task created successfully, ID:', task.id);
 
@@ -300,26 +254,36 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                     .from('subtasks')
                     .insert(subtasksToInsert);
 
-                if (subtasksError) {
-                    console.error('Error adding subtasks:', subtasksError);
-                    throw subtasksError;
-                }
-
-                console.log('Subtasks added successfully');
+                if (subtasksError) throw subtasksError;
             }
 
             // Schedule notification if due date is set
             if (task?.id && hasDueDate) {
-                console.log('Scheduling notification for new task:', task.id);
                 await scheduleTaskNotification(task);
             }
 
-            // Show success feedback before navigating back
-            Alert.alert(
-                'Success!',
-                'Your task has been created',
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
+            // Show success animation and message before navigating back
+            Animated.sequence([
+                Animated.timing(scaleAnim, {
+                    toValue: 1.05,
+                    duration: 200,
+                    useNativeDriver: true
+                }),
+                Animated.timing(scaleAnim, {
+                    toValue: 1,
+                    duration: 200,
+                    useNativeDriver: true
+                }),
+                Animated.timing(fadeAnim, {
+                    toValue: 0.5,
+                    duration: 300,
+                    useNativeDriver: true
+                })
+            ]).start();
+
+            setTimeout(() => {
+                navigation.goBack();
+            }, 500);
         } catch (error: any) {
             console.error('Error creating task:', error.message);
             Alert.alert('Error', 'Failed to create task: ' + error.message);
@@ -327,8 +291,35 @@ const CreateTaskScreen = ({ navigation }: Props) => {
         }
     };
 
+    // Get priority-specific styles
+    const getPriorityColor = (priorityValue: string) => {
+        switch (priorityValue) {
+            case 'high':
+                return COLORS.highPriority;
+            case 'medium':
+                return COLORS.mediumPriority;
+            case 'low':
+                return COLORS.lowPriority;
+            default:
+                return COLORS.textTertiary;
+        }
+    };
+
+    const getPriorityBgColor = (priorityValue: string) => {
+        switch (priorityValue) {
+            case 'high':
+                return COLORS.cardRed;
+            case 'medium':
+                return COLORS.cardOrange;
+            case 'low':
+                return COLORS.cardGreen;
+            default:
+                return COLORS.cardBlue;
+        }
+    };
+
     const renderBackButton = () => (
-        <BackButton onPress={() => navigation.goBack()} label="Cancel" />
+        <BackButton onPress={() => navigation.goBack()} />
     );
 
     const renderCreateButton = () => (
@@ -358,16 +349,32 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <ScrollView style={styles.container}>
+                <ScrollView
+                    style={styles.container}
+                    showsVerticalScrollIndicator={false}
+                >
                     <Animated.View
                         style={[
                             styles.formContainer,
                             {
                                 opacity: fadeAnim,
-                                transform: [{ scale: scaleAnim }]
+                                transform: [
+                                    { translateY: slideAnim },
+                                    { scale: scaleAnim }
+                                ]
                             }
                         ]}
                     >
+                        {/* Header Image */}
+                        <View style={styles.headerImageContainer}>
+                            <Image
+                                source={require('../../../assets/adaptive-icon.png')}
+                                style={styles.headerImage}
+                                resizeMode="contain"
+                            />
+                            <Text style={styles.headerText}>New Task</Text>
+                        </View>
+
                         {/* Title Input */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>
@@ -375,10 +382,11 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                             </Text>
                             <TextInput
                                 style={[
-                                    styles.titleInput,
+                                    styles.input,
                                     errors.title && styles.inputError
                                 ]}
                                 placeholder="What do you need to do?"
+                                placeholderTextColor={COLORS.textTertiary}
                                 value={title}
                                 onChangeText={(text) => {
                                     setTitle(text);
@@ -389,7 +397,9 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                                 maxLength={100}
                                 autoFocus
                             />
-                            {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+                            {errors.title && (
+                                <Text style={styles.errorText}>{errors.title}</Text>
+                            )}
 
                             {title.length > 0 && (
                                 <Text style={styles.charCount}>
@@ -402,8 +412,9 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Description (optional)</Text>
                             <TextInput
-                                style={styles.descriptionInput}
+                                style={styles.textArea}
                                 placeholder="Add more details about this task..."
+                                placeholderTextColor={COLORS.textTertiary}
                                 value={description}
                                 onChangeText={setDescription}
                                 multiline
@@ -415,62 +426,50 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                         {/* Priority Selection */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Priority</Text>
-                            <View style={styles.priorityButtons}>
+                            <View style={styles.priorityContainer}>
                                 <TouchableOpacity
                                     style={[
-                                        styles.priorityButton,
-                                        styles.lowPriorityButton,
-                                        priority === 'low' && styles.selectedPriorityButton,
+                                        styles.priorityOption,
+                                        { backgroundColor: getPriorityBgColor('low') },
+                                        priority === 'low' && styles.selectedPriorityOption,
+                                        priority === 'low' && { borderColor: COLORS.lowPriority }
                                     ]}
                                     onPress={() => setPriority('low')}
                                 >
-                                    <Ionicons
-                                        name="arrow-down"
-                                        size={16}
-                                        color={priority === 'low' ? COLORS.white : COLORS.lowPriority}
-                                    />
-                                    <Text style={[
-                                        styles.priorityButtonText,
-                                        priority === 'low' && styles.selectedPriorityButtonText,
-                                    ]}>Low</Text>
+                                    <View style={[styles.priorityIconContainer, { backgroundColor: COLORS.lowPriority }]}>
+                                        <Ionicons name="arrow-down" size={18} color={COLORS.white} />
+                                    </View>
+                                    <Text style={styles.priorityText}>Low</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={[
-                                        styles.priorityButton,
-                                        styles.mediumPriorityButton,
-                                        priority === 'medium' && styles.selectedPriorityButton,
+                                        styles.priorityOption,
+                                        { backgroundColor: getPriorityBgColor('medium') },
+                                        priority === 'medium' && styles.selectedPriorityOption,
+                                        priority === 'medium' && { borderColor: COLORS.mediumPriority }
                                     ]}
                                     onPress={() => setPriority('medium')}
                                 >
-                                    <Ionicons
-                                        name="remove"
-                                        size={16}
-                                        color={priority === 'medium' ? COLORS.white : COLORS.mediumPriority}
-                                    />
-                                    <Text style={[
-                                        styles.priorityButtonText,
-                                        priority === 'medium' && styles.selectedPriorityButtonText,
-                                    ]}>Medium</Text>
+                                    <View style={[styles.priorityIconContainer, { backgroundColor: COLORS.mediumPriority }]}>
+                                        <Ionicons name="remove" size={18} color={COLORS.white} />
+                                    </View>
+                                    <Text style={styles.priorityText}>Medium</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={[
-                                        styles.priorityButton,
-                                        styles.highPriorityButton,
-                                        priority === 'high' && styles.selectedPriorityButton,
+                                        styles.priorityOption,
+                                        { backgroundColor: getPriorityBgColor('high') },
+                                        priority === 'high' && styles.selectedPriorityOption,
+                                        priority === 'high' && { borderColor: COLORS.highPriority }
                                     ]}
                                     onPress={() => setPriority('high')}
                                 >
-                                    <Ionicons
-                                        name="arrow-up"
-                                        size={16}
-                                        color={priority === 'high' ? COLORS.white : COLORS.highPriority}
-                                    />
-                                    <Text style={[
-                                        styles.priorityButtonText,
-                                        priority === 'high' && styles.selectedPriorityButtonText,
-                                    ]}>High</Text>
+                                    <View style={[styles.priorityIconContainer, { backgroundColor: COLORS.highPriority }]}>
+                                        <Ionicons name="arrow-up" size={18} color={COLORS.white} />
+                                    </View>
+                                    <Text style={styles.priorityText}>High</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -478,7 +477,10 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                         {/* Due Date Toggle */}
                         <View style={styles.inputGroup}>
                             <View style={styles.dueDateContainer}>
-                                <Text style={styles.label}>Due Date</Text>
+                                <View style={styles.dueDateLabelContainer}>
+                                    <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                                    <Text style={styles.dueDateLabel}>Set Due Date & Time</Text>
+                                </View>
                                 <Switch
                                     value={hasDueDate}
                                     onValueChange={(value) => {
@@ -490,58 +492,75 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                                             setDueDate(nextHour);
                                         }
                                     }}
-                                    trackColor={{ false: COLORS.lightGray, true: COLORS.primaryLight }}
+                                    trackColor={{ false: COLORS.cardShadow, true: COLORS.primaryLight }}
                                     thumbColor={hasDueDate ? COLORS.primary : '#f4f3f4'}
-                                    ios_backgroundColor={COLORS.lightGray}
+                                    ios_backgroundColor={COLORS.cardShadow}
                                 />
                             </View>
 
                             {hasDueDate && (
                                 <View style={styles.dateTimeContainer}>
-                                    <View style={styles.datePreview}>
-                                        <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                                    <TouchableOpacity
+                                        style={styles.dateTimeButton}
+                                        onPress={() => setShowDatePicker(true)}
+                                    >
+                                        <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
                                         <Text style={styles.dateTimeText}>
-                                            {dueDate.toLocaleDateString()}
+                                            {dueDate.toLocaleDateString(undefined, {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                year: 'numeric'
+                                            })}
                                         </Text>
-                                        <TouchableOpacity
-                                            style={styles.dateTimeButton}
-                                            onPress={() => setShowDatePicker(true)}
-                                        >
-                                            <Text style={styles.dateTimeButtonText}>Change</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    </TouchableOpacity>
 
-                                    <View style={styles.timePreview}>
-                                        <Ionicons name="time" size={20} color={COLORS.primary} />
+                                    <TouchableOpacity
+                                        style={styles.dateTimeButton}
+                                        onPress={() => setShowTimePicker(true)}
+                                    >
+                                        <Ionicons name="time-outline" size={20} color={COLORS.primary} />
                                         <Text style={styles.dateTimeText}>
-                                            {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {dueDate.toLocaleTimeString(undefined, {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
                                         </Text>
-                                        <TouchableOpacity
-                                            style={styles.dateTimeButton}
-                                            onPress={() => setShowTimePicker(true)}
-                                        >
-                                            <Text style={styles.dateTimeButtonText}>Change</Text>
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {renderDateTimePickers()}
+                                    </TouchableOpacity>
                                 </View>
                             )}
+
+                            {/* Date Time Picker Modals */}
+                            <DateTimePickerModal
+                                isVisible={showDatePicker}
+                                mode="date"
+                                onConfirm={handleDateConfirm}
+                                onCancel={() => setShowDatePicker(false)}
+                                date={dueDate}
+                                minimumDate={new Date()}
+                            />
+
+                            <DateTimePickerModal
+                                isVisible={showTimePicker}
+                                mode="time"
+                                onConfirm={handleTimeConfirm}
+                                onCancel={() => setShowTimePicker(false)}
+                                date={dueDate}
+                            />
                         </View>
 
                         {/* AI Task Breakdown */}
                         <View style={styles.inputGroup}>
                             <View style={styles.aiBreakdownContainer}>
                                 <View style={styles.aiBreakdownHeader}>
-                                    <Ionicons name="bulb" size={18} color={COLORS.warning} />
+                                    <Ionicons name="sparkles" size={20} color={COLORS.primary} />
                                     <Text style={styles.aiBreakdownTitle}>AI Task Breakdown</Text>
                                 </View>
                                 <Switch
                                     value={useAI}
                                     onValueChange={setUseAI}
-                                    trackColor={{ false: COLORS.lightGray, true: COLORS.primaryLight }}
+                                    trackColor={{ false: COLORS.cardShadow, true: COLORS.primaryLight }}
                                     thumbColor={useAI ? COLORS.primary : '#f4f3f4'}
-                                    ios_backgroundColor={COLORS.lightGray}
+                                    ios_backgroundColor={COLORS.cardShadow}
                                 />
                             </View>
 
@@ -554,16 +573,16 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                                     <TouchableOpacity
                                         style={[
                                             styles.aiBreakdownButton,
-                                            (loading || title.trim() === '') && styles.disabledAiButton
+                                            (loading || title.trim() === '') && styles.disabledButton
                                         ]}
                                         onPress={requestAIBreakdown}
                                         disabled={loading || title.trim() === ''}
                                     >
                                         {loading ? (
-                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                            <ActivityIndicator size="small" color={COLORS.white} />
                                         ) : (
                                             <>
-                                                <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+                                                <Ionicons name="flash" size={18} color={COLORS.white} />
                                                 <Text style={styles.aiBreakdownButtonText}>
                                                     Generate Subtasks
                                                 </Text>
@@ -602,6 +621,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                                     <TextInput
                                         style={styles.subtaskInput}
                                         placeholder="Add a subtask"
+                                        placeholderTextColor={COLORS.textTertiary}
                                         value={newSubtask}
                                         onChangeText={setNewSubtask}
                                         returnKeyType="done"
@@ -610,7 +630,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                                     <TouchableOpacity
                                         style={[
                                             styles.addSubtaskButton,
-                                            newSubtask.trim() === '' && styles.disabledAddSubtaskButton,
+                                            newSubtask.trim() === '' && styles.disabledButton,
                                         ]}
                                         onPress={addSubtask}
                                         disabled={newSubtask.trim() === ''}
@@ -643,20 +663,6 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                         </View>
                     </Animated.View>
                 </ScrollView>
-
-                {/* Keyboard tips */}
-                <Animated.View style={[
-                    styles.keyboardTipsContainer,
-                    {height: tipsHeight}
-                ]}>
-                    {showKeyboardTips && (
-                        <View style={styles.keyboardTips}>
-                            <Text style={styles.keyboardTipTitle}>Keyboard Shortcuts</Text>
-                            <Text style={styles.keyboardTipText}>• Tab + Enter: Add a subtask</Text>
-                            <Text style={styles.keyboardTipText}>• Shift + Enter: Create task</Text>
-                        </View>
-                    )}
-                </Animated.View>
             </KeyboardAvoidingView>
         </ScreenLayout>
     );
@@ -665,25 +671,38 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.light,
+        backgroundColor: COLORS.background,
     },
     formContainer: {
         padding: SPACING.md,
+    },
+    headerImageContainer: {
+        alignItems: 'center',
+        marginVertical: SPACING.lg,
+    },
+    headerImage: {
+        width: 80,
+        height: 80,
+        marginBottom: SPACING.sm,
+    },
+    headerText: {
+        ...Typography.h2,
+        color: COLORS.primary,
     },
     createButton: {
         backgroundColor: COLORS.primary,
         paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.md,
-        borderRadius: SPACING.xs,
+        borderRadius: RADIUS.md,
     },
     disabledButton: {
-        backgroundColor: COLORS.gray,
-        opacity: 0.6,
+        backgroundColor: COLORS.textTertiary,
+        opacity: 0.7,
     },
     createButtonText: {
         color: COLORS.white,
         fontSize: FONTS.size.sm,
-        fontWeight: FONTS.weight.semiBold,
+        fontWeight: '600',
     },
     inputGroup: {
         marginBottom: SPACING.lg,
@@ -700,12 +719,26 @@ const styles = StyleSheet.create({
         textAlign: 'right',
         marginTop: SPACING.xs,
     },
-    titleInput: {
-        ...CommonStyles.input,
+    input: {
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
         fontSize: FONTS.size.md,
-        fontWeight: FONTS.weight.medium,
+        color: COLORS.textPrimary,
+        ...SHADOWS.small,
+    },
+    textArea: {
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        fontSize: FONTS.size.md,
+        color: COLORS.textPrimary,
+        minHeight: 120,
+        textAlignVertical: 'top',
+        ...SHADOWS.small,
     },
     inputError: {
+        borderWidth: 1,
         borderColor: COLORS.danger,
     },
     errorText: {
@@ -713,96 +746,80 @@ const styles = StyleSheet.create({
         fontSize: FONTS.size.xs,
         marginTop: SPACING.xs,
     },
-    descriptionInput: {
-        ...CommonStyles.input,
-        minHeight: 100,
-        textAlignVertical: 'top',
-    },
-    priorityButtons: {
+    priorityContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
-    priorityButton: {
+    priorityOption: {
         flex: 1,
-        flexDirection: 'row',
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        marginHorizontal: SPACING.xxs,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: SPACING.sm,
-        borderRadius: SPACING.xs,
-        marginHorizontal: SPACING.xxs,
-        borderWidth: 1,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        ...SHADOWS.small,
     },
-    selectedPriorityButton: {
-        borderWidth: 0,
+    selectedPriorityOption: {
+        borderWidth: 2,
     },
-    priorityButtonText: {
-        ...Typography.bodyMedium,
-        marginLeft: SPACING.xs,
+    priorityIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: RADIUS.sm,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.xs,
     },
-    selectedPriorityButtonText: {
-        color: COLORS.white,
-        fontWeight: FONTS.weight.semiBold,
-    },
-    lowPriorityButton: {
-        borderColor: COLORS.lowPriority,
-        backgroundColor: 'rgba(39, 174, 96, 0.1)',
-    },
-    mediumPriorityButton: {
-        borderColor: COLORS.mediumPriority,
-        backgroundColor: 'rgba(243, 156, 18, 0.1)',
-    },
-    highPriorityButton: {
-        borderColor: COLORS.highPriority,
-        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    priorityText: {
+        ...Typography.bodySmall,
+        fontWeight: '500',
     },
     dueDateContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        ...SHADOWS.small,
+    },
+    dueDateLabelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    dueDateLabel: {
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.sm,
     },
     dateTimeContainer: {
         marginTop: SPACING.sm,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    dateTimeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: COLORS.white,
-        borderRadius: SPACING.xs,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        padding: SPACING.sm,
-    },
-    datePreview: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: SPACING.sm,
-        paddingBottom: SPACING.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    timePreview: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        marginHorizontal: SPACING.xxs,
+        ...SHADOWS.small,
     },
     dateTimeText: {
         ...Typography.bodyMedium,
-        flex: 1,
         marginLeft: SPACING.sm,
-    },
-    dateTimeButton: {
-        backgroundColor: COLORS.primaryLight,
-        paddingVertical: SPACING.xs,
-        paddingHorizontal: SPACING.sm,
-        borderRadius: SPACING.xs,
-    },
-    dateTimeButtonText: {
-        color: COLORS.primary,
-        fontSize: FONTS.size.xs,
-        fontWeight: FONTS.weight.medium,
     },
     aiBreakdownContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: SPACING.sm,
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        ...SHADOWS.small,
     },
     aiBreakdownHeader: {
         flexDirection: 'row',
@@ -810,37 +827,30 @@ const styles = StyleSheet.create({
     },
     aiBreakdownTitle: {
         ...Typography.bodyMedium,
-        marginLeft: SPACING.xs,
-        fontWeight: FONTS.weight.medium,
+        marginLeft: SPACING.sm,
     },
     aiInfoContainer: {
-        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-        padding: SPACING.sm,
-        borderRadius: SPACING.xs,
-        borderLeftWidth: 3,
-        borderLeftColor: COLORS.primary,
+        backgroundColor: COLORS.primaryLight,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        marginTop: SPACING.sm,
     },
     aiInfoText: {
-        ...Typography.caption,
-        color: COLORS.dark,
-        marginBottom: SPACING.sm,
+        ...Typography.bodyMedium,
+        marginBottom: SPACING.md,
     },
     aiBreakdownButton: {
         backgroundColor: COLORS.primary,
-        borderRadius: SPACING.xs,
-        padding: SPACING.sm,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
         alignItems: 'center',
         flexDirection: 'row',
         justifyContent: 'center',
     },
-    disabledAiButton: {
-        backgroundColor: COLORS.gray,
-        opacity: 0.6,
-    },
     aiBreakdownButtonText: {
         color: COLORS.white,
-        fontSize: FONTS.size.sm,
-        fontWeight: FONTS.weight.semiBold,
+        fontSize: FONTS.size.md,
+        fontWeight: '600',
         marginLeft: SPACING.xs,
     },
     subtasksContainer: {
@@ -850,14 +860,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.white,
-        padding: SPACING.sm,
-        borderRadius: SPACING.xs,
-        marginBottom: SPACING.xs,
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 1,
+        padding: SPACING.md,
+        borderRadius: RADIUS.md,
+        marginBottom: SPACING.sm,
+        ...SHADOWS.small,
     },
     subtaskBullet: {
         marginRight: SPACING.xs,
@@ -875,29 +881,29 @@ const styles = StyleSheet.create({
     },
     subtaskInput: {
         flex: 1,
-        ...CommonStyles.input,
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        fontSize: FONTS.size.md,
+        color: COLORS.textPrimary,
         marginRight: SPACING.sm,
+        ...SHADOWS.small,
     },
     addSubtaskButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 48,
+        height: 48,
+        borderRadius: RADIUS.round,
         backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    disabledAddSubtaskButton: {
-        backgroundColor: COLORS.gray,
-        opacity: 0.6,
+        ...SHADOWS.small,
     },
     tipsContainer: {
-        backgroundColor: COLORS.info + '15', // Light version of info color
+        backgroundColor: COLORS.cardBlue,
         padding: SPACING.md,
-        borderRadius: SPACING.xs,
+        borderRadius: RADIUS.md,
         marginTop: SPACING.md,
         marginBottom: SPACING.xxl,
-        borderLeftWidth: 3,
-        borderLeftColor: COLORS.info,
     },
     tipHeader: {
         flexDirection: 'row',
@@ -906,34 +912,14 @@ const styles = StyleSheet.create({
     },
     tipTitle: {
         ...Typography.bodyMedium,
-        fontWeight: FONTS.weight.semiBold,
+        fontWeight: '600',
         marginLeft: SPACING.xs,
-        color: COLORS.info,
+        color: COLORS.primary,
     },
     tipText: {
-        ...Typography.caption,
-        color: COLORS.dark,
+        ...Typography.bodySmall,
         marginBottom: SPACING.xs,
-        lineHeight: 18,
-    },
-    keyboardTipsContainer: {
-        backgroundColor: 'rgba(236, 240, 241, 0.97)',
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        overflow: 'hidden',
-    },
-    keyboardTips: {
-        padding: SPACING.md,
-    },
-    keyboardTipTitle: {
-        ...Typography.bodyMedium,
-        fontWeight: FONTS.weight.semiBold,
-        marginBottom: SPACING.xs,
-    },
-    keyboardTipText: {
-        ...Typography.caption,
-        color: COLORS.dark,
-        marginBottom: SPACING.xs,
+        lineHeight: 20,
     },
 });
 
