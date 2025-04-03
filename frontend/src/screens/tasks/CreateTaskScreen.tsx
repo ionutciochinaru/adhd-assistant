@@ -365,16 +365,6 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                             }
                         ]}
                     >
-                        {/* Header Image */}
-                        <View style={styles.headerImageContainer}>
-                            <Image
-                                source={require('../../../assets/adaptive-icon.png')}
-                                style={styles.headerImage}
-                                resizeMode="contain"
-                            />
-                            <Text style={styles.headerText}>New Task</Text>
-                        </View>
-
                         {/* Title Input */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>

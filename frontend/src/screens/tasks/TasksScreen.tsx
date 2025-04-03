@@ -1,5 +1,5 @@
 // frontend/src/screens/tasks/TasksScreen.tsx
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
     View,
     Text,
@@ -12,107 +12,31 @@ import {
     RefreshControl,
     Image
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { supabase } from '../../utils/supabase';
-import { useAuth } from '../../context/AuthContext';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {supabase} from '../../utils/supabase';
+import {useAuth} from '../../context/AuthContext';
 import TaskItem from '../../components/TaskItem';
-import { Task } from '../../utils/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import {Task} from '../../utils/supabase';
+import {Ionicons} from '@expo/vector-icons';
 import ScreenLayout from '../../components/ScreenLayout';
-import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
-
-// For smooth animations
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+import {COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS} from '../../utils/styles';
+import SwipeableTaskItem from "../../components/SwipeableTaskItem";
 
 const TasksScreen = () => {
     const navigation = useNavigation();
-    const { user } = useAuth();
+    const {user} = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [sectionsData, setSectionsData] = useState<{title: string, data: Task[], icon?: string}[]>([]);
+    const [sectionsData, setSectionsData] = useState<{ title: string, data: Task[] }[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'overdue' | 'upcoming'>('all');
+    const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'overdue'>('all');
     const [error, setError] = useState<string | null>(null);
 
-    // Animation values
-    const filterBarOpacity = useRef(new Animated.Value(1)).current;
-    const addButtonScale = useRef(new Animated.Value(1)).current;
-    const headerHeight = useRef(new Animated.Value(180)).current;
-    const headerOpacity = useRef(new Animated.Value(1)).current;
+    // Animation refs
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const translateYAnim = useRef(new Animated.Value(50)).current;
 
-    // Refresh tasks every time the screen comes into focus
-    useFocusEffect(
-        useCallback(() => {
-            if (user) {
-                console.log('Screen focused, refreshing tasks for user:', user.id);
-                fetchTasks();
-
-                // Button animation on screen focus
-                Animated.sequence([
-                    Animated.timing(addButtonScale, {
-                        toValue: 1.2,
-                        duration: 200,
-                        useNativeDriver: true
-                    }),
-                    Animated.timing(addButtonScale, {
-                        toValue: 1,
-                        duration: 200,
-                        useNativeDriver: true
-                    })
-                ]).start();
-            }
-        }, [user])
-    );
-
-    // Set up a real-time subscription to task changes
-    useEffect(() => {
-        if (!user) return;
-
-        console.log('Setting up real-time subscription for tasks');
-
-        // Subscribe to changes in the tasks table for this user
-        const subscription = supabase
-            .channel('tasks-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*', // Listen for inserts, updates, and deletes
-                    schema: 'public',
-                    table: 'tasks',
-                    filter: `user_id=eq.${user.id}`,
-                },
-                (payload) => {
-                    console.log('Real-time update received:', payload.eventType);
-                    // Refresh the tasks list when any change occurs
-                    fetchTasks();
-                }
-            )
-            .subscribe();
-
-        // Clean up the subscription when the component unmounts
-        return () => {
-            console.log('Cleaning up real-time subscription');
-            supabase.removeChannel(subscription);
-        };
-    }, [user]);
-
-    // Function to check if a task is overdue
-    const isTaskOverdue = (task: Task) => {
-        if (!task.due_date || task.status === 'completed') return false;
-        const dueDate = new Date(task.due_date);
-        const now = new Date();
-        return dueDate < now;
-    };
-
-    // Function to check if a task is due today
-    const isTaskDueToday = (task: Task) => {
-        if (!task.due_date) return false;
-        const dueDate = new Date(task.due_date);
-        const now = new Date();
-        return dueDate.toDateString() === now.toDateString();
-    };
-
-    // Fetch tasks from Supabase
+    // Fetch and process tasks
     const fetchTasks = async () => {
         if (!user) return;
 
@@ -120,33 +44,19 @@ const TasksScreen = () => {
             setRefreshing(true);
             setError(null);
 
-            // Query tasks with subtask counts
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('tasks')
                 .select(`
-                    *,
-                    subtasks:subtasks(count),
-                    subtasks_completed:subtasks(count).filter(status=eq.completed)
-                `)
+                        *,
+                        subtasks(*)
+                    `)
                 .eq('user_id', user.id)
-                .order('due_date', { ascending: true, nullsLast: true });
+                .order('created_at', {ascending: false});
 
-            if (error) {
-                throw error;
-            }
+            if (error) throw error;
 
-            // Process the results to include subtask counts
-            const tasksWithCounts = data?.map(task => {
-                return {
-                    ...task,
-                    subtasks_count: task.subtasks?.[0]?.count || 0,
-                    subtasks_completed: task.subtasks_completed?.[0]?.count || 0
-                };
-            }) || [];
-
-            console.log(`Fetched ${tasksWithCounts.length} tasks`);
-            setTasks(tasksWithCounts);
-            updateSections(tasksWithCounts, filter);
+            setTasks(data || []);
+            processTaskSections(data || []);
         } catch (error: any) {
             console.error('Error fetching tasks:', error.message);
             setError('Failed to load tasks. Pull down to retry.');
@@ -156,13 +66,11 @@ const TasksScreen = () => {
         }
     };
 
-    // Update sections based on filter and tasks
-    const updateSections = (taskList = tasks, filterType: string) => {
+    // Process tasks into sections
+    const processTaskSections = (taskList: Task[]) => {
         let filteredTasks: Task[] = [];
-        let sections: {title: string, data: Task[], icon?: string}[] = [];
 
-        // First, filter the tasks based on the selected filter
-        switch (filterType) {
+        switch (filter) {
             case 'active':
                 filteredTasks = taskList.filter(task => task.status === 'active');
                 break;
@@ -170,416 +78,266 @@ const TasksScreen = () => {
                 filteredTasks = taskList.filter(task => task.status === 'completed');
                 break;
             case 'overdue':
-                filteredTasks = taskList.filter(task => isTaskOverdue(task));
+                filteredTasks = taskList.filter(task => {
+                    if (task.status === 'completed') return false;
+                    if (!task.due_date) return false;
+                    return new Date(task.due_date) < new Date();
+                });
                 break;
-            case 'upcoming':
-                filteredTasks = taskList.filter(task =>
-                    task.status === 'active' && task.due_date && !isTaskDueToday(task) && !isTaskOverdue(task)
-                );
-                break;
-            default: // 'all'
+            default:
                 filteredTasks = taskList;
-                break;
         }
 
-        // Create sections based on the filter type
-        if (filterType === 'all') {
-            // Overdue tasks get top priority
-            const overdueTasks = taskList.filter(task => isTaskOverdue(task));
-
-            // Get today's tasks
-            const todaysTasks = taskList.filter(task => isTaskDueToday(task) && task.status === 'active');
-
-            // Tasks without a due date
-            const noDueDateTasks = taskList.filter(task =>
-                !task.due_date && task.status === 'active'
-            );
-
-            // Future tasks
-            const upcomingTasks = taskList.filter(task =>
-                task.due_date &&
-                task.status === 'active' &&
-                !isTaskDueToday(task) &&
-                !isTaskOverdue(task)
-            );
-
-            // Completed tasks
-            const completedTasks = taskList.filter(task => task.status === 'completed');
-
-            // Add sections with icons if they have tasks
-            if (overdueTasks.length > 0) {
-                sections.push({
-                    title: 'Overdue',
-                    data: overdueTasks,
-                    icon: 'alert-circle'
-                });
+        const sections = [
+            {
+                title: filter === 'all' ? 'All Tasks' :
+                    filter === 'active' ? 'Active Tasks' :
+                        filter === 'completed' ? 'Completed Tasks' :
+                            'Overdue Tasks',
+                data: filteredTasks
             }
-
-            // Today's tasks
-            if (todaysTasks.length > 0) {
-                sections.push({
-                    title: 'Today',
-                    data: todaysTasks,
-                    icon: 'today-outline'
-                });
-            }
-
-            // No Due Date tasks
-            if (noDueDateTasks.length > 0) {
-                sections.push({
-                    title: 'No Due Date',
-                    data: noDueDateTasks,
-                    icon: 'calendar-clear-outline'
-                });
-            }
-
-            // Upcoming tasks
-            if (upcomingTasks.length > 0) {
-                sections.push({
-                    title: 'Upcoming',
-                    data: upcomingTasks,
-                    icon: 'calendar-outline'
-                });
-            }
-
-            // Completed tasks
-            if (completedTasks.length > 0) {
-                sections.push({
-                    title: 'Completed',
-                    data: completedTasks,
-                    icon: 'checkmark-done-circle-outline'
-                });
-            }
-        } else {
-            // For other views, just use a single section with the filter name
-            const title = filterType.charAt(0).toUpperCase() + filterType.slice(1);
-            let icon = '';
-
-            switch(filterType) {
-                case 'active': icon = 'checkmark-circle-outline'; break;
-                case 'completed': icon = 'checkmark-done-circle-outline'; break;
-                case 'overdue': icon = 'alert-circle'; break;
-                case 'upcoming': icon = 'calendar-outline'; break;
-            }
-
-            sections = [{
-                title: `${title} Tasks`,
-                data: filteredTasks,
-                icon
-            }];
-        }
+        ];
 
         setSectionsData(sections);
     };
 
-    // Apply filter to tasks
-    const applyFilter = (filterType: 'all' | 'active' | 'completed' | 'overdue' | 'upcoming') => {
-        updateSections(tasks, filterType);
-        setFilter(filterType);
+    // Lifecycle and animation effects
+    useEffect(() => {
+        fetchTasks();
+    }, [user, filter]);
 
-        // Animate filter change
-        Animated.sequence([
-            Animated.timing(filterBarOpacity, {
-                toValue: 0.7,
-                duration: 150,
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
                 useNativeDriver: true
             }),
-            Animated.timing(filterBarOpacity, {
-                toValue: 1,
-                duration: 150,
+            Animated.timing(translateYAnim, {
+                toValue: 0,
+                duration: 500,
                 useNativeDriver: true
             })
         ]).start();
-    };
+    }, []);
 
-    // Navigate to the task detail screen
+    // Task interaction handlers
     const handleTaskPress = (taskId: string) => {
-        navigation.navigate('TaskDetail', { taskId } as any);
+        navigation.navigate('TaskDetail', {taskId});
     };
 
-    // Toggle task completion status
     const toggleTaskCompletion = async (task: Task) => {
         try {
             const newStatus = task.status === 'active' ? 'completed' : 'active';
-            const newCompletedAt = newStatus === 'completed' ? new Date().toISOString() : null;
-
-            // Optimistic update
-            setTasks(prevTasks =>
-                prevTasks.map(t =>
-                    t.id === task.id
-                        ? {...t, status: newStatus, completed_at: newCompletedAt}
-                        : t
-                )
-            );
-
-            // Update sections
-            updateSections(
-                tasks.map(t =>
-                    t.id === task.id
-                        ? {...t, status: newStatus, completed_at: newCompletedAt}
-                        : t
-                ),
-                filter
-            );
-
-            // Update in database
-            const { error } = await supabase
+            const {error} = await supabase
                 .from('tasks')
                 .update({
                     status: newStatus,
-                    completed_at: newCompletedAt,
+                    completed_at: newStatus === 'completed' ? new Date().toISOString() : null
                 })
                 .eq('id', task.id);
 
             if (error) throw error;
+
+            // Optimistically update UI
+            const updatedTasks = tasks.map(t =>
+                t.id === task.id
+                    ? {
+                        ...t,
+                        status: newStatus,
+                        completed_at: newStatus === 'completed' ? new Date().toISOString() : null
+                    }
+                    : t
+            );
+
+            setTasks(updatedTasks);
+            processTaskSections(updatedTasks);
         } catch (error) {
-            console.error('Error updating task status:', error.message);
+            console.error('Error updating task status:', error);
             Alert.alert('Error', 'Failed to update task status');
-            // Revert optimistic update
-            fetchTasks();
         }
     };
 
-    // Render empty state when no tasks are available
-    const renderEmpty = () => (
+    // Render empty state
+    const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
             <Image
                 source={require('../../../assets/adaptive-icon.png')}
                 style={styles.emptyImage}
                 resizeMode="contain"
             />
-            <Text style={styles.emptyTitle}>No tasks found</Text>
+            <Text style={styles.emptyTitle}>No Tasks Found</Text>
             <Text style={styles.emptySubtitle}>
                 {filter === 'all'
-                    ? 'Get started by adding your first task'
-                    : `No ${filter} tasks found`}
+                    ? 'Start organizing your day by adding a task'
+                    : `No ${filter} tasks at the moment`}
             </Text>
             <TouchableOpacity
-                style={styles.emptyAddButton}
-                onPress={() => navigation.navigate('CreateTask' as any)}
+                style={styles.addTaskButton}
+                onPress={() => navigation.navigate('CreateTask')}
             >
-                <Ionicons name="add" size={24} color={COLORS.white} />
-                <Text style={styles.emptyAddButtonText}>Add New Task</Text>
+                <Ionicons name="add" size={24} color={COLORS.white}/>
+                <Text style={styles.addTaskButtonText}>Add New Task</Text>
             </TouchableOpacity>
         </View>
     );
 
-    const renderAddButton = () => (
-        <AnimatedTouchable
+    // Filter buttons
+    const FilterButton = ({label, icon, isActive, onPress}) => (
+        <TouchableOpacity
             style={[
-                styles.addButton,
-                { transform: [{ scale: addButtonScale }] }
+                styles.filterButton,
+                isActive && styles.activeFilterButton
             ]}
-            onPress={() => {
-                // Button press animation
-                Animated.sequence([
-                    Animated.timing(addButtonScale, {
-                        toValue: 0.8,
-                        duration: 100,
-                        useNativeDriver: true
-                    }),
-                    Animated.timing(addButtonScale, {
-                        toValue: 1,
-                        duration: 100,
-                        useNativeDriver: true
-                    })
-                ]).start();
-
-                navigation.navigate('CreateTask' as any);
-            }}
-            accessibilityLabel="Add new task"
+            onPress={onPress}
         >
-            <Ionicons name="add" size={24} color={COLORS.white} />
-        </AnimatedTouchable>
-    );
-
-    // Render section header with icon
-    const renderSectionHeader = ({ section }: { section: { title: string, data: Task[], icon?: string } }) => (
-        <View style={styles.sectionHeader}>
-            {section.icon && (
-                <View style={styles.sectionIconContainer}>
-                    <Ionicons
-                        name={section.icon as any}
-                        size={16}
-                        color={COLORS.white}
-                    />
-                </View>
-            )}
-            <Text style={styles.sectionHeaderText}>
-                {section.title} {section.data.length > 0 && `(${section.data.length})`}
+            <Ionicons
+                name={icon}
+                size={16}
+                color={isActive ? COLORS.primary : COLORS.textSecondary}
+            />
+            <Text
+                style={[
+                    styles.filterButtonText,
+                    isActive && styles.activeFilterButtonText
+                ]}
+            >
+                {label}
             </Text>
-
-            {section.title === 'Overdue' && section.data.length > 0 && (
-                <View style={styles.overdueBadge}>
-                    <Ionicons name="alert-circle" size={12} color={COLORS.white} />
-                    <Text style={styles.overdueBadgeText}>Action Needed</Text>
-                </View>
-            )}
-        </View>
+        </TouchableOpacity>
     );
-
-    // Handle pull-to-refresh
-    const handleRefresh = () => {
-        fetchTasks();
-    };
-
-    // Get total active tasks count
-    const activeTasks = tasks.filter(task => task.status === 'active').length;
-
-    // Get completed tasks percentage
-    const completedPercentage = tasks.length > 0
-        ? Math.round((tasks.filter(task => task.status === 'completed').length / tasks.length) * 100)
-        : 0;
 
     return (
         <ScreenLayout
             title="Tasks"
-            rightComponent={renderAddButton()}
             showHeader={false}
         >
-            <View style={styles.container}>
-                {/* Custom header with greeting and summary */}
-                <Animated.View style={[styles.customHeader, { height: headerHeight, opacity: headerOpacity }]}>
-                    <Text style={styles.greeting}>Hello!</Text>
-                    <Text style={styles.welcomeText}>Let's organize your tasks</Text>
+            <Animated.View
+                style={[
+                    styles.container,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{translateY: translateYAnim}]
+                    }
+                ]}
+            >
+                {/* Greeting and Stats Header */}
+                <View style={styles.headerContainer}>
+                    <View style={styles.greetingContainer}>
+                        <Text style={styles.greeting}>Hello!</Text>
+                        <Text style={styles.subGreeting}>
+                            {user?.user_metadata?.name ? `Welcome, ${user.user_metadata.name}` : 'Let\'s organize your day'}
+                        </Text>
+                    </View>
 
-                    <View style={styles.summaryCards}>
-                        <View style={[styles.summaryCard, { backgroundColor: COLORS.cardBlue }]}>
-                            <View style={styles.summaryIconContainer}>
-                                <Ionicons name="checkbox-outline" size={20} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.summaryValue}>{activeTasks}</Text>
-                            <Text style={styles.summaryLabel}>Active Tasks</Text>
+                    <View style={styles.statsContainer}>
+                        <View style={styles.statCard}>
+                            <Ionicons
+                                name="checkbox-outline"
+                                size={24}
+                                color={COLORS.primary}
+                            />
+                            <Text style={styles.statValue}>
+                                {tasks.filter(t => t.status === 'active').length}
+                            </Text>
+                            <Text style={styles.statLabel}>Active Tasks</Text>
                         </View>
-
-                        <View style={[styles.summaryCard, { backgroundColor: COLORS.cardGreen }]}>
-                            <View style={[styles.summaryIconContainer, { backgroundColor: COLORS.lowPriority }]}>
-                                <Ionicons name="pie-chart-outline" size={20} color={COLORS.white} />
-                            </View>
-                            <Text style={styles.summaryValue}>{completedPercentage}%</Text>
-                            <Text style={styles.summaryLabel}>Completed</Text>
+                        <View style={styles.statCard}>
+                            <Ionicons
+                                name="pie-chart-outline"
+                                size={24}
+                                color={COLORS.lowPriority}
+                            />
+                            <Text style={styles.statValue}>
+                                {tasks.length > 0
+                                    ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100)
+                                    : 0}%
+                            </Text>
+                            <Text style={styles.statLabel}>Completed</Text>
                         </View>
                     </View>
-                </Animated.View>
+                </View>
 
-                {/* Task filters */}
-                <Animated.View
-                    style={[
-                        styles.filterContainer,
-                        { opacity: filterBarOpacity }
-                    ]}
-                >
-                    <ScrollableFilterBar
-                        currentFilter={filter}
-                        onFilterChange={applyFilter}
+                {/* Filter Buttons */}
+                <View style={styles.filterContainer}>
+                    <FilterButton
+                        label="All"
+                        icon="list-outline"
+                        isActive={filter === 'all'}
+                        onPress={() => setFilter('all')}
                     />
-                </Animated.View>
+                    <FilterButton
+                        label="Active"
+                        icon="checkbox-outline"
+                        isActive={filter === 'active'}
+                        onPress={() => setFilter('active')}
+                    />
+                    <FilterButton
+                        label="Overdue"
+                        icon="alert-circle"
+                        isActive={filter === 'overdue'}
+                        onPress={() => setFilter('overdue')}
+                    />
+                    <FilterButton
+                        label="Completed"
+                        icon="checkmark-done-circle-outline"
+                        isActive={filter === 'completed'}
+                        onPress={() => setFilter('completed')}
+                    />
+                </View>
 
-                {/* Error message */}
-                {error && !loading && (
-                    <View style={styles.errorContainer}>
-                        <Text style={styles.errorText}>{error}</Text>
-                        <TouchableOpacity
-                            style={styles.retryButton}
-                            onPress={fetchTasks}
-                        >
-                            <Text style={styles.retryButtonText}>Retry</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Loading state */}
+                {/* Tasks List */}
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={COLORS.primary} />
-                        <Text style={styles.loadingText}>Loading your tasks...</Text>
+                        <ActivityIndicator size="large" color={COLORS.primary}/>
+                        <Text style={styles.loadingText}>Loading tasks...</Text>
                     </View>
                 ) : (
-                    /* Task list */
                     <SectionList
                         sections={sectionsData}
                         keyExtractor={(item) => item.id}
-                        renderItem={({ item }) => (
-                            <TaskItem
+                        renderItem={({item}) => (
+                            <SwipeableTaskItem
                                 task={item}
                                 onPress={() => handleTaskPress(item.id)}
-                                onToggleCompletion={toggleTaskCompletion}
+                                onTaskUpdate={(updatedTask) => {
+                                    // Update the tasks list when a task is updated
+                                    const updatedTasks = tasks.map(t =>
+                                        t.id === updatedTask.id ? updatedTask : t
+                                    );
+                                    setTasks(updatedTasks);
+                                    processTaskSections(updatedTasks);
+                                }}
+                                onDelete={(taskId) => {
+                                    // Remove the deleted task from the list
+                                    const updatedTasks = tasks.filter(t => t.id !== taskId);
+                                    setTasks(updatedTasks);
+                                    processTaskSections(updatedTasks);
+                                }}
                             />
                         )}
-                        renderSectionHeader={renderSectionHeader}
-                        contentContainerStyle={[
-                            styles.tasksList,
-                            sectionsData.every(section => section.data.length === 0) && styles.emptyList,
-                        ]}
-                        ListEmptyComponent={renderEmpty}
+                        ListEmptyComponent={renderEmptyState}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
-                                onRefresh={handleRefresh}
+                                onRefresh={fetchTasks}
                                 colors={[COLORS.primary]}
                                 tintColor={COLORS.primary}
                             />
                         }
-                        stickySectionHeadersEnabled={true}
-                        onScroll={(event) => {
-                            // Collapse header on scroll
-                            const scrollY = event.nativeEvent.contentOffset.y;
-                            const newHeight = Math.max(0, 180 - scrollY);
-                            const newOpacity = Math.max(0, 1 - (scrollY / 180));
-
-                            headerHeight.setValue(newHeight);
-                            headerOpacity.setValue(newOpacity);
-                        }}
-                        scrollEventThrottle={16}
+                        contentContainerStyle={styles.tasksListContainer}
                     />
                 )}
-            </View>
-        </ScreenLayout>
-    );
-};
 
-// Scrollable Filter Bar Component
-const ScrollableFilterBar = ({
-                                 currentFilter,
-                                 onFilterChange
-                             }: {
-    currentFilter: string;
-    onFilterChange: (filter: any) => void
-}) => {
-    const filters = [
-        { key: 'all', label: 'All', icon: 'list' },
-        { key: 'overdue', label: 'Overdue', icon: 'alert-circle' },
-        { key: 'upcoming', label: 'Upcoming', icon: 'time' },
-        { key: 'active', label: 'Active', icon: 'checkbox-outline' },
-        { key: 'completed', label: 'Completed', icon: 'checkmark-circle' }
-    ];
-
-    return (
-        <View style={styles.tabBar}>
-            {filters.map(filter => (
+                {/* Add Task Button */}
                 <TouchableOpacity
-                    key={filter.key}
-                    style={[
-                        styles.tab,
-                        currentFilter === filter.key && styles.activeTab
-                    ]}
-                    onPress={() => onFilterChange(filter.key)}
+                    style={styles.addButton}
+                    onPress={() => navigation.navigate('CreateTask')}
                 >
-                    <Ionicons
-                        name={filter.icon as any}
-                        size={16}
-                        color={currentFilter === filter.key ? COLORS.primary : COLORS.textSecondary}
-                        style={styles.tabIcon}
-                    />
-                    <Text style={[
-                        styles.tabText,
-                        currentFilter === filter.key && styles.activeTabText
-                    ]}>
-                        {filter.label}
-                    </Text>
+                    <Ionicons name="add" size={24} color={COLORS.white}/>
                 </TouchableOpacity>
-            ))}
-        </View>
+            </Animated.View>
+        </ScreenLayout>
     );
 };
 
@@ -588,164 +346,81 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
-    customHeader: {
+    headerContainer: {
         backgroundColor: COLORS.white,
         paddingHorizontal: SPACING.md,
         paddingTop: SPACING.xl,
         paddingBottom: SPACING.md,
         ...SHADOWS.small,
     },
+    greetingContainer: {
+        marginBottom: SPACING.md,
+    },
     greeting: {
         ...Typography.h2,
         marginBottom: SPACING.xs,
     },
-    welcomeText: {
+    subGreeting: {
         ...Typography.bodyMedium,
         color: COLORS.textSecondary,
-        marginBottom: SPACING.lg,
     },
-    summaryCards: {
+    statsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
-    summaryCard: {
+    statCard: {
         flex: 1,
+        backgroundColor: COLORS.cardBlue,
+        borderRadius: RADIUS.md,
         padding: SPACING.md,
-        borderRadius: RADIUS.lg,
-        marginRight: SPACING.sm,
+        marginHorizontal: SPACING.xs,
+        alignItems: 'center',
         ...SHADOWS.small,
     },
-    summaryIconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: RADIUS.sm,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.primaryLight,
-        marginBottom: SPACING.sm,
-    },
-    summaryValue: {
+    statValue: {
         ...Typography.h3,
-        marginBottom: SPACING.xxs,
+        marginTop: SPACING.xs,
     },
-    summaryLabel: {
+    statLabel: {
         ...Typography.bodySmall,
-    },
-    addButton: {
-        width: 48,
-        height: 48,
-        borderRadius: RADIUS.round,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...SHADOWS.medium,
-    },
-    errorContainer: {
-        backgroundColor: COLORS.cardRed,
-        marginHorizontal: SPACING.md,
-        marginTop: SPACING.sm,
-        padding: SPACING.sm,
-        borderRadius: RADIUS.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    errorText: {
-        ...Typography.bodySmall,
-        color: COLORS.danger,
-        flex: 1,
-    },
-    retryButton: {
-        backgroundColor: COLORS.danger,
-        paddingVertical: SPACING.xs,
-        paddingHorizontal: SPACING.sm,
-        borderRadius: RADIUS.sm,
-    },
-    retryButtonText: {
-        ...Typography.captionBold,
-        color: COLORS.white,
-    },
-    tabBar: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.white,
-        marginHorizontal: SPACING.md,
-        marginVertical: SPACING.sm,
-        borderRadius: RADIUS.lg,
-        padding: SPACING.xs,
-        ...SHADOWS.small,
-    },
-    tab: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: SPACING.sm,
-        borderRadius: RADIUS.md,
-        flexDirection: 'row',
-    },
-    tabIcon: {
-        marginRight: SPACING.xxs,
-    },
-    activeTab: {
-        backgroundColor: COLORS.primaryLight,
-    },
-    tabText: {
-        ...Typography.caption,
         color: COLORS.textSecondary,
-    },
-    activeTabText: {
-        ...Typography.captionBold,
-        color: COLORS.primary,
+        marginTop: SPACING.xs,
     },
     filterContainer: {
-        marginBottom: SPACING.sm,
-    },
-    tasksList: {
-        paddingBottom: SPACING.xl,
-    },
-    emptyList: {
-        flexGrow: 1,
-    },
-    sectionHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: SPACING.sm,
+        justifyContent: 'space-between',
         paddingHorizontal: SPACING.md,
-        backgroundColor: COLORS.background,
-        marginVertical: SPACING.xs,
+        paddingVertical: SPACING.sm,
+        backgroundColor: COLORS.white,
+        ...SHADOWS.small,
     },
-    sectionIconContainer: {
-        width: 24,
-        height: 24,
-        borderRadius: RADIUS.sm,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: SPACING.xs,
-    },
-    sectionHeaderText: {
-        ...Typography.bodyMedium,
-        fontWeight: '600',
-    },
-    overdueBadge: {
+    filterButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.danger,
-        paddingVertical: SPACING.xxs,
+        backgroundColor: COLORS.background,
+        paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.sm,
         borderRadius: RADIUS.round,
-        marginLeft: SPACING.sm,
     },
-    overdueBadgeText: {
-        ...Typography.tiny,
-        color: COLORS.white,
-        fontWeight: '500',
-        marginLeft: 2,
+    activeFilterButton: {
+        backgroundColor: COLORS.primaryLight,
+    },
+    filterButtonText: {
+        ...Typography.bodySmall,
+        marginLeft: SPACING.xs,
+        color: COLORS.textSecondary,
+    },
+    activeFilterButtonText: {
+        color: COLORS.primary,
+        fontWeight: FONTS.weight.semiBold,
+    },
+    tasksListContainer: {
+        paddingBottom: SPACING.xxl,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingBottom: SPACING.xxl,
     },
     loadingText: {
         ...Typography.bodyMedium,
@@ -775,20 +450,33 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: SPACING.xl,
     },
-    emptyAddButton: {
+    addTaskButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.primary,
         paddingVertical: SPACING.md,
         paddingHorizontal: SPACING.xl,
         borderRadius: RADIUS.round,
+        alignSelf: 'center',
         ...SHADOWS.medium,
     },
-    emptyAddButtonText: {
+    addTaskButtonText: {
         ...Typography.bodyMedium,
         color: COLORS.white,
-        fontWeight: '600',
+        fontWeight: FONTS.weight.semiBold,
         marginLeft: SPACING.sm,
+    },
+    addButton: {
+        position: 'absolute',
+        bottom: SPACING.xl,
+        right: SPACING.xl,
+        width: 60,
+        height: 60,
+        borderRadius: RADIUS.round,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.medium,
     },
 });
 

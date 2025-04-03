@@ -27,7 +27,6 @@ import {AuthProvider, useAuth} from './src/context/AuthContext';
 import {GestureHandlerRootView} from "react-native-gesture-handler";
 import MoodJournalScreen from "./src/screens/journal/MoodJournalDetailScreen";
 import {patchTextComponent, patchTextRender} from './src/utils/patches';
-import StatusBarManager from './src/components/StatusBarManager';
 
 try {
     patchTextComponent();
