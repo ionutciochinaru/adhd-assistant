@@ -7,6 +7,7 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Medication } from '../../utils/supabase';
 import ScreenLayout from "../../components/ScreenLayout";
+import {COLORS} from "../../utils/styles";
 
 const MedicationsScreen = () => {
     const navigation = useNavigation();
@@ -49,22 +50,25 @@ const MedicationsScreen = () => {
         </View>
     );
 
+    const renderAddButton = () => (
+        <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => Alert.alert('Coming Soon', 'Add medication functionality will be available soon!')}
+        >
+            <Ionicons name="add" size={24} color={COLORS.white} />
+        </TouchableOpacity>
+    );
+
     return (
-        <ScreenLayout>
+        <ScreenLayout
+            title="Medications"
+            rightComponent={renderAddButton()}
+        >
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Medications</Text>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={() => Alert.alert('Coming Soon', 'Add medication functionality will be available soon!')}
-                    >
-                        <Ionicons name="add" size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
-                </View>
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#3498db" />
+                        <ActivityIndicator size="large" color={COLORS.primary} />
                     </View>
                 ) : (
                     <FlatList
@@ -99,7 +103,7 @@ const MedicationsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: COLORS.light,
     },
     header: {
         flexDirection: 'row',
@@ -120,7 +124,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#3498db',
+        backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
     },

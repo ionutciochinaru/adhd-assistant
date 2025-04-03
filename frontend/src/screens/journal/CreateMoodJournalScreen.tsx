@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import ScreenLayout from "../../components/ScreenLayout";
 import BackButton from "../../components/BackButton";
+import { COLORS, SPACING, Typography } from '../../utils/styles';
 
 // Navigation types
 type JournalStackParamList = {
@@ -214,25 +215,30 @@ const CreateMoodJournalScreen = ({ navigation }: Props) => {
         </View>
     );
 
-    return (
-        <ScreenLayout>
-            <View style={styles.container}>
-            <View style={styles.header}>
-                <BackButton onPress={() => navigation.goBack()} />
-                <Text style={styles.headerTitle}>New Journal Entry</Text>
-                <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={saveJournal}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                        <Text style={styles.saveButtonText}>Save</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
+    const renderBackButton = () => (
+        <BackButton onPress={() => navigation.goBack()} />
+    );
 
+    const renderSaveButton = () => (
+        <TouchableOpacity
+            style={styles.saveButton}
+            onPress={saveJournal}
+            disabled={loading}
+        >
+            {loading ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+                <Text style={styles.saveButtonText}>Save</Text>
+            )}
+        </TouchableOpacity>
+    );
+
+    return (
+        <ScreenLayout
+            leftComponent={renderBackButton()}
+            rightComponent={renderSaveButton()}
+            title="New Journal Entry"
+        >
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                 <View style={styles.dateContainer}>
                     <Text style={styles.sectionTitle}>Date</Text>
@@ -329,7 +335,6 @@ const CreateMoodJournalScreen = ({ navigation }: Props) => {
                     />
                 </View>
             </ScrollView>
-        </View>
         </ScreenLayout>
     );
 };
@@ -349,6 +354,23 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#E5E5E5',
     },
+    scrollView: {
+        flex: 1,
+    },
+    contentContainer: {
+        padding: SPACING.md,
+    },
+    saveButton: {
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm,
+        backgroundColor: COLORS.primary,
+        borderRadius: 6,
+    },
+    saveButtonText: {
+        fontSize: 16,
+        color: COLORS.white,
+        fontWeight: '600',
+    },
     headerTitle: {
         fontSize: 18,
         fontWeight: '600',
@@ -360,23 +382,6 @@ const styles = StyleSheet.create({
     cancelButtonText: {
         fontSize: 16,
         color: '#7F8C8D',
-    },
-    saveButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: '#3498DB',
-        borderRadius: 6,
-    },
-    saveButtonText: {
-        fontSize: 16,
-        color: '#FFFFFF',
-        fontWeight: '600',
-    },
-    scrollView: {
-        flex: 1,
-    },
-    contentContainer: {
-        padding: 16,
     },
     dateContainer: {
         marginBottom: 16,

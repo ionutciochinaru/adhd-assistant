@@ -16,6 +16,7 @@ import {useAuth} from '../../context/AuthContext';
 import {Task} from '../../utils/supabase';
 import ScreenLayout from "../../components/ScreenLayout";
 import { normalizeDate, formatDate } from '../../utils/dateUtils';
+import {COLORS, SPACING, Typography} from "../../utils/styles";
 
 type MarkedDates = {
     [date: string]: {
@@ -161,30 +162,28 @@ const CalendarScreen = () => {
     );
 
     return (
-        <ScreenLayout>
+        <ScreenLayout
+            title="Calendar"
+        >
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Calendar</Text>
-                </View>
-
                 <RNCalendar
                     current={selectedDate}
                     onDayPress={onDateSelect}
                     markedDates={markedDates}
                     markingType="dot"
                     theme={{
-                        calendarBackground: '#FFFFFF',
-                        textSectionTitleColor: '#666',
-                        selectedDayBackgroundColor: '#3498db',
-                        selectedDayTextColor: '#FFFFFF',
-                        todayTextColor: '#3498db',
-                        dayTextColor: '#333',
+                        calendarBackground: COLORS.white,
+                        textSectionTitleColor: COLORS.gray,
+                        selectedDayBackgroundColor: COLORS.primary,
+                        selectedDayTextColor: COLORS.white,
+                        todayTextColor: COLORS.primary,
+                        dayTextColor: COLORS.dark,
                         textDisabledColor: '#CCC',
-                        dotColor: '#3498db',
-                        selectedDotColor: '#FFFFFF',
-                        arrowColor: '#3498db',
-                        monthTextColor: '#333',
-                        indicatorColor: '#3498db',
+                        dotColor: COLORS.primary,
+                        selectedDotColor: COLORS.white,
+                        arrowColor: COLORS.primary,
+                        monthTextColor: COLORS.dark,
+                        indicatorColor: COLORS.primary,
                         textDayFontWeight: '300',
                         textMonthFontWeight: 'bold',
                         textDayHeaderFontWeight: '500',
@@ -221,7 +220,7 @@ const CalendarScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: COLORS.light,
     },
     header: {
         padding: 16,
@@ -240,18 +239,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     tasksHeader: {
-        padding: 16,
-        backgroundColor: '#FFFFFF',
+        padding: SPACING.md,
+        backgroundColor: COLORS.white,
         borderTopWidth: 1,
-        borderTopColor: '#E5E5E5',
+        borderTopColor: COLORS.border,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
+        borderBottomColor: COLORS.border,
         marginTop: 10,
     },
     tasksHeaderText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
+        ...Typography.bodyMedium,
     },
     emptyContainer: {
         flex: 1,

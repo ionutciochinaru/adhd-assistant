@@ -22,6 +22,9 @@ import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 import BackButton from "../../components/BackButton";
 import ActionButtons from "../../components/ActionButtons";
 import * as Notifications from 'expo-notifications';
+import ScreenLayout from '../../components/ScreenLayout';
+import { COLORS, SPACING, Typography } from '../../utils/styles';
+
 // Navigation types
 type TasksStackParamList = {
     TasksList: undefined;
@@ -392,69 +395,81 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
         );
     };
 
+    const renderBackButton = () => (
+        <BackButton onPress={() => navigation.goBack()} />
+    );
+
+    const renderActionButtons = () => (
+        <View style={styles.actionsContainer}>
+            {isEditing ? (
+                <ActionButtons
+                    onCancel={() => {
+                        setEditedTitle(task.title);
+                        setEditedDescription(task.description || '');
+                        setEditedPriority(task.priority);
+                        setEditedDueDate(task.due_date ? new Date(task.due_date) : null);
+                        setIsEditing(false);
+                    }}
+                    onSave={saveEditedTask}
+                    loading={updating}
+                    disabled={editedTitle.trim() === ''}
+                />
+            ) : (
+                <>
+                    <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() => setIsEditing(true)}
+                        disabled={updating}
+                    >
+                        <Text style={styles.editButtonText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={deleteTask}
+                    >
+                        {updating ? (
+                            <ActivityIndicator size="small" color={COLORS.white} />
+                        ) : (
+                            <Text style={styles.deleteButtonText}>Delete</Text>
+                        )}
+                    </TouchableOpacity>
+                </>
+            )}
+        </View>
+    );
+
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#3498db" />
-            </View>
+            <ScreenLayout>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+            </ScreenLayout>
         );
     }
 
     if (!task) {
         return (
-            <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Task not found</Text>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Text style={styles.backButtonText}>Go Back</Text>
-                </TouchableOpacity>
-            </View>
+            <ScreenLayout>
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>Task not found</Text>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Text style={styles.backButtonText}>Go Back</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScreenLayout>
         );
     }
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-            <View style={styles.container}>
-                <View style={styles.header}>
-                    <BackButton onPress={() => navigation.goBack()} />
-
-                    {isEditing ? (
-                        <ActionButtons
-                            onCancel={() => {
-                                setEditedTitle(task.title);
-                                setEditedDescription(task.description || '');
-                                setEditedPriority(task.priority);
-                                setEditedDueDate(task.due_date ? new Date(task.due_date) : null);
-                                setIsEditing(false);
-                            }}
-                            onSave={saveEditedTask}
-                            loading={updating}
-                            disabled={editedTitle.trim() === ''}
-                        />
-                    ) : (
-                        <View style={styles.actionsContainer}>
-                            <TouchableOpacity
-                                style={styles.editButton}
-                                onPress={() => setIsEditing(true)}
-                                disabled={updating}
-                            >
-                                <Text style={styles.editButtonText}>Edit</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.deleteButton}
-                                onPress={deleteTask}
-                            >
-                                {updating ? (
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                    <Text style={styles.deleteButtonText}>Delete</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    )}
-                </View>
+        <ScreenLayout
+            leftComponent={renderBackButton()}
+            rightComponent={renderActionButtons()}
+            title={task.title}
+        >
 
                 <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                     {isEditing ? (
@@ -669,8 +684,7 @@ const TaskDetailScreen = ({ route, navigation }: Props) => {
                         </View>
                     )}
                 </ScrollView>
-            </View>
-        </SafeAreaView>
+        </ScreenLayout>
     );
 };
 

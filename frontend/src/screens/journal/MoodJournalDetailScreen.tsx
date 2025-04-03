@@ -1,13 +1,14 @@
 // frontend/src/screens/journal/MoodJournalScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { MoodJournal } from '../../utils/supabase';
-import ScreenLayout from "../../components/ScreenLayout";
 import BackButton from "../../components/BackButton";
+import ScreenLayout from "../../components/ScreenLayout";
+import { COLORS, SPACING, Typography } from '../../utils/styles';
+import { Ionicons } from '@expo/vector-icons';
 
 const MoodJournalScreen = () => {
     const navigation = useNavigation();
@@ -39,24 +40,26 @@ const MoodJournalScreen = () => {
         }
     };
 
+    const renderAddButton = () => (
+        <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('CreateMoodJournal' as never)}
+            accessibilityLabel="Create new journal entry"
+        >
+            <Ionicons name="add" size={24} color={COLORS.white} />
+        </TouchableOpacity>
+    );
+
     // Implement the rest of the component...
     return (
-        <ScreenLayout>
+        <ScreenLayout
+            title="Mood Journal"
+            rightComponent={renderAddButton()}
+        >
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Mood Journal</Text>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={() => navigation.navigate('CreateMoodJournal' as never)}
-                        accessibilityLabel="Create new journal entry"
-                    >
-                        <Ionicons name="add" size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
-                </View>
-
                 {/* Content */}
                 {loading ? (
-                    <ActivityIndicator size="large" color="#3498db" style={styles.loader} />
+                    <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
                 ) : (
                     <FlatList
                         data={journals}
@@ -121,7 +124,15 @@ const getMoodLabel = (rating: number) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: COLORS.light,
+    },
+    addButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     header: {
         flexDirection: 'row',
@@ -149,14 +160,6 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: 'bold',
         color: '#333',
-    },
-    addButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#3498db',
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     loader: {
         flex: 1,

@@ -18,6 +18,7 @@ import * as Notifications from 'expo-notifications';
 import {supabase} from '../../utils/supabase';
 import ScreenLayout from "../../components/ScreenLayout";
 import ActionButtons from "../../components/ActionButtons";
+import {COLORS, SPACING} from "../../utils/styles";
 
 const ProfileScreen = () => {
     const {user, signOut, updateUser} = useAuth();
@@ -235,7 +236,10 @@ const ProfileScreen = () => {
     };
 
     return (
-        <ScreenLayout>
+        <ScreenLayout
+            title="Profile"
+            showHeader={false}
+        >
             <ScrollView style={styles.container}>
                 <View style={styles.header}>
                     <View style={styles.profileImageContainer}>
@@ -386,13 +390,13 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: COLORS.light,
     },
     header: {
-        padding: 20,
-        backgroundColor: '#FFFFFF',
+        padding: SPACING.xl,
+        backgroundColor: COLORS.white,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
+        borderBottomColor: COLORS.border,
         flexDirection: 'row',
         alignItems: 'center',
     },

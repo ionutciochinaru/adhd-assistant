@@ -19,8 +19,9 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
-import ScreenLayout from '../../components/ScreenLayout';
 import BackButton from "../../components/BackButton";
+import ScreenLayout from '../../components/ScreenLayout';
+import { COLORS, SPACING, Typography } from '../../utils/styles';
 
 // Navigation types
 type TasksStackParamList = {
@@ -234,29 +235,34 @@ const CreateTaskScreen = ({ navigation }: Props) => {
         }
     };
 
+    const renderBackButton = () => (
+        <BackButton onPress={() => navigation.goBack()} label="Cancel" />
+    );
+
+    const renderCreateButton = () => (
+        <TouchableOpacity
+            style={styles.createButton}
+            onPress={createTask}
+            disabled={loading || title.trim() === ''}
+        >
+            {loading ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+                <Text style={styles.createButtonText}>Create</Text>
+            )}
+        </TouchableOpacity>
+    );
+
     return (
-        <ScreenLayout>
+        <ScreenLayout
+            leftComponent={renderBackButton()}
+            rightComponent={renderCreateButton()}
+        >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <ScrollView style={styles.container}>
-                    <View style={styles.header}>
-                        <BackButton onPress={() => navigation.goBack()} label="Cancel" />
-                        <Text style={styles.headerTitle}>New Task</Text>
-                        <TouchableOpacity
-                            style={styles.createButton}
-                            onPress={createTask}
-                            disabled={loading || title.trim() === ''}
-                        >
-                            {loading ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.createButtonText}>Create</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-
                     <View style={styles.formContainer}>
                         <Text style={styles.label}>Title</Text>
                         <TextInput
@@ -427,7 +433,7 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: COLORS.light,
     },
     header: {
         flexDirection: 'row',

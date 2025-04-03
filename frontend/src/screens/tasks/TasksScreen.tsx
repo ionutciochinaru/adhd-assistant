@@ -16,8 +16,9 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import TaskItem from '../../components/TaskItem';
 import { Task } from '../../utils/supabase';
-import ScreenLayout from '../../components/ScreenLayout';
 import { Ionicons } from '@expo/vector-icons';
+import ScreenLayout from '../../components/ScreenLayout';
+import { COLORS, SPACING, Typography } from '../../utils/styles';
 
 const TasksScreen = () => {
     const navigation = useNavigation();
@@ -191,13 +192,26 @@ const TasksScreen = () => {
         </View>
     );
 
+    const renderAddButton = () => (
+        <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('CreateTask' as any)}
+            accessibilityLabel="Add new task"
+        >
+            <Ionicons name="add" size={24} color={COLORS.white} />
+        </TouchableOpacity>
+    );
+
     // Handle pull-to-refresh
     const handleRefresh = () => {
         fetchTasks();
     };
 
     return (
-        <ScreenLayout>
+        <ScreenLayout
+            title="Tasks"
+            rightComponent={renderAddButton()}
+        >
             {error && !loading && (
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{error}</Text>
@@ -210,15 +224,6 @@ const TasksScreen = () => {
                 </View>
             )}
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Tasks</Text>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={() => navigation.navigate('CreateTask' as any)}
-                    >
-                        <Ionicons name="add" size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
-                </View>
                 <View style={styles.filterContainer}>
                     <TouchableOpacity
                         style={[
@@ -301,7 +306,15 @@ const TasksScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: COLORS.light,
+    },
+    addButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     header: {
         flexDirection: 'row',
@@ -339,14 +352,6 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: 'bold',
         color: '#333',
-    },
-    addButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#3498db',
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     filterContainer: {
         flexDirection: 'row',

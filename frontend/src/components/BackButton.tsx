@@ -18,7 +18,6 @@ const BackButton = ({ onPress, label = 'Back', color = COLORS.primary }: BackBut
             accessibilityRole="button"
         >
             <Ionicons name="arrow-back" size={24} color={color} style={styles.icon} />
-            <Text style={[styles.text, { color }]}>{label}</Text>
         </TouchableOpacity>
     );
 };
