@@ -51,7 +51,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setLoading(true);
                 console.log('Initializing auth state...');
 
-                // Get existing session
+                // Try to restore session from SecureStore first
+                const savedSession = await SecureStore.getItemAsync('supabase_session');
+                if (savedSession) {
+                    try {
+                        const parsedSession = JSON.parse(savedSession);
+                        // Set session from storage if it exists and isn't expired
+                        const now = new Date();
+                        const expiresAt = new Date(parsedSession.expires_at * 1000);
+
+                        if (expiresAt > now) {
+                            console.log('Restored session from secure storage');
+                            // Update supabase with this session
+                            await supabase.auth.setSession({
+                                access_token: parsedSession.access_token,
+                                refresh_token: parsedSession.refresh_token
+                            });
+                        } else {
+                            console.log('Saved session expired, getting fresh session');
+                        }
+                    } catch (parseError) {
+                        console.error('Error parsing saved session:', parseError);
+                    }
+                }
+
+                // Get existing session or refresh token
                 const { data: { session }, error } = await supabase.auth.getSession();
 
                 if (error) {
@@ -61,16 +85,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 console.log('Initial session:', session ? 'Found' : 'None');
 
+                if (session) {
+                    // Save the session to SecureStore for persistence
+                    await SecureStore.setItemAsync('supabase_session', JSON.stringify({
+                        access_token: session.access_token,
+                        refresh_token: session.refresh_token,
+                        expires_at: Math.floor(new Date(session.expires_at).getTime() / 1000)
+                    }));
+                }
+
                 if (isMounted.current) {
                     setSession(session);
                     setUser(session?.user ?? null);
+                    setLoading(false);
                 }
             } catch (error) {
                 console.error('Auth initialization error:', error);
-            } finally {
-                if (isMounted.current) {
-                    setLoading(false);
-                }
+                setLoading(false);
             }
         };
 
@@ -78,8 +109,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Set up auth state change listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (event, currentSession) => {
+            async (event, currentSession) => {
                 console.log('Auth state changed:', event);
+
+                if (event === 'SIGNED_IN' && currentSession) {
+                    // Save session to SecureStore when user signs in
+                    await SecureStore.setItemAsync('supabase_session', JSON.stringify({
+                        access_token: currentSession.access_token,
+                        refresh_token: currentSession.refresh_token,
+                        expires_at: Math.floor(new Date(currentSession.expires_at).getTime() / 1000)
+                    }));
+                } else if (event === 'SIGNED_OUT') {
+                    // Remove session from SecureStore when user signs out
+                    await SecureStore.deleteItemAsync('supabase_session');
+                }
 
                 if (isMounted.current) {
                     setSession(currentSession);
@@ -110,6 +153,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             console.log('Sign in successful');
+
+            // Save session to SecureStore when user signs in
+            if (data.session) {
+                await SecureStore.setItemAsync('supabase_session', JSON.stringify({
+                    access_token: data.session.access_token,
+                    refresh_token: data.session.refresh_token,
+                    expires_at: Math.floor(new Date(data.session.expires_at).getTime() / 1000)
+                }));
+            }
+
             return {};
         } catch (error: any) {
             console.error('Error signing in:', error.message);
@@ -135,6 +188,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             console.log('Sign up and auto-sign in successful');
+
+            // Save session to SecureStore if auto-sign in happened
+            if (data.session) {
+                await SecureStore.setItemAsync('supabase_session', JSON.stringify({
+                    access_token: data.session.access_token,
+                    refresh_token: data.session.refresh_token,
+                    expires_at: Math.floor(new Date(data.session.expires_at).getTime() / 1000)
+                }));
+            }
+
             return {};
         } catch (error: any) {
             console.error('Error signing up:', error.message);
@@ -154,6 +217,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setSession(null);
             }
 
+            // Remove session from SecureStore
+            await SecureStore.deleteItemAsync('supabase_session');
+
+            // Also try to clear saved credentials if they exist
+            await SecureStore.deleteItemAsync('email');
+            await SecureStore.deleteItemAsync('password');
+            await SecureStore.setItemAsync('rememberMe', 'false');
+
+            // Call supabase signOut
             await supabase.auth.signOut();
             console.log('Sign out successful');
         } catch (error: any) {

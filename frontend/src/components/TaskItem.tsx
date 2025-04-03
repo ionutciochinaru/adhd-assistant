@@ -95,27 +95,27 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
         <TouchableOpacity
             style={[
                 styles.container,
-                task.status === 'completed' && styles.completedContainer,
-                overdue && styles.overdueContainer,
-                dueSoon && styles.dueSoonContainer
+                task.status === 'completed' ? styles.completedContainer : null,
+                overdue ? styles.overdueContainer : null,
+                dueSoon ? styles.dueSoonContainer : null
             ]}
             onPress={onPress}
             activeOpacity={0.7}
         >
             {/* Task completion checkbox */}
-            {onToggleCompletion && (
+            {onToggleCompletion ? (
                 <TouchableOpacity
                     style={[
                         styles.checkbox,
-                        task.status === 'completed' && styles.checkboxChecked
+                        task.status === 'completed' ? styles.checkboxChecked : null
                     ]}
                     onPress={handleToggleCompletion}
                 >
-                    {task.status === 'completed' && (
+                    {task.status === 'completed' ? (
                         <Ionicons name="checkmark" size={16} color="#fff" />
-                    )}
+                    ) : null}
                 </TouchableOpacity>
-            )}
+            ) : null}
 
             <View
                 style={[
@@ -129,7 +129,7 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                     <Text
                         style={[
                             styles.taskTitle,
-                            task.status === 'completed' && styles.completedTitle
+                            task.status === 'completed' ? styles.completedTitle : null
                         ]}
                         numberOfLines={2}
                         ellipsizeMode="tail"
@@ -137,16 +137,16 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                         {task.title}
                     </Text>
 
-                    {task.status === 'completed' && (
+                    {task.status === 'completed' ? (
                         <Ionicons name="checkmark-circle" size={20} color="#2ecc71" style={styles.checkIcon} />
-                    )}
+                    ) : null}
                 </View>
 
                 {task.description ? (
                     <Text
                         style={[
                             styles.description,
-                            task.status === 'completed' && styles.completedDescription
+                            task.status === 'completed' ? styles.completedDescription : null
                         ]}
                         numberOfLines={1}
                     >
@@ -155,7 +155,7 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                 ) : null}
 
                 <View style={styles.metadataContainer}>
-                    {dueDate && (
+                    {dueDate ? (
                         <View style={styles.dueDateContainer}>
                             <Ionicons
                                 name="calendar-outline"
@@ -164,23 +164,23 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
                             />
                             <Text style={[
                                 styles.dueDate,
-                                overdue && styles.overdueText,
-                                dueSoon && styles.dueSoonText
+                                overdue ? styles.overdueText : null,
+                                dueSoon ? styles.dueSoonText : null
                             ]}>
                                 {overdue ? `Overdue: ${dueDate}` : dueDate}
                             </Text>
                         </View>
-                    )}
+                    ) : null}
 
                     {/* Show subtask count if any */}
-                    {task.subtasks_count && task.subtasks_count > 0 && (
+                    {(task.subtasks_count && task.subtasks_count > 0) ? (
                         <View style={styles.subtaskContainer}>
                             <Ionicons name="list-outline" size={14} color="#7f8c8d" />
                             <Text style={styles.subtaskText}>
                                 {task.subtasks_completed || 0}/{task.subtasks_count}
                             </Text>
                         </View>
-                    )}
+                    ) : null}
                 </View>
             </View>
 
@@ -317,4 +317,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default TaskItem
+export default TaskItem;

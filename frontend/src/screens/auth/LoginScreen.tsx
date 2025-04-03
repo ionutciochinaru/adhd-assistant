@@ -1,3 +1,4 @@
+// Fixed LoginScreen.tsx with proper text rendering
 import React, { useState } from 'react';
 import {
     View,
@@ -61,7 +62,7 @@ const LoginScreen = ({ navigation }: Props) => {
                         resizeMode="contain"
                     />
                     <Text style={styles.title}>ADHD Assistant</Text>
-                    <Text textBreakStrategy={"simple"} style={styles.subtitle} >Stay focused, get things done</Text>
+                    <Text style={styles.subtitle}>Stay focused, get things done</Text>
                 </View>
 
                 <View style={styles.formContainer}>
@@ -91,13 +92,12 @@ const LoginScreen = ({ navigation }: Props) => {
                         />
                     </View>
 
-
                     <View style={styles.signupContainer}>
                         <TouchableOpacity
                             style={styles.forgotPasswordContainer}
                             onPress={() => navigation.navigate('ForgotPassword')}
                         >
-                            <Text textBreakStrategy={"simple"}  style={styles.forgotPasswordText}>Forgot Password?</Text>
+                            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                         </TouchableOpacity>
                     </View>
 
