@@ -28,7 +28,7 @@ const TasksScreen = () => {
     const navigation = useNavigation();
     const { user, session } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [sectionsData, setSectionsData] = useState<{title: string, data: Task[]}[]>([]);
+    const [sectionsData, setSectionsData] = useState<{title: string, data: Task[], icon?: string}[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'overdue' | 'upcoming'>('all');
@@ -102,14 +102,36 @@ const TasksScreen = () => {
         return dueDate < now;
     };
 
-    // Function to check if a task is upcoming within 24 hours
-    const isTaskUpcoming = (task: Task) => {
-        if (!task.due_date || task.status === 'completed') return false;
+    // Function to check if a task is due today
+    const isTaskDueToday = (task: Task) => {
+        if (!task.due_date) return false;
         const dueDate = new Date(task.due_date);
         const now = new Date();
-        const tomorrow = new Date(now);
-        tomorrow.setHours(now.getHours() + 24);
-        return dueDate > now && dueDate <= tomorrow;
+        return dueDate.toDateString() === now.toDateString();
+    };
+
+    // Function to get time period of the day (morning, afternoon, evening, night)
+    const getTimePeriod = (dateString?: string | null) => {
+        if (!dateString) return 'any';
+
+        const date = new Date(dateString);
+        const hours = date.getHours();
+
+        if (hours >= 5 && hours < 12) return 'morning';
+        if (hours >= 12 && hours < 17) return 'afternoon';
+        if (hours >= 17 && hours < 21) return 'evening';
+        return 'night';
+    };
+
+    // Get icon for time period
+    const getTimeIcon = (period: string) => {
+        switch (period) {
+            case 'morning': return 'sunny-outline';
+            case 'afternoon': return 'partly-sunny-outline';
+            case 'evening': return 'moon-outline';
+            case 'night': return 'cloudy-night-outline';
+            default: return 'time-outline';
+        }
     };
 
     // Fetch tasks from Supabase
@@ -159,8 +181,9 @@ const TasksScreen = () => {
     // Update sections based on filter and tasks
     const updateSections = (taskList = tasks, filterType: string) => {
         let filteredTasks: Task[] = [];
-        let sections: {title: string, data: Task[]}[] = [];
+        let sections: {title: string, data: Task[], icon?: string}[] = [];
 
+        // First, filter the tasks based on the selected filter
         switch (filterType) {
             case 'active':
                 filteredTasks = taskList.filter(task => task.status === 'active');
@@ -172,49 +195,144 @@ const TasksScreen = () => {
                 filteredTasks = taskList.filter(task => isTaskOverdue(task));
                 break;
             case 'upcoming':
-                filteredTasks = taskList.filter(task => isTaskUpcoming(task));
+                filteredTasks = taskList.filter(task =>
+                    task.status === 'active' && task.due_date && !isTaskDueToday(task) && !isTaskOverdue(task)
+                );
                 break;
             default: // 'all'
                 filteredTasks = taskList;
                 break;
         }
 
-        // For 'all' view, organize tasks into logical sections
+        // Create sections based on the filter type
         if (filterType === 'all') {
+            // Overdue tasks get top priority
             const overdueTasks = taskList.filter(task => isTaskOverdue(task));
-            const dueTodayTasks = taskList.filter(task => {
-                if (task.due_date && task.status === 'active') {
-                    const dueDate = new Date(task.due_date);
-                    const now = new Date();
-                    return dueDate.toDateString() === now.toDateString();
-                }
-                return false;
-            });
-            const upcomingTasks = taskList.filter(task => {
-                if (task.due_date && task.status === 'active') {
-                    const dueDate = new Date(task.due_date);
-                    const now = new Date();
-                    const today = new Date(now);
-                    today.setHours(23, 59, 59, 999);
-                    return dueDate > today && !isTaskOverdue(task) && !dueTodayTasks.includes(task);
-                }
-                return false;
-            });
-            const noDueDateTasks = taskList.filter(task => {
-                return !task.due_date && task.status === 'active';
-            });
+
+            // Get today's tasks and group by time of day
+            const todaysTasks = taskList.filter(task => isTaskDueToday(task) && task.status === 'active');
+
+            // Group today's tasks by time period
+            const morningTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'morning');
+            const afternoonTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'afternoon');
+            const eveningTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'evening');
+            const nightTasks = todaysTasks.filter(task => getTimePeriod(task.due_date) === 'night');
+
+            // Tasks without a due date
+            const noDueDateTasks = taskList.filter(task =>
+                !task.due_date && task.status === 'active'
+            );
+
+            // Future tasks
+            const upcomingTasks = taskList.filter(task =>
+                task.due_date &&
+                task.status === 'active' &&
+                !isTaskDueToday(task) &&
+                !isTaskOverdue(task)
+            );
+
+            // Completed tasks
             const completedTasks = taskList.filter(task => task.status === 'completed');
 
-            sections = [
-                { title: 'Overdue', data: overdueTasks },
-                { title: 'Due Today', data: dueTodayTasks },
-                { title: 'Upcoming', data: upcomingTasks },
-                { title: 'No Due Date', data: noDueDateTasks },
-                { title: 'Completed', data: completedTasks }
-            ].filter(section => section.data.length > 0); // Only include non-empty sections
+            // Add sections with icons if they have tasks
+            if (overdueTasks.length > 0) {
+                sections.push({
+                    title: 'Overdue',
+                    data: overdueTasks,
+                    icon: 'alert-circle'
+                });
+            }
+
+            // Morning section for today
+            if (morningTasks.length > 0) {
+                sections.push({
+                    title: 'Morning',
+                    data: morningTasks,
+                    icon: 'sunny-outline'
+                });
+            }
+
+            // Afternoon section for today
+            if (afternoonTasks.length > 0) {
+                sections.push({
+                    title: 'Afternoon',
+                    data: afternoonTasks,
+                    icon: 'partly-sunny-outline'
+                });
+            }
+
+            // Evening section for today
+            if (eveningTasks.length > 0) {
+                sections.push({
+                    title: 'Evening',
+                    data: eveningTasks,
+                    icon: 'moon-outline'
+                });
+            }
+
+            // Night section for today
+            if (nightTasks.length > 0) {
+                sections.push({
+                    title: 'Night',
+                    data: nightTasks,
+                    icon: 'cloudy-night-outline'
+                });
+            }
+
+            // If no time-based sections were created but we have today's tasks, group them together
+            if (morningTasks.length === 0 && afternoonTasks.length === 0 &&
+                eveningTasks.length === 0 && nightTasks.length === 0 &&
+                todaysTasks.length > 0) {
+                sections.push({
+                    title: 'Today',
+                    data: todaysTasks,
+                    icon: 'today-outline'
+                });
+            }
+
+            // No Due Date tasks
+            if (noDueDateTasks.length > 0) {
+                sections.push({
+                    title: 'No Due Date',
+                    data: noDueDateTasks,
+                    icon: 'calendar-clear-outline'
+                });
+            }
+
+            // Upcoming tasks
+            if (upcomingTasks.length > 0) {
+                sections.push({
+                    title: 'Upcoming',
+                    data: upcomingTasks,
+                    icon: 'calendar-outline'
+                });
+            }
+
+            // Completed tasks
+            if (completedTasks.length > 0) {
+                sections.push({
+                    title: 'Completed',
+                    data: completedTasks,
+                    icon: 'checkmark-done-circle-outline'
+                });
+            }
         } else {
-            // For other views, just use the filtered tasks as a single section
-            sections = [{ title: filterType.charAt(0).toUpperCase() + filterType.slice(1) + ' Tasks', data: filteredTasks }];
+            // For other views, just use a single section with the filter name
+            const title = filterType.charAt(0).toUpperCase() + filterType.slice(1);
+            let icon = '';
+
+            switch(filterType) {
+                case 'active': icon = 'checkmark-circle-outline'; break;
+                case 'completed': icon = 'checkmark-done-circle-outline'; break;
+                case 'overdue': icon = 'alert-circle'; break;
+                case 'upcoming': icon = 'calendar-outline'; break;
+            }
+
+            sections = [{
+                title: `${title} Tasks`,
+                data: filteredTasks,
+                icon
+            }];
         }
 
         setSectionsData(sections);
@@ -251,7 +369,7 @@ const TasksScreen = () => {
             const newStatus = task.status === 'active' ? 'completed' : 'active';
             const newCompletedAt = newStatus === 'completed' ? new Date().toISOString() : null;
 
-            // Optimistic update - use functional updates for atomic changes
+            // Optimistic update
             setTasks(prevTasks =>
                 prevTasks.map(t =>
                     t.id === task.id
@@ -260,7 +378,7 @@ const TasksScreen = () => {
                 )
             );
 
-            // Also update the sections
+            // Update sections
             updateSections(
                 tasks.map(t =>
                     t.id === task.id
@@ -283,7 +401,7 @@ const TasksScreen = () => {
         } catch (error) {
             console.error('Error updating task status:', error.message);
             Alert.alert('Error', 'Failed to update task status');
-            // Revert optimistic update by re-fetching
+            // Revert optimistic update
             fetchTasks();
         }
     };
@@ -337,16 +455,25 @@ const TasksScreen = () => {
         </AnimatedTouchable>
     );
 
-    // Render section header
-    const renderSectionHeader = ({ section }: { section: { title: string, data: Task[] } }) => (
+    // Render section header with icon
+    const renderSectionHeader = ({ section }: { section: { title: string, data: Task[], icon?: string } }) => (
         <View style={styles.sectionHeader}>
+            {section.icon && (
+                <Ionicons
+                    name={section.icon as any}
+                    size={18}
+                    color={COLORS.primary}
+                    style={styles.sectionIcon}
+                />
+            )}
             <Text style={styles.sectionHeaderText}>
                 {section.title} {section.data.length > 0 && `(${section.data.length})`}
             </Text>
+
             {section.title === 'Overdue' && section.data.length > 0 && (
                 <View style={styles.overdueBadge}>
                     <Ionicons name="alert-circle" size={14} color={COLORS.white} />
-                    <Text style={styles.overdueBadgeText}>Needs Attention</Text>
+                    <Text style={styles.overdueBadgeText}>Action Needed</Text>
                 </View>
             )}
         </View>
@@ -474,9 +601,9 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.light,
     },
     addButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
@@ -487,30 +614,32 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     errorContainer: {
-        padding: SPACING.md,
+        padding: SPACING.sm,
         backgroundColor: '#ffebee',
         marginHorizontal: SPACING.md,
-        marginTop: SPACING.md,
-        borderRadius: 8,
+        marginTop: SPACING.sm,
+        borderRadius: 6,
         alignItems: 'center',
     },
     errorText: {
         color: COLORS.danger,
-        marginBottom: SPACING.sm,
+        marginBottom: SPACING.xs,
         ...Typography.bodyMedium,
+        fontSize: 13,
     },
     retryButton: {
         backgroundColor: COLORS.danger,
-        paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.sm,
         borderRadius: 4,
     },
     retryButtonText: {
         color: COLORS.white,
         fontWeight: FONTS.weight.semiBold,
+        fontSize: 12,
     },
     filterContainer: {
-        padding: SPACING.sm,
+        padding: SPACING.xs,
         backgroundColor: COLORS.white,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
@@ -518,15 +647,14 @@ const styles = StyleSheet.create({
     },
     scrollableFilterContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: SPACING.xs,
+        paddingVertical: 2,
     },
     filterButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.md,
-        borderRadius: 20,
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: 16,
         backgroundColor: COLORS.lightGray,
         marginRight: SPACING.xs,
     },
@@ -544,7 +672,7 @@ const styles = StyleSheet.create({
         fontWeight: FONTS.weight.semiBold,
     },
     tasksList: {
-        paddingBottom: SPACING.xxl,
+        paddingBottom: SPACING.md,
     },
     emptyList: {
         flexGrow: 1,
@@ -553,31 +681,35 @@ const styles = StyleSheet.create({
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: SPACING.sm,
+        paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.md,
         backgroundColor: 'rgba(248, 249, 250, 0.95)',
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
+    sectionIcon: {
+        marginRight: SPACING.xs,
+    },
     sectionHeaderText: {
         ...Typography.bodyMedium,
         color: COLORS.dark,
         fontWeight: FONTS.weight.semiBold,
+        fontSize: 14,
     },
     overdueBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.danger,
-        paddingVertical: SPACING.xs,
-        paddingHorizontal: SPACING.sm,
-        borderRadius: 12,
+        paddingVertical: 2,
+        paddingHorizontal: SPACING.xs,
+        borderRadius: 10,
         marginLeft: SPACING.sm,
     },
     overdueBadgeText: {
         color: COLORS.white,
-        fontSize: FONTS.size.xs,
+        fontSize: 10,
         fontWeight: FONTS.weight.medium,
-        marginLeft: SPACING.xs,
+        marginLeft: 2,
     },
     loadingContainer: {
         flex: 1,

@@ -32,7 +32,7 @@ const TaskItem = ({ task, onPress, onToggleCompletion }: TaskItemProps) => {
 
         // Check if the date is today, tomorrow, or another day
         if (date.toDateString() === now.toDateString()) {
-            return `Today, ${timeStr}`;
+            return timeStr;
         } else if (date.toDateString() === tomorrow.toDateString()) {
             return `Tomorrow, ${timeStr}`;
         } else {
@@ -459,5 +459,4 @@ const styles = StyleSheet.create({
         height: '100%',
     }
 });
-
 export default TaskItem;
