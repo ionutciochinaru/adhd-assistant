@@ -1,19 +1,20 @@
-import React from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import React, { useState } from 'react';
+import {View, Text, StyleSheet, TouchableOpacity, Alert} from 'react-native';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
     withTiming,
+    withSpring,
     interpolate,
     Extrapolation,
     runOnJS,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../utils/supabase';
-import TaskItem from './TaskItem';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../utils/styles';
-import { Task, Subtask } from '../utils/supabase';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import {Subtask, Task} from "../utils/supabase";
+import {COLORS, RADIUS, SHADOWS, SPACING} from "../utils/styles";
+import TaskItem from "../components/TaskItem";
+
 type SwipeableTaskItemProps = {
     task: Task & {
         subtasks?: Subtask[];
@@ -21,211 +22,177 @@ type SwipeableTaskItemProps = {
         subtasks_completed?: number;
     };
     onPress: () => void;
-    onTaskUpdate: (updatedTask: Task) => void;
-    onDelete?: (taskId: string) => void;
-    simultaneousHandlers?: any; // Allow ref from SectionList
+    onPomodoroStart: (task: Task) => void;
+    onEdit: (taskId: string) => void;
+    onDelete: (taskId: string) => void;
 };
-
-const SWIPE_THRESHOLD = 100; // pixels to trigger action
-const SCREEN_WIDTH = 400; // You might want to use Dimensions.get('window').width
 
 const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                                                                  task,
                                                                  onPress,
-                                                                 onTaskUpdate,
+                                                                 onPomodoroStart,
+                                                                 onEdit,
                                                                  onDelete,
-                                                                 simultaneousHandlers,
                                                              }) => {
-    // Shared values for animation
+    // Animation shared values
     const translateX = useSharedValue(0);
-    const isSwipeActive = useSharedValue(false);
+    const isDragging = useSharedValue(false);
+    const [showOptions, setShowOptions] = useState(false);
 
-    // Complete task and its subtasks
-    const completeTaskAndSubtasks = async () => {
-        try {
-            // Update task status
-            const { data: updatedTask, error: taskError } = await supabase
-                .from('tasks')
-                .update({
-                    status: 'completed',
-                    completed_at: new Date().toISOString()
-                })
-                .eq('id', task.id)
-                .select()
-                .single();
+    // Constants
+    const ITEM_HEIGHT = 100;
+    const SCREEN_WIDTH = 350;
+    const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
-            if (taskError) throw taskError;
-
-            // Update all subtasks
-            if (task.subtasks && task.subtasks.length > 0) {
-                const { error: subtasksError } = await supabase
-                    .from('subtasks')
-                    .update({
-                        status: 'completed',
-                        completed_at: new Date().toISOString()
-                    })
-                    .eq('task_id', task.id);
-
-                if (subtasksError) throw subtasksError;
-            }
-
-            // Call onTaskUpdate with the updated task
-            onTaskUpdate({
-                ...updatedTask,
-                subtasks: task.subtasks?.map(subtask => ({
-                    ...subtask,
-                    status: 'completed',
-                    completed_at: new Date().toISOString()
-                })) || []
-            });
-        } catch (error) {
-            console.error('Error completing task:', error);
-            Alert.alert('Error', 'Failed to complete task');
-        }
+    // Handle starting Pomodoro timer
+    const startPomodoro = () => {
+        onPomodoroStart(task);
     };
 
-    // Delete task and its subtasks
-    const deleteTaskAndSubtasks = async () => {
-        try {
-            // Delete subtasks first
-            const { error: subtasksError } = await supabase
-                .from('subtasks')
-                .delete()
-                .eq('task_id', task.id);
-
-            if (subtasksError) throw subtasksError;
-
-            // Delete the task
-            const { error: taskError } = await supabase
-                .from('tasks')
-                .delete()
-                .eq('id', task.id);
-
-            if (taskError) throw taskError;
-
-            // Call onDelete if provided
-            onDelete && onDelete(task.id);
-        } catch (error) {
-            console.error('Error deleting task:', error);
-            Alert.alert('Error', 'Failed to delete task');
-        }
-    };
-
-    // Pan gesture handler using Reanimated
+    // Pan gesture handler
     const panGesture = Gesture.Pan()
-        .onUpdate((event) => {
-            if (Math.abs(event.translationX) > Math.abs(event.translationY)) {
-                // Detect horizontal swipe
+        .onBegin(() => {
+            isDragging.value = true;
+        })
+        .onChange((event) => {
+            // Only allow swiping right for Pomodoro
+            if (event.translationX > 0) {
                 translateX.value = event.translationX;
             }
         })
         .onEnd((event) => {
-            if (event.translationX < -SWIPE_THRESHOLD) {
-                translateX.value = withTiming(-SCREEN_WIDTH, {}, () => {
-                    runOnJS(deleteTaskAndSubtasks)();
-                });
-            } else if (event.translationX > SWIPE_THRESHOLD) {
-                translateX.value = withTiming(SCREEN_WIDTH, {}, () => {
-                    runOnJS(completeTaskAndSubtasks)();
+            isDragging.value = false;
+
+            if (event.translationX > SWIPE_THRESHOLD) {
+                // Swiped right - start Pomodoro
+                translateX.value = withTiming(SCREEN_WIDTH, { duration: 300 }, (finished) => {
+                    if (finished) {
+                        runOnJS(startPomodoro)();
+                        // Reset back after starting Pomodoro
+                        translateX.value = withTiming(0, { duration: 300 });
+                    }
                 });
             } else {
-                translateX.value = withTiming(0);
+                // Not enough to trigger action, spring back
+                translateX.value = withSpring(0);
             }
-        });
+        })
+        .activeOffsetX([5, 200]) // Require a minimum movement to activate
+        .failOffsetY([-20, 20]); // Fail if vertical movement is dominant
 
-
-    // Animated styles for task item and actions
-    const animatedTaskStyle = useAnimatedStyle(() => {
+    // Animated styles
+    const taskItemStyle = useAnimatedStyle(() => {
         return {
-            transform: [{ translateX: translateX.value }],
+            transform: [
+                { translateX: translateX.value },
+                { scale: withTiming(isDragging.value ? 1.02 : 1, { duration: 100 }) }
+            ],
+            zIndex: 10,
         };
     });
 
-    const animatedLeftActionStyle = useAnimatedStyle(() => {
+    // Right action (Pomodoro) animated style
+    const rightActionStyle = useAnimatedStyle(() => {
         const opacity = interpolate(
             translateX.value,
             [0, SWIPE_THRESHOLD],
             [0, 1],
             Extrapolation.CLAMP
         );
+
+        const scale = interpolate(
+            translateX.value,
+            [0, SWIPE_THRESHOLD],
+            [0.8, 1],
+            Extrapolation.CLAMP
+        );
+
         return {
             opacity,
-            backgroundColor: COLORS.success,
-            transform: [
-                {
-                    scale: interpolate(
-                        translateX.value,
-                        [0, SWIPE_THRESHOLD],
-                        [0.8, 1],
-                        Extrapolation.CLAMP
-                    )
-                }
-            ]
+            transform: [{ scale }],
+            backgroundColor: COLORS.primary,
         };
     });
 
-    const animatedRightActionStyle = useAnimatedStyle(() => {
-        const opacity = interpolate(
-            translateX.value,
-            [0, -SWIPE_THRESHOLD],
-            [0, 1],
-            Extrapolation.CLAMP
-        );
-        return {
-            opacity,
-            backgroundColor: COLORS.danger,
-            transform: [
-                {
-                    scale: interpolate(
-                        translateX.value,
-                        [0, -SWIPE_THRESHOLD],
-                        [0.8, 1],
-                        Extrapolation.CLAMP
-                    )
-                }
-            ]
-        };
-    });
+    // Toggle the options menu
+    const toggleOptions = () => {
+        setShowOptions(!showOptions);
+    };
 
     return (
         <View style={styles.container}>
-            {/* Left Action (Complete) */}
+            {/* Right Action (Pomodoro) */}
             <Animated.View
                 style={[
                     styles.actionContainer,
-                    styles.leftAction,
-                    animatedLeftActionStyle
+                    rightActionStyle
                 ]}
             >
                 <Ionicons
-                    name="checkmark-done-circle"
+                    name="timer-outline"
                     size={24}
                     color={COLORS.white}
                 />
-                <Text style={styles.actionText}>Complete</Text>
+                <Text style={styles.actionText}>Pomodoro</Text>
             </Animated.View>
 
-            {/* Right Action (Delete) */}
-            <Animated.View
-                style={[
-                    styles.actionContainer,
-                    styles.rightAction,
-                    animatedRightActionStyle
-                ]}
-            >
-                <Ionicons
-                    name="trash-outline"
-                    size={24}
-                    color={COLORS.white}
-                />
-                <Text style={styles.actionText}>Delete</Text>
-            </Animated.View>
+            {/* Task Item with swipe gesture */}
+            <GestureDetector gesture={panGesture}>
+                <Animated.View style={[styles.taskItemWrapper, taskItemStyle]}>
+                    <View style={styles.taskHeader}>
+                        <TaskItem
+                            task={task}
+                            onPress={onPress}
+                        />
+                        <TouchableOpacity
+                            style={styles.optionsButton}
+                            onPress={toggleOptions}
+                        >
+                            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
 
-            {/* Task Item */}
-            <GestureDetector gesture={panGesture} simultaneousHandlers={simultaneousHandlers}>
-                <View style={styles.taskItemWrapper}>
-                    <TaskItem task={task} onPress={onPress} />
-                </View>
+                    {/* Options menu that appears when three dots are tapped */}
+                    {showOptions && (
+                        <View style={styles.optionsMenu}>
+                            <TouchableOpacity
+                                style={styles.optionItem}
+                                onPress={() => {
+                                    setShowOptions(false);
+                                    onEdit(task.id);
+                                }}
+                            >
+                                <Ionicons name="create-outline" size={18} color={COLORS.primary} />
+                                <Text style={styles.optionText}>Edit</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.optionItem}
+                                onPress={() => {
+                                    setShowOptions(false);
+                                    Alert.alert(
+                                        "Delete Task",
+                                        "Are you sure you want to delete this task?",
+                                        [
+                                            {
+                                                text: "Cancel",
+                                                style: "cancel"
+                                            },
+                                            {
+                                                text: "Delete",
+                                                onPress: () => onDelete(task.id),
+                                                style: "destructive"
+                                            }
+                                        ]
+                                    );
+                                }}
+                            >
+                                <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+                                <Text style={[styles.optionText, { color: COLORS.danger }]}>Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </Animated.View>
             </GestureDetector>
         </View>
     );
@@ -234,36 +201,61 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
 const styles = StyleSheet.create({
     container: {
         position: 'relative',
-        marginHorizontal: SPACING.md,
-        marginVertical: SPACING.sm,
+        margin: SPACING.sm,
     },
     taskItemWrapper: {
-        zIndex: 10,
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.lg,
+        ...SHADOWS.small,
+        overflow: 'visible',
+        position: 'relative',
+    },
+    taskHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    optionsButton: {
+        padding: SPACING.sm,
+        zIndex: 2,
     },
     actionContainer: {
         position: 'absolute',
         top: 0,
         bottom: 0,
+        width: '100%',
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'row',
-        borderRadius: RADIUS.lg,
         paddingHorizontal: SPACING.md,
-        overflow: 'hidden',
-    },
-    leftAction: {
-        left: 0,
-        right: 0,
-        backgroundColor: COLORS.success,
-    },
-    rightAction: {
-        left: 0,
-        right: 0,
-        backgroundColor: COLORS.danger,
+        borderRadius: RADIUS.lg,
+        backgroundColor: COLORS.primary,
     },
     actionText: {
         color: COLORS.white,
-        marginLeft: SPACING.sm,
+        marginHorizontal: SPACING.sm,
+        fontWeight: '600',
+    },
+    optionsMenu: {
+        position: 'absolute',
+        top: SPACING.xl,
+        right: SPACING.sm,
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.md,
+        padding: SPACING.xs,
+        width: 120,
+        ...SHADOWS.medium,
+        zIndex: 999,
+    },
+    optionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.sm,
+    },
+    optionText: {
+        marginLeft: SPACING.xs,
+        fontSize: 14,
+        color: COLORS.textPrimary,
     }
 });
 

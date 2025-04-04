@@ -1,5 +1,5 @@
 // frontend/src/screens/tasks/TasksScreen.tsx
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -12,31 +12,29 @@ import {
     RefreshControl,
     Image
 } from 'react-native';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
-import {supabase} from '../../utils/supabase';
-import {useAuth} from '../../context/AuthContext';
-import TaskItem from '../../components/TaskItem';
-import {Task} from '../../utils/supabase';
-import {Ionicons} from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { supabase } from '../../utils/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { Task } from '../../utils/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ScreenLayout from '../../components/ScreenLayout';
-import {COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS} from '../../utils/styles';
-import SwipeableTaskItem from "../../components/SwipeableTaskItem";
-import {GestureHandlerRootView} from "react-native-gesture-handler";
+import SwipeableTaskItem from '../../components/SwipeableTaskItem';
+import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
 
 const TasksScreen = () => {
     const navigation = useNavigation();
-    const {user} = useAuth();
+    const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [sectionsData, setSectionsData] = useState<{ title: string, data: Task[] }[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'overdue'>('all');
     const [error, setError] = useState<string | null>(null);
-    const scrollViewRef = useRef(null);
-    const scrollRef = useRef(null);
-    // Animation refs
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const translateYAnim = useRef(new Animated.Value(50)).current;
+
+    // Animation values
+    const fadeAnim = useState(new Animated.Value(0))[0];
+    const translateYAnim = useState(new Animated.Value(50))[0];
 
     // Fetch and process tasks
     const fetchTasks = async () => {
@@ -46,14 +44,14 @@ const TasksScreen = () => {
             setRefreshing(true);
             setError(null);
 
-            const {data, error} = await supabase
+            const { data, error } = await supabase
                 .from('tasks')
                 .select(`
-                        *,
-                        subtasks(*)
-                    `)
+                    *,
+                    subtasks(*)
+                `)
                 .eq('user_id', user.id)
-                .order('created_at', {ascending: false});
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
 
@@ -68,7 +66,7 @@ const TasksScreen = () => {
         }
     };
 
-    // Process tasks into sections
+    // Process tasks into sections based on the active filter
     const processTaskSections = (taskList: Task[]) => {
         let filteredTasks: Task[] = [];
 
@@ -123,40 +121,48 @@ const TasksScreen = () => {
         ]).start();
     }, []);
 
+    // Refresh when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            if (user) {
+                fetchTasks();
+            }
+        }, [user])
+    );
+
     // Task interaction handlers
     const handleTaskPress = (taskId: string) => {
-        navigation.navigate('TaskDetail', {taskId});
+        navigation.navigate('TaskDetail', { taskId });
     };
 
-    const toggleTaskCompletion = async (task: Task) => {
+    // Start Pomodoro timer for a task
+    const handlePomodoroStart = (task: Task) => {
+        navigation.navigate('Pomodoro', { task });
+    };
+
+    // Edit task
+    const handleEditTask = (taskId: string) => {
+        navigation.navigate('TaskDetail', { taskId, isEditing: true });
+    };
+
+    // Delete task and its subtasks
+    const handleDeleteTask = async (taskId: string) => {
         try {
-            const newStatus = task.status === 'active' ? 'completed' : 'active';
-            const {error} = await supabase
+            // Delete the task (subtasks will be deleted via cascade)
+            const { error } = await supabase
                 .from('tasks')
-                .update({
-                    status: newStatus,
-                    completed_at: newStatus === 'completed' ? new Date().toISOString() : null
-                })
-                .eq('id', task.id);
+                .delete()
+                .eq('id', taskId);
 
             if (error) throw error;
 
-            // Optimistically update UI
-            const updatedTasks = tasks.map(t =>
-                t.id === task.id
-                    ? {
-                        ...t,
-                        status: newStatus,
-                        completed_at: newStatus === 'completed' ? new Date().toISOString() : null
-                    }
-                    : t
-            );
-
+            // Update the UI optimistically
+            const updatedTasks = tasks.filter(t => t.id !== taskId);
             setTasks(updatedTasks);
             processTaskSections(updatedTasks);
-        } catch (error) {
-            console.error('Error updating task status:', error);
-            Alert.alert('Error', 'Failed to update task status');
+        } catch (error: any) {
+            console.error('Error deleting task:', error.message);
+            Alert.alert('Error', 'Failed to delete task');
         }
     };
 
@@ -178,14 +184,14 @@ const TasksScreen = () => {
                 style={styles.addTaskButton}
                 onPress={() => navigation.navigate('CreateTask')}
             >
-                <Ionicons name="add" size={24} color={COLORS.white}/>
+                <Ionicons name="add" size={24} color={COLORS.white} />
                 <Text style={styles.addTaskButtonText}>Add New Task</Text>
             </TouchableOpacity>
         </View>
     );
 
     // Filter buttons
-    const FilterButton = ({label, icon, isActive, onPress}) => (
+    const FilterButton = ({ label, icon, isActive, onPress }) => (
         <TouchableOpacity
             style={[
                 styles.filterButton,
@@ -219,7 +225,7 @@ const TasksScreen = () => {
                     styles.container,
                     {
                         opacity: fadeAnim,
-                        transform: [{translateY: translateYAnim}]
+                        transform: [{ translateY: translateYAnim }]
                     }
                 ]}
             >
@@ -291,32 +297,21 @@ const TasksScreen = () => {
                 {/* Tasks List */}
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={COLORS.primary}/>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
                         <Text style={styles.loadingText}>Loading tasks...</Text>
                     </View>
                 ) : (
                     <GestureHandlerRootView style={{ flex: 1 }}>
                         <SectionList
-                            ref={scrollRef} // Attach ref to SectionList
                             sections={sectionsData}
                             keyExtractor={(item) => item.id}
                             renderItem={({ item }) => (
                                 <SwipeableTaskItem
                                     task={item}
                                     onPress={() => handleTaskPress(item.id)}
-                                    onTaskUpdate={(updatedTask) => {
-                                        const updatedTasks = tasks.map(t =>
-                                            t.id === updatedTask.id ? updatedTask : t
-                                        );
-                                        setTasks(updatedTasks);
-                                        processTaskSections(updatedTasks);
-                                    }}
-                                    onDelete={(taskId) => {
-                                        const updatedTasks = tasks.filter(t => t.id !== taskId);
-                                        setTasks(updatedTasks);
-                                        processTaskSections(updatedTasks);
-                                    }}
-                                    simultaneousHandlers={scrollRef} // Pass ref here
+                                    onPomodoroStart={handlePomodoroStart}
+                                    onEdit={handleEditTask}
+                                    onDelete={handleDeleteTask}
                                 />
                             )}
                             ListEmptyComponent={renderEmptyState}
@@ -338,7 +333,7 @@ const TasksScreen = () => {
                     style={styles.addButton}
                     onPress={() => navigation.navigate('CreateTask')}
                 >
-                    <Ionicons name="add" size={24} color={COLORS.white}/>
+                    <Ionicons name="add" size={24} color={COLORS.white} />
                 </TouchableOpacity>
             </Animated.View>
         </ScreenLayout>
@@ -420,6 +415,7 @@ const styles = StyleSheet.create({
     },
     tasksListContainer: {
         paddingBottom: SPACING.xxl,
+        flexGrow: 1,
     },
     loadingContainer: {
         flex: 1,

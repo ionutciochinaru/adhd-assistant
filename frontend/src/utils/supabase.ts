@@ -57,9 +57,9 @@ export type Task = {
     due_date: string | null;
     created_at: string;
     completed_at: string | null;
-    subtasks?: any[]; // Added for better typing with joined queries
-    subtasks_count?: number; // Added for count aggregation
-    subtasks_completed?: number; // Added for completed count
+    subtasks?: any[];
+    subtasks_count?: number;
+    subtasks_completed?: number;
 };
 
 export type Subtask = {
