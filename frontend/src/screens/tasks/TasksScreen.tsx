@@ -1,4 +1,3 @@
-// frontend/src/screens/tasks/TasksScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
@@ -10,7 +9,7 @@ import {
     Alert,
     Animated,
     RefreshControl,
-    Image
+    Image, Dimensions
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { supabase } from '../../utils/supabase';
@@ -21,6 +20,11 @@ import ScreenLayout from '../../components/ScreenLayout';
 import TaskItem from '../../components/TaskItem';
 import TaskOptionModal from '../../components/TaskOptionModal';
 import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
+import { normalizeDate } from '../../utils/dateUtils';
+import SingleRowCalendar from "../../components/SingleRowCalendar";
+import {CalendarProvider} from "react-native-calendars";
+import {MarkedDates} from "react-native-calendars/src/types";
+import moment from "moment";
 
 const TasksScreen = () => {
     const navigation = useNavigation();
@@ -34,9 +38,16 @@ const TasksScreen = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [optionsModalVisible, setOptionsModalVisible] = useState(false);
 
+    // NEW: Calendar state
+    const [selectedDate, setSelectedDate] = useState(normalizeDate(new Date().toISOString()));
+    const [markedDates, setMarkedDates] = useState<MarkedDates>({});
+    const [completionRate, setCompletionRate] = useState(0);
+    const [motivationalMessage, setMotivationalMessage] = useState('');
+
     // Animation values
     const fadeAnim = useState(new Animated.Value(0))[0];
     const translateYAnim = useState(new Animated.Value(50))[0];
+    const progressAnim = useState(new Animated.Value(0))[0];
 
     // Fetch and process tasks
     const fetchTasks = async () => {
@@ -59,7 +70,9 @@ const TasksScreen = () => {
 
             setTasks(data || []);
             processTaskSections(data || []);
-        } catch (error: any) {
+            updateMarkedDates(data || []);
+            calculateCompletionRate(data || [], selectedDate);
+        } catch (error) {
             console.error('Error fetching tasks:', error.message);
             setError('Failed to load tasks. Pull down to retry.');
         } finally {
@@ -68,26 +81,33 @@ const TasksScreen = () => {
         }
     };
 
-    // Process tasks into sections based on the active filter
+    // Process tasks into sections based on the active filter and selected date
     const processTaskSections = (taskList: Task[]) => {
+        // First filter by selected date
+        const dateFilteredTasks = taskList.filter(task => {
+            if (!task.due_date) return false;
+            return normalizeDate(task.due_date) === selectedDate;
+        });
+
+        // Then apply status filter
         let filteredTasks: Task[] = [];
 
         switch (filter) {
             case 'active':
-                filteredTasks = taskList.filter(task => task.status === 'active');
+                filteredTasks = dateFilteredTasks.filter(task => task.status === 'active');
                 break;
             case 'completed':
-                filteredTasks = taskList.filter(task => task.status === 'completed');
+                filteredTasks = dateFilteredTasks.filter(task => task.status === 'completed');
                 break;
             case 'overdue':
-                filteredTasks = taskList.filter(task => {
+                filteredTasks = dateFilteredTasks.filter(task => {
                     if (task.status === 'completed') return false;
                     if (!task.due_date) return false;
                     return new Date(task.due_date) < new Date();
                 });
                 break;
             default:
-                filteredTasks = taskList;
+                filteredTasks = dateFilteredTasks;
         }
 
         const sections = [
@@ -103,10 +123,120 @@ const TasksScreen = () => {
         setSectionsData(sections);
     };
 
+    // NEW: Update marked dates for calendar
+    const updateMarkedDates = (taskList: Task[]) => {
+        const marks: MarkedDates = {};
+
+        // Group tasks by date
+        taskList.forEach(task => {
+            if (!task.due_date) return;
+
+            const date = normalizeDate(task.due_date);
+            if (!date) return;
+
+            // If this date is already in marks, update it
+            if (marks[date]) {
+                // If there are no dots yet, create the array
+                if (!marks[date].dots) {
+                    marks[date].dots = [];
+                }
+
+                // Add a dot for this task, color based on priority and status
+                const dotColor = task.status === 'completed' ? COLORS.success :
+                    task.priority === 'high' ? COLORS.highPriority :
+                        task.priority === 'medium' ? COLORS.mediumPriority :
+                            COLORS.lowPriority;
+
+                marks[date].dots.push({ color: dotColor });
+            } else {
+                // First task for this date
+                const dotColor = task.status === 'completed' ? COLORS.success :
+                    task.priority === 'high' ? COLORS.highPriority :
+                        task.priority === 'medium' ? COLORS.mediumPriority :
+                            COLORS.lowPriority;
+
+                marks[date] = {
+                    marked: true,
+                    dots: [{ color: dotColor }]
+                };
+            }
+        });
+
+        // Mark selected date
+        if (selectedDate) {
+            marks[selectedDate] = {
+                ...marks[selectedDate],
+                selected: true,
+                selectedColor: COLORS.primary
+            };
+        }
+
+        setMarkedDates(marks);
+    };
+
+    // NEW: Calculate completion rate
+    const calculateCompletionRate = (taskList: Task[], date: string) => {
+        // Filter tasks for selected date
+        const dateFilteredTasks = taskList.filter(task => {
+            if (!task.due_date) return false;
+            return normalizeDate(task.due_date) === date;
+        });
+
+        if (dateFilteredTasks.length > 0) {
+            const completedTasks = dateFilteredTasks.filter(task => task.status === 'completed').length;
+            const rate = Math.round((completedTasks / dateFilteredTasks.length) * 100);
+            setCompletionRate(rate);
+
+            // Update motivational message based on completion rate
+            updateMotivationalMessage(rate);
+
+            // Animate progress bar
+            Animated.timing(progressAnim, {
+                toValue: rate,
+                duration: 800,
+                useNativeDriver: false
+            }).start();
+        } else {
+            setCompletionRate(0);
+            setMotivationalMessage("No tasks for today yet!");
+            Animated.timing(progressAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: false
+            }).start();
+        }
+    };
+
+    // NEW: Update motivational message based on completion rate
+    const updateMotivationalMessage = (rate: number) => {
+        if (rate === 0) {
+            setMotivationalMessage("Let's get started! You got this!");
+        } else if (rate < 25) {
+            setMotivationalMessage("Progress begins with a single step. Keep going!");
+        } else if (rate < 50) {
+            setMotivationalMessage("You're making great progress. Keep the momentum going!");
+        } else if (rate < 75) {
+            setMotivationalMessage("Getting closer! You've accomplished so much today!");
+        } else if (rate < 100) {
+            setMotivationalMessage("Almost there! Just a few more tasks to go!");
+        } else {
+            setMotivationalMessage("Amazing job! You've completed all your tasks for the day! 🎉");
+        }
+    };
+
     // Lifecycle and animation effects
     useEffect(() => {
         fetchTasks();
-    }, [user, filter]);
+    }, [user]);
+
+    // NEW: Update tasks when date or filter changes
+    useEffect(() => {
+        if (tasks.length > 0) {
+            processTaskSections(tasks);
+            updateMarkedDates(tasks);
+            calculateCompletionRate(tasks, selectedDate);
+        }
+    }, [selectedDate, filter]);
 
     useEffect(() => {
         Animated.parallel([
@@ -134,12 +264,12 @@ const TasksScreen = () => {
 
     // Task interaction handlers
     const handleTaskPress = (taskId: string) => {
-        navigation.navigate('TaskDetail' as never, { taskId } as never);
+        navigation.navigate('TaskDetail', { taskId });
     };
 
     // Start Pomodoro timer for a task
     const handlePomodoroStart = (task: Task) => {
-        navigation.navigate('Pomodoro' as never, { task } as never);
+        navigation.navigate('Pomodoro', { task });
     };
 
     // Show options for a task
@@ -152,7 +282,7 @@ const TasksScreen = () => {
     const handleEditTask = () => {
         if (!selectedTask) return;
         setOptionsModalVisible(false);
-        navigation.navigate('TaskDetail' as never, { taskId: selectedTask.id } as never);
+        navigation.navigate('TaskDetail', { taskId: selectedTask.id });
     };
 
     // Delete task and its subtasks
@@ -174,10 +304,12 @@ const TasksScreen = () => {
             const updatedTasks = tasks.filter(t => t.id !== selectedTask.id);
             setTasks(updatedTasks);
             processTaskSections(updatedTasks);
+            updateMarkedDates(updatedTasks);
+            calculateCompletionRate(updatedTasks, selectedDate);
 
             // Show success message
             Alert.alert('Success', 'Task deleted successfully');
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error deleting task:', error.message);
             Alert.alert('Error', 'Failed to delete task');
         }
@@ -203,6 +335,8 @@ const TasksScreen = () => {
 
             setTasks(updatedTasks);
             processTaskSections(updatedTasks);
+            updateMarkedDates(updatedTasks);
+            calculateCompletionRate(updatedTasks, selectedDate);
 
             // Update in database
             const { error } = await supabase
@@ -227,6 +361,36 @@ const TasksScreen = () => {
         }
     };
 
+    // NEW: Handle date selection in calendar
+    const handleDateSelect = (date) => {
+        setSelectedDate(date.dateString);
+    };
+
+    // Get count for filter badges
+    const getFilterCount = (filterType: 'all' | 'active' | 'completed' | 'overdue'): number => {
+        // Filter tasks for the selected date first
+        const dateFilteredTasks = tasks.filter(task => {
+            if (!task.due_date) return false;
+            return normalizeDate(task.due_date) === selectedDate;
+        });
+
+        // Then count by filter type
+        switch (filterType) {
+            case 'active':
+                return dateFilteredTasks.filter(task => task.status === 'active').length;
+            case 'completed':
+                return dateFilteredTasks.filter(task => task.status === 'completed').length;
+            case 'overdue':
+                return dateFilteredTasks.filter(task => {
+                    if (task.status === 'completed') return false;
+                    if (!task.due_date) return false;
+                    return new Date(task.due_date) < new Date();
+                }).length;
+            default: // 'all'
+                return dateFilteredTasks.length;
+        }
+    };
+
     // Render empty state
     const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
@@ -237,13 +401,13 @@ const TasksScreen = () => {
             />
             <Text style={styles.emptyTitle}>No Tasks Found</Text>
             <Text style={styles.emptySubtitle}>
-                {filter === 'all'
+                {selectedDate === normalizeDate(new Date().toISOString())
                     ? 'Start organizing your day by adding a task'
-                    : `No ${filter} tasks at the moment`}
+                    : `No tasks scheduled for this date`}
             </Text>
             <TouchableOpacity
                 style={styles.addTaskButton}
-                onPress={() => navigation.navigate('CreateTask' as never)}
+                onPress={() => navigation.navigate('CreateTask')}
             >
                 <Ionicons name="add" size={24} color={COLORS.white} />
                 <Text style={styles.addTaskButtonText}>Add New Task</Text>
@@ -252,7 +416,7 @@ const TasksScreen = () => {
     );
 
     // Filter buttons
-    const FilterButton = ({ label, icon, isActive, onPress }) => (
+    const FilterButton = ({ label, icon, type, isActive, onPress }) => (
         <TouchableOpacity
             style={[
                 styles.filterButton,
@@ -273,33 +437,20 @@ const TasksScreen = () => {
             >
                 {label}
             </Text>
+            {getFilterCount(type) > 0 && (
+                <View style={[
+                    styles.filterBadge,
+                    isActive && styles.activeFilterBadge
+                ]}>
+                    <Text style={[
+                        styles.filterBadgeText,
+                        isActive && styles.activeFilterBadgeText
+                    ]}>
+                        {getFilterCount(type)}
+                    </Text>
+                </View>
+            )}
         </TouchableOpacity>
-    );
-
-    const renderOptionsModal = () => (
-        <TaskOptionModal
-            visible={optionsModalVisible}
-            task={selectedTask}
-            onClose={() => setOptionsModalVisible(false)}
-            onEdit={handleEditTask}
-            onDelete={() => {
-                Alert.alert(
-                    'Delete Task',
-                    'Are you sure you want to delete this task?',
-                    [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: handleDeleteTask }
-                    ]
-                );
-            }}
-            onStartPomodoro={() => {
-                setOptionsModalVisible(false);
-                if (selectedTask) {
-                    handlePomodoroStart(selectedTask);
-                }
-            }}
-            onCompleteTask={handleToggleTaskCompletion}
-        />
     );
 
     return (
@@ -316,41 +467,39 @@ const TasksScreen = () => {
                     }
                 ]}
             >
-                {/* Greeting and Stats Header */}
-                <View style={styles.headerContainer}>
-                    <View style={styles.greetingContainer}>
-                        <Text style={styles.greeting}>Hello!</Text>
-                        <Text style={styles.subGreeting}>
-                            {user?.user_metadata?.name ? `Welcome, ${user.user_metadata.name}` : 'Let\'s organize your day'}
-                        </Text>
+                {/* Calendar */}
+                <SingleRowCalendar
+                    selectedDate={selectedDate}
+                    onDateSelect={(date) => setSelectedDate(date.dateString)}
+                    markedDates={markedDates}
+                />
+                {/* Progress section */}
+                <View style={styles.progressContainer}>
+                    <View style={styles.progressHeader}>
+                        <View style={styles.progressHeader}>
+                            <Text style={styles.progressTitle}>
+                                {selectedDate === moment().format('YYYY-MM-DD') ? "Today's Progress" : `Progress for ${moment(selectedDate).format('MMMM D')}`}
+                            </Text>
+                        </View>
+                        <Text style={styles.progressPercentage}>{completionRate}%</Text>
                     </View>
 
-                    <View style={styles.statsContainer}>
-                        <View style={styles.statCard}>
-                            <Ionicons
-                                name="checkbox-outline"
-                                size={24}
-                                color={COLORS.primary}
-                            />
-                            <Text style={styles.statValue}>
-                                {tasks.filter(t => t.status === 'active').length}
-                            </Text>
-                            <Text style={styles.statLabel}>Active Tasks</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Ionicons
-                                name="pie-chart-outline"
-                                size={24}
-                                color={COLORS.lowPriority}
-                            />
-                            <Text style={styles.statValue}>
-                                {tasks.length > 0
-                                    ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100)
-                                    : 0}%
-                            </Text>
-                            <Text style={styles.statLabel}>Completed</Text>
-                        </View>
+                    <View style={styles.progressBarContainer}>
+                        <Animated.View
+                            style={[
+                                styles.progressBar,
+                                {
+                                    width: progressAnim.interpolate({
+                                        inputRange: [0, 100],
+                                        outputRange: ['0%', '100%']
+                                    })
+                                },
+                                completionRate === 100 ? styles.progressBarComplete : null
+                            ]}
+                        />
                     </View>
+
+                    <Text style={styles.motivationalMessage}>{motivationalMessage}</Text>
                 </View>
 
                 {/* Filter Buttons */}
@@ -358,24 +507,28 @@ const TasksScreen = () => {
                     <FilterButton
                         label="All"
                         icon="list-outline"
+                        type="all"
                         isActive={filter === 'all'}
                         onPress={() => setFilter('all')}
                     />
                     <FilterButton
                         label="Active"
                         icon="checkbox-outline"
+                        type="active"
                         isActive={filter === 'active'}
                         onPress={() => setFilter('active')}
                     />
                     <FilterButton
                         label="Overdue"
                         icon="alert-circle"
+                        type="overdue"
                         isActive={filter === 'overdue'}
                         onPress={() => setFilter('overdue')}
                     />
                     <FilterButton
-                        label="Completed"
+                        label="Done"
                         icon="checkmark-done-circle-outline"
+                        type="completed"
                         isActive={filter === 'completed'}
                         onPress={() => setFilter('completed')}
                     />
@@ -415,13 +568,35 @@ const TasksScreen = () => {
                 {/* Add Task Button */}
                 <TouchableOpacity
                     style={styles.addButton}
-                    onPress={() => navigation.navigate('CreateTask' as never)}
+                    onPress={() => navigation.navigate('CreateTask')}
                 >
                     <Ionicons name="add" size={24} color={COLORS.white} />
                 </TouchableOpacity>
 
                 {/* Options Modal */}
-                {renderOptionsModal()}
+                <TaskOptionModal
+                    visible={optionsModalVisible}
+                    task={selectedTask}
+                    onClose={() => setOptionsModalVisible(false)}
+                    onEdit={handleEditTask}
+                    onDelete={() => {
+                        Alert.alert(
+                            'Delete Task',
+                            'Are you sure you want to delete this task?',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Delete', style: 'destructive', onPress: handleDeleteTask }
+                            ]
+                        );
+                    }}
+                    onStartPomodoro={() => {
+                        setOptionsModalVisible(false);
+                        if (selectedTask) {
+                            handlePomodoroStart(selectedTask);
+                        }
+                    }}
+                    onCompleteTask={handleToggleTaskCompletion}
+                />
             </Animated.View>
         </ScreenLayout>
     );
@@ -432,45 +607,71 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
-    headerContainer: {
+    calendarContainer: {
+        backgroundColor: COLORS.white,
+        paddingBottom: SPACING.sm,
+        ...SHADOWS.small,
+        height: 100,
+        overflow: 'hidden', // Prevent content from spilling out
+    },
+    progressContainer: {
         backgroundColor: COLORS.white,
         paddingHorizontal: SPACING.md,
-        paddingTop: SPACING.xl,
-        paddingBottom: SPACING.md,
+        paddingVertical: SPACING.md,
+        marginBottom: SPACING.sm,
         ...SHADOWS.small,
     },
-    greetingContainer: {
-        marginBottom: SPACING.md,
-    },
-    greeting: {
-        ...Typography.h2,
-        marginBottom: SPACING.xs,
-    },
-    subGreeting: {
-        ...Typography.bodyMedium,
-        color: COLORS.textSecondary,
-    },
-    statsContainer: {
+    progressHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-    },
-    statCard: {
-        flex: 1,
-        backgroundColor: COLORS.cardBlue,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
-        marginHorizontal: SPACING.xs,
         alignItems: 'center',
+        marginBottom: SPACING.xs,
+    },
+    progressTitle: {
+        ...Typography.bodyMedium,
+        fontWeight: '600',
+    },
+    progressPercentage: {
+        ...Typography.bodyMedium,
+        fontWeight: '700',
+        color: COLORS.primary,
+    },
+    progressBarContainer: {
+        height: 8,
+        backgroundColor: COLORS.primaryLight,
+        borderRadius: 4,
+        marginBottom: SPACING.sm,
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: COLORS.primary,
+        borderRadius: 4,
+    },
+    progressBarComplete: {
+        backgroundColor: COLORS.success,
+    },
+    motivationalMessage: {
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        fontStyle: 'italic',
+    },
+    daySegmentContainer: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.white,
+        marginBottom: SPACING.sm,
+        padding: SPACING.xs,
         ...SHADOWS.small,
     },
-    statValue: {
-        ...Typography.h3,
-        marginTop: SPACING.xs,
+    daySegmentOption: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: SPACING.xs,
+        borderRadius: RADIUS.md,
     },
-    statLabel: {
+    daySegmentText: {
         ...Typography.bodySmall,
         color: COLORS.textSecondary,
-        marginTop: SPACING.xs,
     },
     filterContainer: {
         flexDirection: 'row',
@@ -478,6 +679,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.sm,
         backgroundColor: COLORS.white,
+        marginBottom: SPACING.sm,
         ...SHADOWS.small,
     },
     filterButton: {
@@ -499,6 +701,26 @@ const styles = StyleSheet.create({
     activeFilterButtonText: {
         color: COLORS.primary,
         fontWeight: FONTS.weight.semiBold,
+    },
+    filterBadge: {
+        backgroundColor: COLORS.primaryLight,
+        borderRadius: RADIUS.round,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        marginLeft: SPACING.xs,
+        minWidth: 20,
+        alignItems: 'center',
+    },
+    activeFilterBadge: {
+        backgroundColor: COLORS.primary,
+    },
+    filterBadgeText: {
+        ...Typography.tiny,
+        color: COLORS.textSecondary,
+        fontWeight: FONTS.weight.semiBold,
+    },
+    activeFilterBadgeText: {
+        color: COLORS.white,
     },
     tasksListContainer: {
         paddingBottom: SPACING.xxl,
@@ -564,60 +786,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         ...SHADOWS.medium,
-    },
-    // Modal styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContainer: {
-        width: '80%',
-        maxWidth: 400,
-        backgroundColor: 'transparent',
-    },
-    modalContent: {
-        backgroundColor: COLORS.white,
-        borderRadius: RADIUS.lg,
-        padding: SPACING.lg,
-        ...SHADOWS.large,
-    },
-    modalTitle: {
-        ...Typography.h3,
-        textAlign: 'center',
-        marginBottom: SPACING.md,
-    },
-    modalOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: SPACING.md,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    modalOptionText: {
-        ...Typography.bodyMedium,
-        marginLeft: SPACING.md,
-        color: COLORS.textPrimary,
-    },
-    deleteOption: {
-        borderBottomWidth: 0,
-    },
-    deleteOptionText: {
-        ...Typography.bodyMedium,
-        marginLeft: SPACING.md,
-        color: COLORS.danger,
-    },
-    closeButton: {
-        marginTop: SPACING.md,
-        paddingVertical: SPACING.sm,
-        backgroundColor: COLORS.cardShadow,
-        borderRadius: RADIUS.md,
-        alignItems: 'center',
-    },
-    closeButtonText: {
-        ...Typography.bodyMedium,
-        color: COLORS.textSecondary,
     },
 });
 
