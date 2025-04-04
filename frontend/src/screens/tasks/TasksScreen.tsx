@@ -276,7 +276,6 @@ const TasksScreen = () => {
         </TouchableOpacity>
     );
 
-    // Use the TaskOptionModal component instead of inline modal
     const renderOptionsModal = () => (
         <TaskOptionModal
             visible={optionsModalVisible}
