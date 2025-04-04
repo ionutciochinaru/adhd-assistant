@@ -11,7 +11,7 @@ import {
     RefreshControl,
     Image, Dimensions
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import {RouteProp, useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Task } from '../../utils/supabase';
@@ -19,15 +19,17 @@ import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../../components/ScreenLayout';
 import TaskItem from '../../components/TaskItem';
 import TaskOptionModal from '../../components/TaskOptionModal';
-import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
+import { COLORS, SPACING, FONTS, Typography, RADIUS, SHADOWS } from '../../utils/styles';
 import { normalizeDate } from '../../utils/dateUtils';
 import SingleRowCalendar from "../../components/SingleRowCalendar";
-import {CalendarProvider} from "react-native-calendars";
 import {MarkedDates} from "react-native-calendars/src/types";
 import moment from "moment";
+import {TasksStackParamList} from "../../navigation/TasksNavigator";
+import {StackNavigationProp} from "@react-navigation/stack";
 
 const TasksScreen = () => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<StackNavigationProp<TasksStackParamList>>();
+    const route = useRoute<RouteProp<TasksStackParamList, 'TasksList'>>();
     const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [sectionsData, setSectionsData] = useState<{ title: string, data: Task[] }[]>([]);
@@ -256,10 +258,14 @@ const TasksScreen = () => {
     // Refresh when screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            if (user) {
-                fetchTasks();
+            // Get the date to select from navigation params
+            const returnedDate = route.params?.selectDate;
+            if (returnedDate) {
+                setSelectedDate(returnedDate);
+                // Clear the parameter to avoid reselecting on subsequent focus events
+                navigation.setParams({ selectDate: undefined });
             }
-        }, [user])
+        }, [route.params?.selectDate])
     );
 
     // Task interaction handlers
@@ -407,7 +413,7 @@ const TasksScreen = () => {
             </Text>
             <TouchableOpacity
                 style={styles.addTaskButton}
-                onPress={() => navigation.navigate('CreateTask')}
+                onPress={() => navigation.navigate('CreateTask', { selectedDate })}
             >
                 <Ionicons name="add" size={24} color={COLORS.white} />
                 <Text style={styles.addTaskButtonText}>Add New Task</Text>
@@ -568,7 +574,7 @@ const TasksScreen = () => {
                 {/* Add Task Button */}
                 <TouchableOpacity
                     style={styles.addButton}
-                    onPress={() => navigation.navigate('CreateTask')}
+                    onPress={() => navigation.navigate('CreateTask', { selectedDate })}
                 >
                     <Ionicons name="add" size={24} color={COLORS.white} />
                 </TouchableOpacity>

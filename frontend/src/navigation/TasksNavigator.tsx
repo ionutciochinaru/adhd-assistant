@@ -7,11 +7,10 @@ import TaskDetailScreen from '../screens/tasks/TaskDetailScreen';
 
 // Define navigation types
 export type TasksStackParamList = {
-    TasksList: undefined;
-    CreateTask: undefined;
+    TasksList: { selectDate?: string };
+    CreateTask: { selectedDate?: string };
     TaskDetail: { taskId: string };
 };
-
 const Stack = createStackNavigator<TasksStackParamList>();
 
 const TasksNavigator = () => {

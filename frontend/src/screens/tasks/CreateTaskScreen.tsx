@@ -16,7 +16,7 @@ import {
     Keyboard,
     Image,
 } from 'react-native';
-import { StackScreenProps } from '@react-navigation/stack';
+import {StackNavigationProp, StackScreenProps} from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -25,6 +25,8 @@ import BackButton from "../../components/BackButton";
 import ScreenLayout from '../../components/ScreenLayout';
 import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
 import { Ionicons } from '@expo/vector-icons';
+import {normalizeDate} from "../../utils/dateUtils";
+import {RouteProp} from "@react-navigation/native";
 
 // Navigation types
 type TasksStackParamList = {
@@ -33,21 +35,31 @@ type TasksStackParamList = {
     TaskDetail: { taskId: string };
 };
 
+type CreateTaskScreenProps = {
+    navigation: StackNavigationProp<TasksStackParamList, 'CreateTask'>;
+    route: RouteProp<TasksStackParamList, 'CreateTask'>;
+};
+
 type Props = StackScreenProps<TasksStackParamList, 'CreateTask'>;
 
-const CreateTaskScreen = ({ navigation }: Props) => {
+const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }) => {
     const { user } = useAuth();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-    const [hasDueDate, setHasDueDate] = useState(false);
-    const [dueDate, setDueDate] = useState(new Date());
+    const selectedDateParam = route.params?.selectedDate;
+    const [hasDueDate, setHasDueDate] = useState(true);
+    const [dueDate, setDueDate] = useState(() => {
+        const date = selectedDateParam ? new Date(selectedDateParam) : new Date();
+        // Set to next hour
+        date.setHours(date.getHours() + 1, 0, 0, 0);
+        return date;
+    });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [subtasks, setSubtasks] = useState<string[]>([]);
     const [newSubtask, setNewSubtask] = useState('');
     const [loading, setLoading] = useState(false);
-    const [useAI, setUseAI] = useState(false);
     const { scheduleTaskNotification } = useTaskNotifications();
 
     // Animations
@@ -232,7 +244,7 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                     description: description.trim() || null,
                     priority,
                     status: 'active',
-                    due_date: hasDueDate ? dueDate.toISOString() : null,
+                    due_date: dueDate.toISOString(),
                 })
                 .select()
                 .single();
@@ -282,26 +294,14 @@ const CreateTaskScreen = ({ navigation }: Props) => {
             ]).start();
 
             setTimeout(() => {
-                navigation.goBack();
+                navigation.navigate('TasksList', {
+                    selectDate: normalizeDate(dueDate.toISOString())
+                });
             }, 500);
         } catch (error: any) {
             console.error('Error creating task:', error.message);
             Alert.alert('Error', 'Failed to create task: ' + error.message);
             setLoading(false);
-        }
-    };
-
-    // Get priority-specific styles
-    const getPriorityColor = (priorityValue: string) => {
-        switch (priorityValue) {
-            case 'high':
-                return COLORS.highPriority;
-            case 'medium':
-                return COLORS.mediumPriority;
-            case 'low':
-                return COLORS.lowPriority;
-            default:
-                return COLORS.textTertiary;
         }
     };
 
@@ -466,29 +466,11 @@ const CreateTaskScreen = ({ navigation }: Props) => {
 
                         {/* Due Date Toggle */}
                         <View style={styles.inputGroup}>
-                            <View style={styles.dueDateContainer}>
-                                <View style={styles.dueDateLabelContainer}>
-                                    <Ionicons name="calendar" size={20} color={COLORS.primary} />
-                                    <Text style={styles.dueDateLabel}>Set Due Date & Time</Text>
-                                </View>
-                                <Switch
-                                    value={hasDueDate}
-                                    onValueChange={(value) => {
-                                        setHasDueDate(value);
-                                        if (value) {
-                                            // Set to next hour when enabling
-                                            const nextHour = new Date();
-                                            nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
-                                            setDueDate(nextHour);
-                                        }
-                                    }}
-                                    trackColor={{ false: COLORS.cardShadow, true: COLORS.primaryLight }}
-                                    thumbColor={hasDueDate ? COLORS.primary : '#f4f3f4'}
-                                    ios_backgroundColor={COLORS.cardShadow}
-                                />
+                            <View style={styles.dueDateLabelContainer}>
+                                <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                                <Text style={styles.dueDateLabel}>Due Date & Time</Text>
                             </View>
 
-                            {hasDueDate && (
                                 <View style={styles.dateTimeContainer}>
                                     <TouchableOpacity
                                         style={styles.dateTimeButton}
@@ -517,7 +499,6 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
-                            )}
 
                             {/* Date Time Picker Modals */}
                             <DateTimePickerModal
@@ -539,48 +520,35 @@ const CreateTaskScreen = ({ navigation }: Props) => {
                         </View>
 
                         {/* AI Task Breakdown */}
-                        <View style={styles.inputGroup}>
-                            <View style={styles.aiBreakdownContainer}>
-                                <View style={styles.aiBreakdownHeader}>
-                                    <Ionicons name="sparkles" size={20} color={COLORS.primary} />
-                                    <Text style={styles.aiBreakdownTitle}>AI Task Breakdown</Text>
-                                </View>
-                                <Switch
-                                    value={useAI}
-                                    onValueChange={setUseAI}
-                                    trackColor={{ false: COLORS.cardShadow, true: COLORS.primaryLight }}
-                                    thumbColor={useAI ? COLORS.primary : '#f4f3f4'}
-                                    ios_backgroundColor={COLORS.cardShadow}
-                                />
+                        <View style={styles.aiInfoContainer}>
+                            <View style={styles.aiBreakdownHeader}>
+                                <Ionicons name="sparkles" size={20} color={COLORS.primary} />
+                                <Text style={styles.aiBreakdownTitle}>AI Task Breakdown</Text>
                             </View>
 
-                            {useAI && (
-                                <View style={styles.aiInfoContainer}>
-                                    <Text style={styles.aiInfoText}>
-                                        Let AI help break down your task into manageable subtasks
-                                    </Text>
+                            <Text style={styles.aiInfoText}>
+                                Let AI help break down your task into manageable subtasks
+                            </Text>
 
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.aiBreakdownButton,
-                                            (loading || title.trim() === '') && styles.disabledButton
-                                        ]}
-                                        onPress={requestAIBreakdown}
-                                        disabled={loading || title.trim() === ''}
-                                    >
-                                        {loading ? (
-                                            <ActivityIndicator size="small" color={COLORS.white} />
-                                        ) : (
-                                            <>
-                                                <Ionicons name="flash" size={18} color={COLORS.white} />
-                                                <Text style={styles.aiBreakdownButtonText}>
-                                                    Generate Subtasks
-                                                </Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-                            )}
+                            <TouchableOpacity
+                                style={[
+                                    styles.aiBreakdownButton,
+                                    (loading || title.trim() === '') && styles.disabledButton
+                                ]}
+                                onPress={requestAIBreakdown}
+                                disabled={loading || title.trim() === ''}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator size="small" color={COLORS.white} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="flash" size={18} color={COLORS.white} />
+                                        <Text style={styles.aiBreakdownButtonText}>
+                                            Generate Subtasks
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
                         </View>
 
                         {/* Subtasks Section */}
