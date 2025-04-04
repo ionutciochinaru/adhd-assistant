@@ -1,3 +1,4 @@
+// src/components/TaskItem.tsx
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,47 +12,20 @@ type TaskItemProps = {
         subtasks_completed?: number;
     };
     onPress: () => void;
-    onToggleCompletion?: (task: Task) => void;
+    onPomodoroStart: (task: Task) => void;
+    onOptionsPress: () => void;
 };
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }) => {
+const TaskItem: React.FC<TaskItemProps> = ({
+                                               task,
+                                               onPress,
+                                               onPomodoroStart,
+                                               onOptionsPress
+                                           }) => {
     // Calculate subtask progress
     const subtaskProgress = task.subtasks_count && task.subtasks_count > 0
         ? Math.round(((task.subtasks_completed || 0) / task.subtasks_count) * 100)
         : 0;
-
-    // Priority color and icon mapping
-    const getPriorityStyles = () => {
-        switch (task.priority) {
-            case 'high':
-                return {
-                    color: COLORS.highPriority,
-                    icon: 'alert-circle',
-                    badgeStyle: {
-                        backgroundColor: COLORS.highPriority,
-                    }
-                };
-            case 'medium':
-                return {
-                    color: COLORS.mediumPriority,
-                    icon: 'alert',
-                    badgeStyle: {
-                        backgroundColor: COLORS.mediumPriority,
-                    }
-                };
-            case 'low':
-            default:
-                return {
-                    color: COLORS.lowPriority,
-                    icon: 'checkmark-circle',
-                    badgeStyle: {
-                        backgroundColor: COLORS.lowPriority,
-                    }
-                };
-        }
-    };
-
-    const priorityStyles = getPriorityStyles();
 
     // Determine due date status
     const getDueDateStatus = () => {
@@ -64,7 +38,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }
 
         if (dueDate < now) {
             return {
-                text: 'Expires Soon',
+                text: 'Overdue',
                 style: styles.overdueBadge,
                 textStyle: styles.overdueBadgeText
             };
@@ -83,8 +57,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }
 
         return null;
     };
-
-    const dueDateStatus = getDueDateStatus();
 
     // Format date with optional time
     const formatDate = (date: Date) => {
@@ -105,10 +77,64 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }
         return task.due_date ? `${formattedDate} ${formattedTime}` : 'No Due Date';
     };
 
-    // Truncate title if it's too long
-    const truncateTitle = (title: string, maxLength: number = 30) => {
-        return title.length > maxLength ? `${title.slice(0, maxLength)}...` : title;
+    // Get the priority color
+    const getPriorityColor = () => {
+        switch (task.priority) {
+            case 'high':
+                return COLORS.highPriority;
+            case 'medium':
+                return COLORS.mediumPriority;
+            case 'low':
+                return COLORS.lowPriority;
+            default:
+                return COLORS.textTertiary;
+        }
     };
+
+    // Determine work button style based on priority and due date
+    const getWorkButtonStyle = () => {
+        const dueStatus = getDueDateStatus();
+
+        if (dueStatus?.text === 'Overdue') {
+            return {
+                backgroundColor: COLORS.danger,
+                text: 'Start Now!'
+            };
+        }
+
+        if (dueStatus?.text === 'Due Soon') {
+            return {
+                backgroundColor: COLORS.warning,
+                text: 'Start Soon'
+            };
+        }
+
+        switch (task.priority) {
+            case 'high':
+                return {
+                    backgroundColor: COLORS.highPriority,
+                    text: 'Start Work'
+                };
+            case 'medium':
+                return {
+                    backgroundColor: COLORS.mediumPriority,
+                    text: 'Start Work'
+                };
+            case 'low':
+                return {
+                    backgroundColor: COLORS.lowPriority,
+                    text: 'Start Work'
+                };
+            default:
+                return {
+                    backgroundColor: COLORS.primary,
+                    text: 'Start Work'
+                };
+        }
+    };
+
+    const dueDateStatus = getDueDateStatus();
+    const workButtonStyle = getWorkButtonStyle();
 
     return (
         <TouchableOpacity
@@ -119,18 +145,28 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }
             onPress={onPress}
             activeOpacity={0.8}
         >
-            {/* Header with Date and Badges */}
+            {/* Header with Date and Options */}
             <View style={styles.headerContainer}>
                 <Text style={styles.dateText}>
                     {task.due_date ? formatDate(new Date(task.due_date)) : 'No Due Date'}
                 </Text>
-                {dueDateStatus && (
-                    <View style={[styles.statusBadge, dueDateStatus.style]}>
-                        <Text style={[styles.statusBadgeText, dueDateStatus.textStyle]}>
-                            {dueDateStatus.text}
-                        </Text>
-                    </View>
-                )}
+
+                <View style={styles.headerRight}>
+                    {dueDateStatus && (
+                        <View style={[styles.statusBadge, dueDateStatus.style]}>
+                            <Text style={[styles.statusBadgeText, dueDateStatus.textStyle]}>
+                                {dueDateStatus.text}
+                            </Text>
+                        </View>
+                    )}
+
+                    <TouchableOpacity
+                        style={styles.optionsButton}
+                        onPress={onOptionsPress}
+                    >
+                        <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Task Title with Priority */}
@@ -140,13 +176,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }
                         styles.taskTitle,
                         task.status === 'completed' && styles.completedTitle
                     ]}
-                    numberOfLines={1}
+                    numberOfLines={2}
                 >
-                    {truncateTitle(task.title)}
+                    {task.title}
                 </Text>
                 <View style={[
                     styles.priorityBadge,
-                    priorityStyles.badgeStyle
+                    { backgroundColor: getPriorityColor() }
                 ]}>
                     <Text style={styles.priorityText}>
                         {task.priority.charAt(0).toUpperCase()}
@@ -167,39 +203,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }
                 </Text>
             )}
 
-            {/* Subtasks */}
+            {/* Subtasks Section */}
             {task.subtasks && task.subtasks.length > 0 && (
-                <View style={styles.subtasksSection}>
-                    <Text style={styles.subtasksHeader}>Subtasks</Text>
-                    {task.subtasks.map((subtask) => (
-                        <View key={subtask.id} style={styles.subtaskItem}>
-                            <Ionicons
-                                name={subtask.status === 'completed'
-                                    ? 'checkmark-circle'
-                                    : 'radio-button-off'
-                                }
-                                size={16}
-                                color={subtask.status === 'completed'
-                                    ? COLORS.success
-                                    : COLORS.textSecondary
-                                }
-                            />
-                            <Text
-                                style={[
-                                    styles.subtaskText,
-                                    subtask.status === 'completed' && styles.completedSubtaskText
-                                ]}
-                            >
-                                {subtask.title}
-                            </Text>
-                        </View>
-                    ))}
-                </View>
-            )}
-
-            {/* Subtasks Progress */}
-            {task.subtasks_count && task.subtasks_count > 0 && (
                 <View style={styles.subtasksContainer}>
+                    {/* Subtasks Progress Bar */}
+                    <View style={styles.progressHeaderContainer}>
+                        <Text style={styles.subtasksHeader}>Subtasks</Text>
+                        <Text style={styles.subtasksText}>
+                            {task.subtasks.filter(s => s.status === 'completed').length} of {task.subtasks.length}
+                        </Text>
+                    </View>
+
                     <View style={styles.progressContainer}>
                         <View
                             style={[
@@ -208,10 +222,48 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onPress, onToggleCompletion }
                             ]}
                         />
                     </View>
-                    <Text style={styles.subtasksText}>
-                        {task.subtasks_completed} of {task.subtasks_count} subtasks
-                    </Text>
+
+                    {/* Subtasks List (showing up to 5) */}
+                    <View style={styles.subtasksList}>
+                        {task.subtasks.slice(0, 5).map((subtask, index) => (
+                            <View key={subtask.id || index} style={styles.subtaskItem}>
+                                <View style={[
+                                    styles.subtaskCheckbox,
+                                    subtask.status === 'completed' && styles.subtaskCheckboxCompleted
+                                ]}>
+                                    {subtask.status === 'completed' && (
+                                        <Ionicons name="checkmark" size={12} color={COLORS.white} />
+                                    )}
+                                </View>
+                                <Text
+                                    style={[
+                                        styles.subtaskText,
+                                        subtask.status === 'completed' && styles.subtaskTextCompleted
+                                    ]}
+                                    numberOfLines={1}
+                                >
+                                    {subtask.title}
+                                </Text>
+                            </View>
+                        ))}
+                        {task.subtasks.length > 5 && (
+                            <Text style={styles.moreSubtasksText}>
+                                +{task.subtasks.length - 5} more subtasks
+                            </Text>
+                        )}
+                    </View>
                 </View>
+            )}
+
+            {/* Start Work Button */}
+            {task.status !== 'completed' && (
+                <TouchableOpacity
+                    style={[styles.workButton, { backgroundColor: workButtonStyle.backgroundColor }]}
+                    onPress={() => onPomodoroStart(task)}
+                >
+                    <Ionicons name="timer-outline" size={18} color={COLORS.white} style={styles.workButtonIcon} />
+                    <Text style={styles.workButtonText}>{workButtonStyle.text}</Text>
+                </TouchableOpacity>
             )}
         </TouchableOpacity>
     );
@@ -229,7 +281,7 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     completedContainer: {
-        opacity: 0.5,
+        opacity: 0.7,
     },
     headerContainer: {
         flexDirection: 'row',
@@ -240,16 +292,16 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.border,
         paddingBottom: SPACING.sm,
     },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     dateText: {
         ...Typography.bodySmall,
         color: COLORS.textSecondary,
     },
-    badgesContainer: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-    },
     statusBadge: {
-        paddingVertical: 0,
+        paddingVertical: 2,
         paddingHorizontal: SPACING.sm,
         borderRadius: RADIUS.round,
         marginRight: SPACING.xs,
@@ -269,6 +321,9 @@ const styles = StyleSheet.create({
     },
     dueSoonBadgeText: {
         color: COLORS.warning,
+    },
+    optionsButton: {
+        padding: SPACING.xs,
     },
     titleContainer: {
         flexDirection: 'row',
@@ -301,25 +356,6 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontWeight: FONTS.weight.bold,
     },
-
-    priorityBadgePosition: {
-        position: 'relative',
-    },
-    completionToggle: {
-        position: 'relative',
-        top: SPACING.sm,
-        right: SPACING.sm,
-        width: 32,
-        height: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    incompleteToggle: {
-        width: 24,
-        height: 24,
-        borderRadius: RADIUS.round,
-        borderWidth: 2,
-    },
     taskDescription: {
         ...Typography.bodySmall,
         color: COLORS.textSecondary,
@@ -332,35 +368,26 @@ const styles = StyleSheet.create({
         textDecorationLine: 'line-through',
         color: COLORS.textTertiary,
     },
-    subtasksSection: {
+    subtasksContainer: {
         marginBottom: SPACING.sm,
+        paddingTop: SPACING.sm,
     },
-    subtasksHeader: {
-        ...Typography.bodySmall,
-        color: COLORS.textSecondary,
-        marginBottom: SPACING.xs,
-    },
-    subtaskItem: {
+    progressHeaderContainer: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: SPACING.xs,
     },
-    subtaskText: {
+    subtasksHeader: {
         ...Typography.bodySmall,
-        marginLeft: SPACING.xs,
-    },
-    completedSubtaskText: {
-        textDecorationLine: 'line-through',
-        color: COLORS.textTertiary,
-    },
-    subtasksContainer: {
-        marginBottom: SPACING.sm,
+        fontWeight: FONTS.weight.semiBold,
+        color: COLORS.textSecondary,
     },
     progressContainer: {
         height: 6,
         backgroundColor: COLORS.cardShadow,
         borderRadius: RADIUS.round,
-        marginBottom: SPACING.xs,
+        marginBottom: SPACING.sm,
         overflow: 'hidden',
     },
     progressBar: {
@@ -371,9 +398,59 @@ const styles = StyleSheet.create({
     subtasksText: {
         ...Typography.tiny,
         color: COLORS.textSecondary,
-        textAlign: 'right',
     },
+    subtasksList: {
+        marginTop: SPACING.xs,
+    },
+    subtaskItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.xs,
+    },
+    subtaskCheckbox: {
+        width: 16,
+        height: 16,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.xs,
+    },
+    subtaskCheckboxCompleted: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    subtaskText: {
+        ...Typography.bodySmall,
+        flex: 1,
+    },
+    subtaskTextCompleted: {
+        textDecorationLine: 'line-through',
+        color: COLORS.textTertiary,
+    },
+    moreSubtasksText: {
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
+        fontStyle: 'italic',
+        marginTop: SPACING.xs,
+    },
+    workButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: RADIUS.md,
+        paddingVertical: SPACING.sm,
+        marginTop: SPACING.xs,
+    },
+    workButtonIcon: {
+        marginRight: SPACING.xs,
+    },
+    workButtonText: {
+        ...Typography.bodySmall,
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
+    }
 });
 
 export default TaskItem;
-

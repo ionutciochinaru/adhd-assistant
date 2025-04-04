@@ -17,9 +17,9 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Task } from '../../utils/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ScreenLayout from '../../components/ScreenLayout';
-import SwipeableTaskItem from '../../components/SwipeableTaskItem';
+import TaskItem from '../../components/TaskItem';
+import TaskOptionModal from '../../components/TaskOptionModal';
 import { COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS } from '../../utils/styles';
 
 const TasksScreen = () => {
@@ -31,6 +31,8 @@ const TasksScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'overdue'>('all');
     const [error, setError] = useState<string | null>(null);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [optionsModalVisible, setOptionsModalVisible] = useState(false);
 
     // Animation values
     const fadeAnim = useState(new Animated.Value(0))[0];
@@ -132,37 +134,96 @@ const TasksScreen = () => {
 
     // Task interaction handlers
     const handleTaskPress = (taskId: string) => {
-        navigation.navigate('TaskDetail', { taskId });
+        navigation.navigate('TaskDetail' as never, { taskId } as never);
     };
 
     // Start Pomodoro timer for a task
     const handlePomodoroStart = (task: Task) => {
-        navigation.navigate('Pomodoro', { task });
+        navigation.navigate('Pomodoro' as never, { task } as never);
+    };
+
+    // Show options for a task
+    const handleOptionsPress = (task: Task) => {
+        setSelectedTask(task);
+        setOptionsModalVisible(true);
     };
 
     // Edit task
-    const handleEditTask = (taskId: string) => {
-        navigation.navigate('TaskDetail', { taskId, isEditing: true });
+    const handleEditTask = () => {
+        if (!selectedTask) return;
+        setOptionsModalVisible(false);
+        navigation.navigate('TaskDetail' as never, { taskId: selectedTask.id } as never);
     };
 
     // Delete task and its subtasks
-    const handleDeleteTask = async (taskId: string) => {
+    const handleDeleteTask = async () => {
+        if (!selectedTask) return;
+
         try {
+            setOptionsModalVisible(false);
+
             // Delete the task (subtasks will be deleted via cascade)
             const { error } = await supabase
                 .from('tasks')
                 .delete()
-                .eq('id', taskId);
+                .eq('id', selectedTask.id);
 
             if (error) throw error;
 
             // Update the UI optimistically
-            const updatedTasks = tasks.filter(t => t.id !== taskId);
+            const updatedTasks = tasks.filter(t => t.id !== selectedTask.id);
             setTasks(updatedTasks);
             processTaskSections(updatedTasks);
+
+            // Show success message
+            Alert.alert('Success', 'Task deleted successfully');
         } catch (error: any) {
             console.error('Error deleting task:', error.message);
             Alert.alert('Error', 'Failed to delete task');
+        }
+    };
+
+    // Toggle task completion status
+    const handleToggleTaskCompletion = async () => {
+        if (!selectedTask) return;
+
+        try {
+            const newStatus = selectedTask.status === 'active' ? 'completed' : 'active';
+
+            // Update the task status optimistically in UI
+            const updatedTasks = tasks.map(task =>
+                task.id === selectedTask.id
+                    ? {
+                        ...task,
+                        status: newStatus,
+                        completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+                    }
+                    : task
+            );
+
+            setTasks(updatedTasks);
+            processTaskSections(updatedTasks);
+
+            // Update in database
+            const { error } = await supabase
+                .from('tasks')
+                .update({
+                    status: newStatus,
+                    completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+                })
+                .eq('id', selectedTask.id);
+
+            if (error) throw error;
+
+            // Show feedback
+            const message = newStatus === 'completed' ? 'Task completed!' : 'Task marked as active';
+            Alert.alert('Success', message);
+
+        } catch (error) {
+            console.error('Error updating task status:', error.message);
+            Alert.alert('Error', 'Failed to update task status');
+            // Revert optimistic update on error
+            fetchTasks();
         }
     };
 
@@ -182,7 +243,7 @@ const TasksScreen = () => {
             </Text>
             <TouchableOpacity
                 style={styles.addTaskButton}
-                onPress={() => navigation.navigate('CreateTask')}
+                onPress={() => navigation.navigate('CreateTask' as never)}
             >
                 <Ionicons name="add" size={24} color={COLORS.white} />
                 <Text style={styles.addTaskButtonText}>Add New Task</Text>
@@ -213,6 +274,33 @@ const TasksScreen = () => {
                 {label}
             </Text>
         </TouchableOpacity>
+    );
+
+    // Use the TaskOptionModal component instead of inline modal
+    const renderOptionsModal = () => (
+        <TaskOptionModal
+            visible={optionsModalVisible}
+            task={selectedTask}
+            onClose={() => setOptionsModalVisible(false)}
+            onEdit={handleEditTask}
+            onDelete={() => {
+                Alert.alert(
+                    'Delete Task',
+                    'Are you sure you want to delete this task?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: handleDeleteTask }
+                    ]
+                );
+            }}
+            onStartPomodoro={() => {
+                setOptionsModalVisible(false);
+                if (selectedTask) {
+                    handlePomodoroStart(selectedTask);
+                }
+            }}
+            onCompleteTask={handleToggleTaskCompletion}
+        />
     );
 
     return (
@@ -301,40 +389,40 @@ const TasksScreen = () => {
                         <Text style={styles.loadingText}>Loading tasks...</Text>
                     </View>
                 ) : (
-                    <GestureHandlerRootView style={{ flex: 1 }}>
-                        <SectionList
-                            sections={sectionsData}
-                            keyExtractor={(item) => item.id}
-                            renderItem={({ item }) => (
-                                <SwipeableTaskItem
-                                    task={item}
-                                    onPress={() => handleTaskPress(item.id)}
-                                    onPomodoroStart={handlePomodoroStart}
-                                    onEdit={handleEditTask}
-                                    onDelete={handleDeleteTask}
-                                />
-                            )}
-                            ListEmptyComponent={renderEmptyState}
-                            refreshControl={
-                                <RefreshControl
-                                    refreshing={refreshing}
-                                    onRefresh={fetchTasks}
-                                    colors={[COLORS.primary]}
-                                    tintColor={COLORS.primary}
-                                />
-                            }
-                            contentContainerStyle={styles.tasksListContainer}
-                        />
-                    </GestureHandlerRootView>
+                    <SectionList
+                        sections={sectionsData}
+                        keyExtractor={(item) => item.id}
+                        renderItem={({ item }) => (
+                            <TaskItem
+                                task={item}
+                                onPress={() => handleTaskPress(item.id)}
+                                onPomodoroStart={handlePomodoroStart}
+                                onOptionsPress={() => handleOptionsPress(item)}
+                            />
+                        )}
+                        ListEmptyComponent={renderEmptyState}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={fetchTasks}
+                                colors={[COLORS.primary]}
+                                tintColor={COLORS.primary}
+                            />
+                        }
+                        contentContainerStyle={styles.tasksListContainer}
+                    />
                 )}
 
                 {/* Add Task Button */}
                 <TouchableOpacity
                     style={styles.addButton}
-                    onPress={() => navigation.navigate('CreateTask')}
+                    onPress={() => navigation.navigate('CreateTask' as never)}
                 >
                     <Ionicons name="add" size={24} color={COLORS.white} />
                 </TouchableOpacity>
+
+                {/* Options Modal */}
+                {renderOptionsModal()}
             </Animated.View>
         </ScreenLayout>
     );
@@ -477,6 +565,60 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         ...SHADOWS.medium,
+    },
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContainer: {
+        width: '80%',
+        maxWidth: 400,
+        backgroundColor: 'transparent',
+    },
+    modalContent: {
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.lg,
+        ...SHADOWS.large,
+    },
+    modalTitle: {
+        ...Typography.h3,
+        textAlign: 'center',
+        marginBottom: SPACING.md,
+    },
+    modalOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.md,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    modalOptionText: {
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.md,
+        color: COLORS.textPrimary,
+    },
+    deleteOption: {
+        borderBottomWidth: 0,
+    },
+    deleteOptionText: {
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.md,
+        color: COLORS.danger,
+    },
+    closeButton: {
+        marginTop: SPACING.md,
+        paddingVertical: SPACING.sm,
+        backgroundColor: COLORS.cardShadow,
+        borderRadius: RADIUS.md,
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
     },
 });
 

@@ -176,14 +176,6 @@ export default function App() {
                         shouldShowAlert: true,
                         shouldPlaySound: true,
                         shouldSetBadge: true,
-                        // Customize iOS presentation options
-                        ...(Platform.OS === 'ios' && {
-                            presentationOptions: [
-                                Notifications.PresentationOption.BANNER,
-                                Notifications.PresentationOption.SOUND,
-                                Notifications.PresentationOption.BADGE,
-                            ],
-                        }),
                     }),
                 });
 
