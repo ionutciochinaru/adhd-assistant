@@ -21,6 +21,7 @@ import {Ionicons} from '@expo/vector-icons';
 import ScreenLayout from '../../components/ScreenLayout';
 import {COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS} from '../../utils/styles';
 import SwipeableTaskItem from "../../components/SwipeableTaskItem";
+import {GestureHandlerRootView} from "react-native-gesture-handler";
 
 const TasksScreen = () => {
     const navigation = useNavigation();
@@ -31,7 +32,8 @@ const TasksScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'overdue'>('all');
     const [error, setError] = useState<string | null>(null);
-
+    const scrollViewRef = useRef(null);
+    const scrollRef = useRef(null);
     // Animation refs
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const translateYAnim = useRef(new Animated.Value(50)).current;
@@ -293,40 +295,42 @@ const TasksScreen = () => {
                         <Text style={styles.loadingText}>Loading tasks...</Text>
                     </View>
                 ) : (
-                    <SectionList
-                        sections={sectionsData}
-                        keyExtractor={(item) => item.id}
-                        renderItem={({item}) => (
-                            <SwipeableTaskItem
-                                task={item}
-                                onPress={() => handleTaskPress(item.id)}
-                                onTaskUpdate={(updatedTask) => {
-                                    // Update the tasks list when a task is updated
-                                    const updatedTasks = tasks.map(t =>
-                                        t.id === updatedTask.id ? updatedTask : t
-                                    );
-                                    setTasks(updatedTasks);
-                                    processTaskSections(updatedTasks);
-                                }}
-                                onDelete={(taskId) => {
-                                    // Remove the deleted task from the list
-                                    const updatedTasks = tasks.filter(t => t.id !== taskId);
-                                    setTasks(updatedTasks);
-                                    processTaskSections(updatedTasks);
-                                }}
-                            />
-                        )}
-                        ListEmptyComponent={renderEmptyState}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={fetchTasks}
-                                colors={[COLORS.primary]}
-                                tintColor={COLORS.primary}
-                            />
-                        }
-                        contentContainerStyle={styles.tasksListContainer}
-                    />
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                        <SectionList
+                            ref={scrollRef} // Attach ref to SectionList
+                            sections={sectionsData}
+                            keyExtractor={(item) => item.id}
+                            renderItem={({ item }) => (
+                                <SwipeableTaskItem
+                                    task={item}
+                                    onPress={() => handleTaskPress(item.id)}
+                                    onTaskUpdate={(updatedTask) => {
+                                        const updatedTasks = tasks.map(t =>
+                                            t.id === updatedTask.id ? updatedTask : t
+                                        );
+                                        setTasks(updatedTasks);
+                                        processTaskSections(updatedTasks);
+                                    }}
+                                    onDelete={(taskId) => {
+                                        const updatedTasks = tasks.filter(t => t.id !== taskId);
+                                        setTasks(updatedTasks);
+                                        processTaskSections(updatedTasks);
+                                    }}
+                                    simultaneousHandlers={scrollRef} // Pass ref here
+                                />
+                            )}
+                            ListEmptyComponent={renderEmptyState}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={fetchTasks}
+                                    colors={[COLORS.primary]}
+                                    tintColor={COLORS.primary}
+                                />
+                            }
+                            contentContainerStyle={styles.tasksListContainer}
+                        />
+                    </GestureHandlerRootView>
                 )}
 
                 {/* Add Task Button */}

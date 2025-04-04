@@ -1,17 +1,19 @@
 import React from 'react';
-import {View, Text, StyleSheet, Alert} from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import Animated, {
     useAnimatedStyle,
+    useSharedValue,
+    withTiming,
     interpolate,
-    Extrapolation
+    Extrapolation,
+    runOnJS,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../utils/supabase';
 import TaskItem from './TaskItem';
-import { COLORS, SPACING, RADIUS } from '../utils/styles';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../utils/styles';
 import { Task, Subtask } from '../utils/supabase';
-
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 type SwipeableTaskItemProps = {
     task: Task & {
         subtasks?: Subtask[];
@@ -21,16 +23,23 @@ type SwipeableTaskItemProps = {
     onPress: () => void;
     onTaskUpdate: (updatedTask: Task) => void;
     onDelete?: (taskId: string) => void;
+    simultaneousHandlers?: any; // Allow ref from SectionList
 };
 
 const SWIPE_THRESHOLD = 100; // pixels to trigger action
+const SCREEN_WIDTH = 400; // You might want to use Dimensions.get('window').width
 
 const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                                                                  task,
                                                                  onPress,
                                                                  onTaskUpdate,
-                                                                 onDelete
+                                                                 onDelete,
+                                                                 simultaneousHandlers,
                                                              }) => {
+    // Shared values for animation
+    const translateX = useSharedValue(0);
+    const isSwipeActive = useSharedValue(false);
+
     // Complete task and its subtasks
     const completeTaskAndSubtasks = async () => {
         try {
@@ -102,73 +111,92 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
         }
     };
 
-    // Gesture handler
-    const [translateX, setTranslateX] = React.useState(0);
-    const [isSwipeActive, setIsSwipeActive] = React.useState(false);
-
+    // Pan gesture handler using Reanimated
     const panGesture = Gesture.Pan()
         .onUpdate((event) => {
-            if (event.translationX < 0) {
-                // Swiping left to delete
-                setTranslateX(Math.max(event.translationX, -SWIPE_THRESHOLD));
-                setIsSwipeActive(true);
-            } else if (event.translationX > 0) {
-                // Swiping right to complete
-                setTranslateX(Math.min(event.translationX, SWIPE_THRESHOLD));
-                setIsSwipeActive(true);
+            if (Math.abs(event.translationX) > Math.abs(event.translationY)) {
+                // Detect horizontal swipe
+                translateX.value = event.translationX;
             }
         })
         .onEnd((event) => {
             if (event.translationX < -SWIPE_THRESHOLD) {
-                // Delete action
-                deleteTaskAndSubtasks();
+                translateX.value = withTiming(-SCREEN_WIDTH, {}, () => {
+                    runOnJS(deleteTaskAndSubtasks)();
+                });
             } else if (event.translationX > SWIPE_THRESHOLD) {
-                // Complete action
-                completeTaskAndSubtasks();
+                translateX.value = withTiming(SCREEN_WIDTH, {}, () => {
+                    runOnJS(completeTaskAndSubtasks)();
+                });
+            } else {
+                translateX.value = withTiming(0);
             }
-
-            // Reset translation
-            setTranslateX(0);
-            setIsSwipeActive(false);
         });
 
-    // Animated styles
-    const animatedStyle = useAnimatedStyle(() => {
+
+    // Animated styles for task item and actions
+    const animatedTaskStyle = useAnimatedStyle(() => {
         return {
-            transform: [{ translateX: translateX }]
+            transform: [{ translateX: translateX.value }],
         };
     });
 
-    const leftActionStyle = useAnimatedStyle(() => {
+    const animatedLeftActionStyle = useAnimatedStyle(() => {
         const opacity = interpolate(
-            translateX,
+            translateX.value,
             [0, SWIPE_THRESHOLD],
             [0, 1],
             Extrapolation.CLAMP
         );
         return {
             opacity,
-            backgroundColor: COLORS.success
+            backgroundColor: COLORS.success,
+            transform: [
+                {
+                    scale: interpolate(
+                        translateX.value,
+                        [0, SWIPE_THRESHOLD],
+                        [0.8, 1],
+                        Extrapolation.CLAMP
+                    )
+                }
+            ]
         };
     });
 
-    const rightActionStyle = useAnimatedStyle(() => {
+    const animatedRightActionStyle = useAnimatedStyle(() => {
         const opacity = interpolate(
-            translateX,
+            translateX.value,
             [0, -SWIPE_THRESHOLD],
             [0, 1],
             Extrapolation.CLAMP
         );
         return {
             opacity,
-            backgroundColor: COLORS.danger
+            backgroundColor: COLORS.danger,
+            transform: [
+                {
+                    scale: interpolate(
+                        translateX.value,
+                        [0, -SWIPE_THRESHOLD],
+                        [0.8, 1],
+                        Extrapolation.CLAMP
+                    )
+                }
+            ]
         };
     });
 
     return (
         <View style={styles.container}>
             {/* Left Action (Complete) */}
-            <Animated.View style={[styles.actionContainer, styles.leftAction, leftActionStyle]}>
+            <Animated.View
+                style={[
+                    styles.actionContainer,
+                    styles.leftAction,
+                    animatedLeftActionStyle
+                ]}
+            >
                 <Ionicons
                     name="checkmark-done-circle"
                     size={24}
@@ -178,7 +206,13 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
             </Animated.View>
 
             {/* Right Action (Delete) */}
-            <Animated.View style={[styles.actionContainer, styles.rightAction, rightActionStyle]}>
+            <Animated.View
+                style={[
+                    styles.actionContainer,
+                    styles.rightAction,
+                    animatedRightActionStyle
+                ]}
+            >
                 <Ionicons
                     name="trash-outline"
                     size={24}
@@ -188,14 +222,10 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
             </Animated.View>
 
             {/* Task Item */}
-            <GestureDetector gesture={panGesture}>
-                <Animated.View style={animatedStyle}>
-                    <TaskItem
-                        task={task}
-                        onPress={onPress}
-                        onToggleCompletion={() => completeTaskAndSubtasks()}
-                    />
-                </Animated.View>
+            <GestureDetector gesture={panGesture} simultaneousHandlers={simultaneousHandlers}>
+                <View style={styles.taskItemWrapper}>
+                    <TaskItem task={task} onPress={onPress} />
+                </View>
             </GestureDetector>
         </View>
     );
@@ -207,6 +237,9 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.md,
         marginVertical: SPACING.sm,
     },
+    taskItemWrapper: {
+        zIndex: 10,
+    },
     actionContainer: {
         position: 'absolute',
         top: 0,
@@ -216,6 +249,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         borderRadius: RADIUS.lg,
         paddingHorizontal: SPACING.md,
+        overflow: 'hidden',
     },
     leftAction: {
         left: 0,
