@@ -1,18 +1,20 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, forwardRef, useCallback, useImperativeHandle} from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
     ScrollView,
-    Dimensions
+    Dimensions,
 } from 'react-native';
 import moment from 'moment';
 import {COLORS, SPACING, Typography} from '../utils/styles';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const DATE_CARD_WIDTH = 65;
-const BUFFER_DAYS = 45; // Additional days to load on both sides
+const DATE_CARD_MARGIN = SPACING.xs * 2;
+const TOTAL_ITEM_WIDTH = DATE_CARD_WIDTH + DATE_CARD_MARGIN;
+const BUFFER_DAYS = 15;
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 type MarkedDates = {
     [date: string]: {
@@ -20,58 +22,98 @@ type MarkedDates = {
     };
 };
 
+export type SingleRowCalendarMethods = {
+    scrollToDate: (dateString: string) => void;
+};
+
 type SingleRowCalendarProps = {
     onDateSelect: (date: { dateString: string }) => void;
     selectedDate: string;
     markedDates?: MarkedDates;
-    maxVisibleTasks?: number;
 };
 
-const SingleRowCalendar: React.FC<SingleRowCalendarProps> = ({
-                                                                 onDateSelect,
-                                                                 selectedDate,
-                                                                 markedDates = {},
-                                                                 maxVisibleTasks = 3
-                                                             }) => {
+const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendarProps>(({
+                                                                                            onDateSelect,
+                                                                                            selectedDate,
+                                                                                            markedDates = {},
+                                                                                        }, ref) => {
     const [dates, setDates] = useState<moment.Moment[]>([]);
     const [currentMonth, setCurrentMonth] = useState<string>('');
     const scrollViewRef = useRef<ScrollView>(null);
+    const initialized = useRef(false);
+    const today = moment().format('YYYY-MM-DD');
 
+    // Initialize dates when component mounts
     useEffect(() => {
-        initializeDates();
+        const _dates = [];
+        const todayMoment = moment();
+
+        for (let i = -BUFFER_DAYS; i < BUFFER_DAYS + 30; i++) {
+            _dates.push(moment(todayMoment).add(i, 'days'));
+        }
+
+        setDates(_dates);
+        updateMonth(todayMoment);
+
+        // Set initial selected date to today if none is provided
+        if (!selectedDate) {
+            onDateSelect({dateString: today});
+        }
     }, []);
 
-    const initializeDates = () => {
-        const _dates = [];
-        for (let i = -BUFFER_DAYS; i < BUFFER_DAYS; i++) {
-            _dates.push(moment().add(i, 'days'));
+    // Scroll to today on initial load
+    useEffect(() => {
+        if (dates.length > 0 && !initialized.current) {
+            initialized.current = true;
+
+            // Use requestAnimationFrame to ensure layout is complete
+            requestAnimationFrame(() => {
+                scrollToDate(today);
+            });
         }
-        setDates(_dates);
-        updateMonth(_dates[BUFFER_DAYS]);
-    };
+    }, [dates]);
+
+    // When selectedDate changes from external source
+    useEffect(() => {
+        if (dates.length > 0 && selectedDate && selectedDate !== today) {
+            updateMonth(moment(selectedDate));
+            scrollToDate(selectedDate);
+        }
+    }, [selectedDate, dates]);
+
+    const scrollToDate = useCallback((dateString: string) => {
+        if (!scrollViewRef.current) return;
+
+        const dateIndex = dates.findIndex(date =>
+            date.format('YYYY-MM-DD') === dateString
+        );
+
+        if (dateIndex !== -1) {
+            const itemPosition = dateIndex * TOTAL_ITEM_WIDTH;
+
+            let scrollPosition;
+                const halfScreenWidth = SCREEN_WIDTH / 2;
+                const halfItemWidth = TOTAL_ITEM_WIDTH / 2;
+                scrollPosition = itemPosition - halfScreenWidth + halfItemWidth;
+
+            scrollViewRef.current.scrollTo({
+                x: scrollPosition + 150,
+                animated: initialized.current
+            });
+        }
+    }, [dates]);
+
+    useImperativeHandle(ref, () => ({
+        scrollToDate: (dateString: string) => scrollToDate(dateString)
+    }));
 
     const updateMonth = (date: moment.Moment) => {
-        setCurrentMonth(date.format('MMMM'));
-    };
-
-    const handleScroll = (event: any) => {
-        const offsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.floor(offsetX / DATE_CARD_WIDTH);
-        if (dates[index]) {
-            updateMonth(dates[index]);
-        }
+        setCurrentMonth(date.format('MMMM YYYY'));
     };
 
     const scrollToToday = () => {
-        const today = moment().format('YYYY-MM-DD');
-        const todayIndex = dates.findIndex(date => date.isSame(moment(), 'day'));
-
-        if (todayIndex !== -1 && scrollViewRef.current) {
-            scrollViewRef.current.scrollTo({x: todayIndex * DATE_CARD_WIDTH, animated: true});
-
-            // Select the today date
-            onDateSelect({dateString: today});
-        }
+        onDateSelect({dateString: today});
+        scrollToDate(today);
     };
 
     const DateComponent = ({date, selected}: { date: moment.Moment, selected: boolean }) => {
@@ -84,13 +126,8 @@ const SingleRowCalendar: React.FC<SingleRowCalendarProps> = ({
         const hasTasks = taskCount > 0;
         const isWeekend = date.day() === 0 || date.day() === 6;
 
-        // Calculate dot scale based on task count (capped at maxVisibleTasks)
-        const visibleCount = Math.min(taskCount, maxVisibleTasks);
-        const dotScale = 1 + Math.min((taskCount / maxVisibleTasks) * 0.5, 1.5);
-
         return (
             <View style={styles.dateContainer}>
-                {/* Task Indicator Bar (above the card) */}
                 {hasTasks && (
                     <View style={[
                         styles.taskIndicator,
@@ -134,6 +171,12 @@ const SingleRowCalendar: React.FC<SingleRowCalendarProps> = ({
         );
     };
 
+    const getScrollViewPadding = () => {
+        return {
+            paddingHorizontal: 0
+        };
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
@@ -146,7 +189,11 @@ const SingleRowCalendar: React.FC<SingleRowCalendarProps> = ({
                 ref={scrollViewRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    getScrollViewPadding()
+                ]}
+                decelerationRate="fast"
             >
                 {dates.map((date, index) => (
                     <DateComponent
@@ -158,7 +205,7 @@ const SingleRowCalendar: React.FC<SingleRowCalendarProps> = ({
             </ScrollView>
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     container: {
@@ -188,6 +235,9 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontWeight: 'bold',
     },
+    scrollContent: {
+        paddingVertical: SPACING.xs,
+    },
     dateCard: {
         backgroundColor: COLORS.background,
         borderRadius: 15,
@@ -208,15 +258,9 @@ const styles = StyleSheet.create({
     selectedDayText: {
         color: COLORS.white,
     },
-    todayCard: {
-        color: COLORS.white,
-    },
     todayText: {
         color: COLORS.success,
         fontWeight: 'bold'
-    },
-    fadedText: {
-        color: COLORS.textSecondary,
     },
     dateText: {
         fontSize: 16,
@@ -226,45 +270,18 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontWeight: 'bold',
     },
-    dotContainer: {
-        flexDirection: 'row',
-        marginTop: SPACING.xs,
-    },
     weekendText: {
         color: COLORS.accent2,
-    },
-    badge: {
-        backgroundColor: COLORS.white,
-        borderRadius: 10,
-        width: 20,
-        height: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: SPACING.xxs,
-    },
-    largeBadge: {
-        width: 24,
-    },
-    selectedBadge: {
-        backgroundColor: COLORS.primaryLight,
-    },
-    badgeText: {
-        fontSize: 10,
-        color: COLORS.black,
-        fontWeight: 'bold',
-    },
-    selectedBadgeText: {
-        color: COLORS.black,
     },
     dateContainer: {
         alignItems: 'center',
         marginHorizontal: SPACING.xs,
-        marginTop: 15, // Make space for the indicator
-        height: 80, // Increased height to accommodate indicator
+        marginTop: 15,
+        height: 80,
     },
     taskIndicator: {
         position: 'absolute',
-        top: -12, // Adjusted positioning
+        top: -12,
         height: 20,
         backgroundColor: COLORS.white,
         borderWidth: 1,
@@ -274,12 +291,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 6,
-        zIndex: 10, // Higher z-index
+        zIndex: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 1,
-        elevation: 2, // For Android
+        elevation: 2,
     },
     selectedTaskIndicator: {
         backgroundColor: COLORS.primaryLight,
@@ -292,9 +309,6 @@ const styles = StyleSheet.create({
     },
     selectedTaskCountText: {
         color: COLORS.textSecondary,
-    },
-    hasTasksCard: {
-        marginTop: 10,
     },
 });
 

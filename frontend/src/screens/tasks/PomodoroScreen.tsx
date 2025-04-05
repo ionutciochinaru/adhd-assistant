@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
     View,
     Text,
@@ -6,11 +6,12 @@ import {
     TouchableOpacity,
     Alert,
     BackHandler,
-    Dimensions
+    ScrollView,
+    FlatList
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {Ionicons} from '@expo/vector-icons';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
@@ -18,13 +19,14 @@ import Animated, {
     Easing,
     interpolate,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, {Circle} from 'react-native-svg';
 import BackButton from "../../components/BackButton";
 import {COLORS, RADIUS, SHADOWS, SPACING, Typography} from "../../utils/styles";
 import ScreenLayout from "../../components/ScreenLayout";
-import {Task} from "../../utils/supabase";
+import {supabase} from '../../utils/supabase';
+import {Task, Subtask} from "../../utils/supabase";
+import moment from 'moment';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 type PomodoroScreenParams = {
     task: Task;
 };
@@ -34,52 +36,65 @@ type PomodoroMode = 'pomodoro' | 'shortBreak' | 'longBreak';
 const POMODORO_DURATION = 25 * 60; // 25 minutes in seconds
 const SHORT_BREAK_DURATION = 5 * 60; // 5 minutes in seconds
 const LONG_BREAK_DURATION = 15 * 60; // 15 minutes in seconds
-const TOTAL_INTERVALS = 4;
 
-const { width } = Dimensions.get('window');
-const CIRCLE_SIZE = width * 0.7;
+const MOTIVATIONAL_QUOTES = [
+    "Every small step counts towards your goal.",
+    "You're making progress, one moment at a time.",
+    "Focus creates magic. Keep going!",
+    "Your dedication is your superpower.",
+    "Consistency beats intensity every time.",
+    "You're stronger than you think.",
+    "Small progress is still progress.",
+];
 
 const PomodoroScreen: React.FC = () => {
     const navigation = useNavigation<StackNavigationProp<any>>();
     const route = useRoute();
-    const { task } = route.params as PomodoroScreenParams;
+    const {task} = route.params as PomodoroScreenParams;
 
     const [timeLeft, setTimeLeft] = useState(POMODORO_DURATION);
     const [isRunning, setIsRunning] = useState(true);
     const [mode, setMode] = useState<PomodoroMode>('pomodoro');
-    const [currentInterval, setCurrentInterval] = useState(1);
+    const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Tracking session details
+    const [totalSessions, setTotalSessions] = useState(0);
+    const [totalBreaks, setTotalBreaks] = useState(0);
+    const [totalTimeSpent, setTotalTimeSpent] = useState(0);
+    const [motivationalQuote, setMotivationalQuote] = useState('');
 
     // Animation values
     const progress = useSharedValue(0);
     const buttonScale = useSharedValue(1);
 
+    // Fetch subtasks on component mount
+    useEffect(() => {
+        fetchSubtasks();
+        // Select a random motivational quote
+        setMotivationalQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
+    }, []);
+
+    // Fetch subtasks for the current task
+    const fetchSubtasks = async () => {
+        try {
+            const {data, error} = await supabase
+                .from('subtasks')
+                .select('*')
+                .eq('task_id', task.id);
+
+            if (error) throw error;
+            setSubtasks(data || []);
+        } catch (error) {
+            console.error('Error fetching subtasks:', error);
+        }
+    };
+
     // Calculate minutes and seconds
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
 
-    // Get the total time for the current mode
-    const getTotalTime = (): number => {
-        switch (mode) {
-            case 'pomodoro':
-                return POMODORO_DURATION;
-            case 'shortBreak':
-                return SHORT_BREAK_DURATION;
-            case 'longBreak':
-                return LONG_BREAK_DURATION;
-        }
-    };
-
-    // Update progress animation
-    useEffect(() => {
-        const totalTime = getTotalTime();
-        progress.value = withTiming(1 - (timeLeft / totalTime), {
-            duration: 1000,
-            easing: Easing.linear
-        });
-    }, [timeLeft, mode]);
-
-    // Set up the timer
+    // Update timer and tracking
     useEffect(() => {
         if (isRunning) {
             timerRef.current = setInterval(() => {
@@ -90,6 +105,7 @@ const PomodoroScreen: React.FC = () => {
                     }
                     return prev - 1;
                 });
+                setTotalTimeSpent(prev => prev + 1);
             }, 1000);
         } else if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -102,15 +118,13 @@ const PomodoroScreen: React.FC = () => {
         };
     }, [isRunning, mode]);
 
-    // Handle Android back button
+    // Update progress animation
     useEffect(() => {
-        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-            handleExit();
-            return true;
+        progress.value = withTiming(1 - (timeLeft / POMODORO_DURATION), {
+            duration: 1000,
+            easing: Easing.linear
         });
-
-        return () => backHandler.remove();
-    }, []);
+    }, [timeLeft]);
 
     // Handle timer completion
     const handleTimerComplete = () => {
@@ -118,395 +132,453 @@ const PomodoroScreen: React.FC = () => {
             clearInterval(timerRef.current);
         }
 
-        // Play sound or vibration here
-
+        // Increment sessions and breaks
         if (mode === 'pomodoro') {
-            if (currentInterval < TOTAL_INTERVALS) {
-                Alert.alert(
-                    "Pomodoro Complete!",
-                    "Time for a short break.",
-                    [{ text: "OK", onPress: () => switchMode('shortBreak') }]
-                );
-            } else {
-                Alert.alert(
-                    "Pomodoro Complete!",
-                    "Time for a long break. Good job completing 4 pomodoros!",
-                    [{ text: "OK", onPress: () => switchMode('longBreak') }]
-                );
-            }
+            setTotalSessions(prev => prev + 1);
         } else {
-            if (mode === 'longBreak') {
-                // Reset intervals after a long break
-                setCurrentInterval(1);
-            } else {
-                // Increment interval after a short break
-                setCurrentInterval(prev => prev + 1);
-            }
-
-            Alert.alert(
-                "Break Complete!",
-                "Ready to focus again?",
-                [{ text: "OK", onPress: () => switchMode('pomodoro') }]
-            );
+            setTotalBreaks(prev => prev + 1);
         }
+
+        // Alternate between modes
+        const newMode = mode === 'pomodoro' ? 'shortBreak' : 'pomodoro';
+        switchMode(newMode);
     };
 
     // Switch between pomodoro and break modes
     const switchMode = (newMode: PomodoroMode) => {
         setMode(newMode);
-
-        switch (newMode) {
-            case 'pomodoro':
-                setTimeLeft(POMODORO_DURATION);
-                break;
-            case 'shortBreak':
-                setTimeLeft(SHORT_BREAK_DURATION);
-                break;
-            case 'longBreak':
-                setTimeLeft(LONG_BREAK_DURATION);
-                break;
-        }
-
+        setTimeLeft(
+            newMode === 'pomodoro' ? POMODORO_DURATION :
+                newMode === 'shortBreak' ? SHORT_BREAK_DURATION :
+                    LONG_BREAK_DURATION
+        );
         setIsRunning(true);
     };
 
     // Toggle timer state
     const toggleTimer = () => {
-        buttonScale.value = withTiming(1.2, { duration: 100 }, () => {
-            buttonScale.value = withTiming(1, { duration: 100 });
+        buttonScale.value = withTiming(1.2, {duration: 100}, () => {
+            buttonScale.value = withTiming(1, {duration: 100});
         });
         setIsRunning(!isRunning);
     };
 
-    // Reset timer
-    const resetTimer = () => {
-        setTimeLeft(getTotalTime());
-        setIsRunning(false);
-    };
+    // Complete task
+    const handleCompleteTask = async () => {
+        // Check if all subtasks are completed
+        const allSubtasksCompleted = subtasks.every(
+            subtask => subtask.status === 'completed'
+        );
 
-    // Handle exit confirmation
-    const handleExit = () => {
-        if (isRunning) {
+        if (!allSubtasksCompleted) {
             Alert.alert(
-                "Exit Pomodoro",
-                "Are you sure you want to exit? Your progress will be lost.",
-                [
-                    { text: "Stay", style: "cancel" },
-                    { text: "Exit", onPress: () => navigation.goBack() }
-                ]
+                'Incomplete Subtasks',
+                'Please complete all subtasks before marking the task as done.',
+                [{text: "OK"}]
             );
-        } else {
-            navigation.goBack();
+            return;
+        }
+
+        try {
+            const {error} = await supabase
+                .from('tasks')
+                .update({
+                    status: 'completed',
+                    completed_at: new Date().toISOString()
+                })
+                .eq('id', task.id);
+
+            if (error) throw error;
+
+            // Navigate back and trigger a refresh
+            navigation.navigate('TasksList', {
+                selectDate: moment().format('YYYY-MM-DD'),
+                refreshTasks: true
+            });
+        } catch (error) {
+            console.error('Error completing task:', error);
+            Alert.alert('Error', 'Failed to complete task');
         }
     };
 
-    // Animated styles
-    const circleStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ rotate: `${progress.value * 360}deg` }]
-        };
-    });
+    // Toggle subtask completion
+    const toggleSubtaskCompletion = async (subtask: Subtask) => {
+        try {
+            const newStatus = subtask.status === 'active' ? 'completed' : 'active';
 
-    const progressStyle = useAnimatedStyle(() => {
-        return {
-            strokeDashoffset: interpolate(
-                progress.value,
-                [0, 1],
-                [CIRCLE_SIZE * Math.PI, 0]
-            )
-        };
-    });
+            // Update in database
+            const {error} = await supabase
+                .from('subtasks')
+                .update({
+                    status: newStatus,
+                    completed_at: newStatus === 'completed' ? new Date().toISOString() : null
+                })
+                .eq('id', subtask.id);
 
-    const buttonStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ scale: buttonScale.value }]
-        };
-    });
+            if (error) throw error;
 
-    const renderBackButton = () => (
-        <BackButton onPress={handleExit} />
-    );
-
-    const getModeColor = (): string => {
-        switch (mode) {
-            case 'pomodoro':
-                return COLORS.primary;
-            case 'shortBreak':
-                return COLORS.success;
-            case 'longBreak':
-                return COLORS.info;
+            // Update local state
+            setSubtasks(prev => prev.map(st =>
+                st.id === subtask.id
+                    ? {
+                        ...st,
+                        status: newStatus,
+                        completed_at: newStatus === 'completed' ? new Date().toISOString() : null
+                    }
+                    : st
+            ));
+        } catch (error) {
+            console.error('Error updating subtask:', error);
+            Alert.alert('Error', 'Failed to update subtask');
         }
     };
 
     return (
         <ScreenLayout
-            leftComponent={renderBackButton()}
-            title={task.title}
+            leftComponent={<BackButton onPress={() => navigation.goBack()}/>}
+            title={mode === 'pomodoro' ? 'Focus Session' :
+                mode === 'shortBreak' ? 'Short Break' :
+                    'Long Break'}
         >
-            <View style={styles.container}>
-                <View style={styles.taskContainer}>
-                    <Text style={styles.taskCategory}>Planner/Task</Text>
-                    <Text style={styles.taskTitle}>{task.title}</Text>
-                </View>
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+            >
+                {/* Timer Card */}
+                <View style={styles.timerCard}>
+                    {/* Motivational Quote */}
+                    <View style={styles.timerHeaderContainer}>
+                        <Text style={styles.progressText}>{motivationalQuote}</Text>
+                    </View>
 
-                <View style={styles.modeButtonsContainer}>
-                    <TouchableOpacity
-                        style={[
-                            styles.modeButton,
-                            mode === 'pomodoro' && styles.activeModeButton,
-                            mode === 'pomodoro' && { backgroundColor: COLORS.primaryLight }
-                        ]}
-                        onPress={() => switchMode('pomodoro')}
-                    >
-                        <Text style={[
-                            styles.modeButtonText,
-                            mode === 'pomodoro' && { color: COLORS.primary }
-                        ]}>
-                            Pomodoro
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.modeButton,
-                            mode === 'shortBreak' && styles.activeModeButton,
-                            mode === 'shortBreak' && { backgroundColor: COLORS.cardGreen }
-                        ]}
-                        onPress={() => switchMode('shortBreak')}
-                    >
-                        <Text style={[
-                            styles.modeButtonText,
-                            mode === 'shortBreak' && { color: COLORS.success }
-                        ]}>
-                            Short break
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.modeButton,
-                            mode === 'longBreak' && styles.activeModeButton,
-                            mode === 'longBreak' && { backgroundColor: COLORS.cardBlue }
-                        ]}
-                        onPress={() => switchMode('longBreak')}
-                    >
-                        <Text style={[
-                            styles.modeButtonText,
-                            mode === 'longBreak' && { color: COLORS.info }
-                        ]}>
-                            Long break
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.timerContainer}>
-                    {/* Progress Circle */}
-                    <Animated.View style={[styles.progressCircleContainer, circleStyle]}>
-                        <View style={styles.background}>
-                            <View style={styles.circleContainer}>
-                                <Svg height={CIRCLE_SIZE} width={CIRCLE_SIZE}>
-                                    {/* Background Circle */}
-                                    <Circle
-                                        cx={CIRCLE_SIZE / 2}
-                                        cy={CIRCLE_SIZE / 2}
-                                        r={CIRCLE_SIZE / 2 - 15}
-                                        stroke={getModeColor() + '40'} // Add transparency
-                                        strokeWidth={10}
-                                        fill="transparent"
-                                    />
-
-                                    {/* Progress Circle */}
-                                    <AnimatedCircle
-                                        cx={CIRCLE_SIZE / 2}
-                                        cy={CIRCLE_SIZE / 2}
-                                        r={CIRCLE_SIZE / 2 - 15}
-                                        stroke={getModeColor()}
-                                        strokeWidth={10}
-                                        fill="transparent"
-                                        strokeDasharray={CIRCLE_SIZE * Math.PI}
-                                        style={progressStyle}
-                                        strokeLinecap="round"
-                                    />
-                                </Svg>
-                            </View>
-                        </View>
-                    </Animated.View>
-
-                    {/* Timer Display */}
+                    {/* Timer Text - Updated with more space */}
                     <View style={styles.timerTextContainer}>
-                        <Text style={styles.timerFocusText}>Focus</Text>
                         <Text style={styles.timerText}>
-                            {minutes.toString().padStart(2, '0')} : {seconds.toString().padStart(2, '0')}
-                        </Text>
-                        <Text style={styles.timerStatusText}>
-                            {isRunning ? 'Running...' : 'Paused'}
+                            {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
                         </Text>
                     </View>
 
-                    <Text style={styles.intervalText}>
-                        {currentInterval} of {TOTAL_INTERVALS} intervals
-                    </Text>
+                    {/* Timer Controls */}
+                    <View style={styles.timerControlsContainer}>
+                        <TouchableOpacity
+                            style={styles.controlButton}
+                            onPress={() => switchMode('pomodoro')}
+                        >
+                            <Ionicons name="play" size={20} color={COLORS.white}/>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.controlButton}
+                            onPress={toggleTimer}
+                        >
+                            {isRunning ? (
+                                <Ionicons name="pause" size={20} color={COLORS.white}/>
+                            ) : (
+                                <Ionicons name="play" size={20} color={COLORS.white}/>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.controlButton}
+                            onPress={() => switchMode('shortBreak')}
+                        >
+                            <Ionicons name="sunny" size={20} color={COLORS.white}/>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Session Stats */}
+                    <View style={styles.sessionStatsContainer}>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statLabel}>Sessions</Text>
+                            <Text style={styles.statValue}>{totalSessions}</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statLabel}>Breaks</Text>
+                            <Text style={styles.statValue}>{totalBreaks}</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statLabel}>Time Spent</Text>
+                            <Text style={styles.statValue}>
+                                {Math.floor(totalTimeSpent / 60)}m {totalTimeSpent % 60}s
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
-                <View style={styles.controlsContainer}>
-                    <TouchableOpacity
-                        style={styles.resetButton}
-                        onPress={resetTimer}
-                    >
-                        <Ionicons name="refresh" size={24} color={COLORS.white} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.continueButton}
-                        onPress={toggleTimer}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.continueButtonText}>
-                            {isRunning ? 'Pause' : 'Continue'}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.squareButton}
-                        onPress={handleExit}
-                    >
-                        <Ionicons name="square" size={24} color={COLORS.white} />
-                    </TouchableOpacity>
+                {/* Task Details */}
+                <View style={styles.taskDetailsContainer}>
+                    <View style={styles.taskInfoCard}>
+                        <Text style={styles.taskTitle}>{task.title}</Text>
+                        {task.description && (
+                            <Text style={styles.taskDescription}>{task.description}</Text>
+                        )}
+                        <View style={styles.taskMetaContainer}>
+                            <View style={styles.taskMetaItem}>
+                                <Ionicons
+                                    name="calendar-outline"
+                                    size={16}
+                                    color={COLORS.textSecondary}
+                                />
+                                <Text style={styles.taskMetaText}>
+                                    {task.due_date
+                                        ? moment(task.due_date).format('MMM D, YYYY')
+                                        : 'No due date'}
+                                </Text>
+                            </View>
+                            <View style={styles.taskMetaItem}>
+                                <Ionicons
+                                    name="flag-outline"
+                                    size={16}
+                                    color={
+                                        task.priority === 'high' ? COLORS.highPriority :
+                                            task.priority === 'medium' ? COLORS.mediumPriority :
+                                                COLORS.lowPriority
+                                    }
+                                />
+                                <Text style={styles.taskMetaText}>
+                                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
                 </View>
-            </View>
+
+                {/* Subtasks */}
+                <View style={styles.subtasksContainer}>
+                    <Text style={styles.sectionTitle}>Subtasks</Text>
+                    {subtasks.length === 0 ? (
+                        <Text style={styles.noSubtasksText}>No subtasks</Text>
+                    ) : (
+                        <FlatList
+                            data={subtasks}
+                            keyExtractor={(item) => item.id}
+                            renderItem={({item}) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.subtaskItem,
+                                        item.status === 'completed' && styles.completedSubtask
+                                    ]}
+                                    onPress={() => toggleSubtaskCompletion(item)}
+                                >
+                                    <Ionicons
+                                        name={
+                                            item.status === 'completed'
+                                                ? "checkbox"
+                                                : "square-outline"
+                                        }
+                                        size={24}
+                                        color={
+                                            item.status === 'completed'
+                                                ? COLORS.success
+                                                : COLORS.textSecondary
+                                        }
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.subtaskText,
+                                            item.status === 'completed' && styles.completedSubtaskText
+                                        ]}
+                                    >
+                                        {item.title}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    )}
+                </View>
+
+                {/* Complete Task Button */}
+                <TouchableOpacity
+                    style={styles.completeTaskButton}
+                    onPress={handleCompleteTask}
+                >
+                    <Text style={styles.completeTaskButtonText}>Complete Task</Text>
+                </TouchableOpacity>
+            </ScrollView>
         </ScreenLayout>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        padding: SPACING.md,
+        flexGrow: 1,
+        backgroundColor: COLORS.background,
+        paddingBottom: SPACING.xl,
+    },
+    timerCard: {
         backgroundColor: COLORS.white,
+        marginHorizontal: SPACING.md,
+        marginVertical: SPACING.md,
+        borderRadius: RADIUS.lg,
+        ...SHADOWS.medium,
+        padding: SPACING.lg, // Increased padding for better spacing
+        paddingBottom: SPACING.md, // Less padding at bottom
     },
-    taskContainer: {
-        marginVertical: SPACING.lg,
+    modeHeaderContainer: {
         alignItems: 'center',
+        marginBottom: SPACING.sm,
     },
-    taskCategory: {
+    modeHeaderText: {
+        ...Typography.h3,
+        color: COLORS.primary,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    timerHeaderContainer: {
+        alignItems: 'center',
+        marginBottom: SPACING.md,
+    },
+    timerTitle: {
+        ...Typography.h3,
+        color: COLORS.textPrimary,
+    },
+    progressText: {
         ...Typography.bodySmall,
         color: COLORS.textSecondary,
-        marginBottom: SPACING.xs,
+        textAlign: 'center',
+        fontStyle: 'italic',
+        marginTop: SPACING.xs,
+    },
+    background: {
+        position: 'relative',
+        borderRadius: 75,
+        backgroundColor: COLORS.white,
+    },
+    timerTextContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: SPACING.sm,
+    },
+    timerText: {
+        ...Typography.h2,
+        fontSize: 50,
+        color: COLORS.textPrimary,
+        lineHeight: 60,
+    },
+    timerModeText: {
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
+        marginTop: SPACING.xs,
+    },
+    timerControlsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.md,
+    },
+    controlButton: {
+        backgroundColor: COLORS.primary,
+        width: 50,
+        height: 50,
+        borderRadius: RADIUS.round,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: SPACING.sm,
+        ...SHADOWS.small,
+    },
+    sessionStatsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        backgroundColor: COLORS.primaryLight,
+        borderRadius: RADIUS.md,
+        padding: SPACING.sm,
+    },
+    statItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    statLabel: {
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
+    },
+    statValue: {
+        ...Typography.bodyMedium,
+        fontWeight: '600',
+        color: COLORS.primary,
+    },
+    taskDetailsContainer: {
+        marginHorizontal: SPACING.md,
+        marginTop: SPACING.lg,
+    },
+    sectionTitle: {
+        ...Typography.h3,
+        marginBottom: SPACING.md,
+        color: COLORS.textPrimary,
+    },
+    taskInfoCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.md,
+        ...SHADOWS.small,
     },
     taskTitle: {
         ...Typography.h2,
-        textAlign: 'center',
+        marginBottom: SPACING.sm,
+        color: COLORS.textPrimary,
     },
-    modeButtonsContainer: {
+    taskDescription: {
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.md,
+    },
+    taskMetaContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: SPACING.xl,
     },
-    modeButton: {
-        flex: 1,
-        paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.xs,
-        backgroundColor: COLORS.cardShadow,
-        borderRadius: RADIUS.round,
-        marginHorizontal: SPACING.xxs,
-        alignItems: 'center',
-    },
-    activeModeButton: {
-        backgroundColor: COLORS.primaryLight,
-    },
-    modeButtonText: {
-        ...Typography.bodySmall,
-        fontWeight: '500',
-        color: COLORS.textSecondary,
-    },
-    timerContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginVertical: SPACING.xl,
-    },
-    progressCircleContainer: {
-        width: CIRCLE_SIZE,
-        height: CIRCLE_SIZE,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    background: {
-        position: 'absolute',
-        width: CIRCLE_SIZE,
-        height: CIRCLE_SIZE,
-        borderRadius: CIRCLE_SIZE / 2,
-        backgroundColor: COLORS.white,
-    },
-    circleContainer: {
-        width: CIRCLE_SIZE,
-        height: CIRCLE_SIZE,
-        borderRadius: CIRCLE_SIZE / 2,
-        alignItems: 'center',
-        justifyContent: 'center',
-        transform: [{ rotate: '-90deg' }],
-    },
-    timerTextContainer: {
-        position: 'absolute',
-        alignItems: 'center',
-    },
-    timerFocusText: {
-        ...Typography.bodyMedium,
-        color: COLORS.textSecondary,
-        marginBottom: SPACING.sm,
-    },
-    timerText: {
-        ...Typography.h1,
-        fontSize: 48,
-        marginBottom: SPACING.xs,
-    },
-    timerStatusText: {
-        ...Typography.bodySmall,
-        color: COLORS.textSecondary,
-    },
-    intervalText: {
-        ...Typography.bodyMedium,
-        marginTop: SPACING.lg,
-        color: COLORS.textSecondary,
-    },
-    controlsContainer: {
+    taskMetaItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 'auto',
-        marginBottom: SPACING.xl,
     },
-    resetButton: {
-        width: 44,
-        height: 44,
-        borderRadius: RADIUS.round,
-        backgroundColor: COLORS.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...SHADOWS.small,
+    taskMetaText: {
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
+        marginLeft: SPACING.xs,
     },
-    continueButton: {
-        flex: 1,
-        height: 50,
-        backgroundColor: COLORS.primary,
-        borderRadius: RADIUS.lg,
-        alignItems: 'center',
-        justifyContent: 'center',
+    subtasksContainer: {
         marginHorizontal: SPACING.md,
+        marginTop: SPACING.lg,
+    },
+    noSubtasksText: {
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginTop: SPACING.md,
+    },
+    subtaskItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        padding: SPACING.md,
+        borderRadius: RADIUS.md,
+        marginBottom: SPACING.sm,
         ...SHADOWS.small,
     },
-    continueButtonText: {
+    completedSubtask: {
+        backgroundColor: COLORS.background,
+    },
+    subtaskText: {
         ...Typography.bodyMedium,
+        marginLeft: SPACING.md,
+        flex: 1,
+    },
+    completedSubtaskText: {
+        textDecorationLine: 'line-through',
+        color: COLORS.textSecondary,
+    },
+    completeTaskButton: {
+        backgroundColor: COLORS.success,
+        marginHorizontal: SPACING.md,
+        marginTop: SPACING.lg,
+        paddingVertical: SPACING.md,
+        borderRadius: RADIUS.round,
+        alignItems: 'center',
+        ...SHADOWS.medium,
+    },
+    completeTaskButtonText: {
+        ...Typography.bodyLarge,
         color: COLORS.white,
         fontWeight: '600',
-    },
-    squareButton: {
-        width: 44,
-        height: 44,
-        borderRadius: RADIUS.md,
-        backgroundColor: COLORS.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...SHADOWS.small,
     }
 });
 

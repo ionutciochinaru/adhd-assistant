@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import TasksScreen from '../screens/tasks/TasksScreen';
 import CreateTaskScreen from '../screens/tasks/CreateTaskScreen';
 import TaskDetailScreen from '../screens/tasks/TaskDetailScreen';
+import PomodoroScreen from "../screens/tasks/PomodoroScreen";
 
 // Define navigation types
 export type TasksStackParamList = {
@@ -24,6 +25,7 @@ const TasksNavigator = () => {
             <Stack.Screen name="TasksList" component={TasksScreen} />
             <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
             <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
+            <Stack.Screen name="PomodoroScreen" component={PomodoroScreen} />
         </Stack.Navigator>
     );
 };

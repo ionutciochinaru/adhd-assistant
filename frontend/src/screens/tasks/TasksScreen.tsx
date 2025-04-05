@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
     View,
     Text,
@@ -21,7 +21,7 @@ import TaskItem from '../../components/TaskItem';
 import TaskOptionModal from '../../components/TaskOptionModal';
 import { COLORS, SPACING, FONTS, Typography, RADIUS, SHADOWS } from '../../utils/styles';
 import { normalizeDate } from '../../utils/dateUtils';
-import SingleRowCalendar from "../../components/SingleRowCalendar";
+import SingleRowCalendar, {SingleRowCalendarMethods} from "../../components/SingleRowCalendar";
 import {MarkedDates} from "react-native-calendars/src/types";
 import moment from "moment";
 import {TasksStackParamList} from "../../navigation/TasksNavigator";
@@ -45,6 +45,7 @@ const TasksScreen = () => {
     const [markedDates, setMarkedDates] = useState<MarkedDates>({});
     const [completionRate, setCompletionRate] = useState(0);
     const [motivationalMessage, setMotivationalMessage] = useState('');
+    const calendarRef = useRef<SingleRowCalendarMethods>(null);
 
     // Animation values
     const fadeAnim = useState(new Animated.Value(0))[0];
@@ -62,14 +63,13 @@ const TasksScreen = () => {
             const { data, error } = await supabase
                 .from('tasks')
                 .select(`
-                    *,
-                    subtasks(*)
-                `)
+                *,
+                subtasks(*)
+            `)
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-
             setTasks(data || []);
             processTaskSections(data || []);
             updateMarkedDates(data || []);
@@ -229,7 +229,7 @@ const TasksScreen = () => {
     // Lifecycle and animation effects
     useEffect(() => {
         fetchTasks();
-    }, [user]);
+    }, [user, selectedDate]);
 
     // NEW: Update tasks when date or filter changes
     useEffect(() => {
@@ -260,12 +260,38 @@ const TasksScreen = () => {
         useCallback(() => {
             // Get the date to select from navigation params
             const returnedDate = route.params?.selectDate;
-            if (returnedDate) {
-                setSelectedDate(returnedDate);
+
+            // Prefer the returned date, otherwise keep the current selectedDate
+            const dateToSelect = returnedDate || selectedDate;
+
+            if (dateToSelect) {
+                console.log("Selecting date:", dateToSelect);
+
+                // Update the selected date state
+                setSelectedDate(dateToSelect);
+
+                // Scroll to the selected date in the calendar
+                if (calendarRef.current) {
+                    calendarRef.current.scrollToDate(dateToSelect);
+                }
+
+                // Refresh tasks for this date
+                if (tasks.length > 0) {
+                    processTaskSections(tasks);
+                    updateMarkedDates(tasks);
+                    calculateCompletionRate(tasks, dateToSelect);
+                } else {
+                    // If no tasks, fetch tasks for the date
+                    fetchTasks();
+                }
+
                 // Clear the parameter to avoid reselecting on subsequent focus events
                 navigation.setParams({ selectDate: undefined });
+            } else {
+                // Fallback to fetching tasks if no date is selected
+                fetchTasks();
             }
-        }, [route.params?.selectDate])
+        }, [route.params?.selectDate, tasks])
     );
 
     // Task interaction handlers
@@ -275,7 +301,7 @@ const TasksScreen = () => {
 
     // Start Pomodoro timer for a task
     const handlePomodoroStart = (task: Task) => {
-        navigation.navigate('Pomodoro', { task });
+        navigation.navigate('PomodoroScreen', { task });
     };
 
     // Show options for a task
@@ -475,8 +501,9 @@ const TasksScreen = () => {
             >
                 {/* Calendar */}
                 <SingleRowCalendar
+                    ref={calendarRef}
                     selectedDate={selectedDate}
-                    onDateSelect={(date) => setSelectedDate(date.dateString)}
+                    onDateSelect={handleDateSelect}
                     markedDates={markedDates}
                 />
                 {/* Progress section */}

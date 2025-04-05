@@ -7,14 +7,12 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
-    Switch,
     ActivityIndicator,
     Alert,
     Platform,
     KeyboardAvoidingView,
     Animated,
     Keyboard,
-    Image,
 } from 'react-native';
 import {StackNavigationProp, StackScreenProps} from '@react-navigation/stack';
 import { supabase } from '../../utils/supabase';
@@ -30,8 +28,8 @@ import {RouteProp} from "@react-navigation/native";
 
 // Navigation types
 type TasksStackParamList = {
-    TasksList: undefined;
-    CreateTask: undefined;
+    TasksList: { selectDate?: string };
+    CreateTask: { selectedDate?: string };
     TaskDetail: { taskId: string };
 };
 
@@ -47,20 +45,31 @@ const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-    const selectedDateParam = route.params?.selectedDate;
-    const [hasDueDate, setHasDueDate] = useState(true);
-    const [dueDate, setDueDate] = useState(() => {
-        const date = selectedDateParam ? new Date(selectedDateParam) : new Date();
-        // Set to next hour
-        date.setHours(date.getHours() + 1, 0, 0, 0);
-        return date;
-    });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [subtasks, setSubtasks] = useState<string[]>([]);
     const [newSubtask, setNewSubtask] = useState('');
     const [loading, setLoading] = useState(false);
     const { scheduleTaskNotification } = useTaskNotifications();
+
+    // Get the selected date from route params
+    const selectedDateParam = route.params?.selectedDate;
+
+    // Set the due date based on the selected date or default to today
+    const [dueDate, setDueDate] = useState(() => {
+        // If we have a selectedDateParam, use it
+        if (selectedDateParam) {
+            const date = new Date(selectedDateParam);
+            // Set it to 8:00 AM by default when creating from calendar
+            date.setHours(8, 0, 0, 0);
+            return date;
+        } else {
+            // Otherwise use current time + 1 hour for same-day tasks
+            const date = new Date();
+            date.setHours(date.getHours() + 1, 0, 0, 0);
+            return date;
+        }
+    });
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -91,11 +100,6 @@ const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }
                 useNativeDriver: true,
             })
         ]).start();
-
-        // Set initial due date to next hour
-        const nextHour = new Date();
-        nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
-        setDueDate(nextHour);
     }, []);
 
     // Handle date picking
@@ -103,13 +107,11 @@ const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }
         setShowDatePicker(false);
 
         // Preserve time from existing due date
-        if (hasDueDate) {
-            selectedDate.setHours(
-                dueDate.getHours(),
-                dueDate.getMinutes(),
-                dueDate.getSeconds()
-            );
-        }
+        selectedDate.setHours(
+            dueDate.getHours(),
+            dueDate.getMinutes(),
+            dueDate.getSeconds()
+        );
 
         setDueDate(selectedDate);
 
@@ -269,10 +271,8 @@ const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }
                 if (subtasksError) throw subtasksError;
             }
 
-            // Schedule notification if due date is set
-            if (task?.id && hasDueDate) {
-                await scheduleTaskNotification(task);
-            }
+            // Schedule notification
+            await scheduleTaskNotification(task);
 
             // Show success animation and message before navigating back
             Animated.sequence([
@@ -293,9 +293,13 @@ const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }
                 })
             ]).start();
 
+            // Extract the date to pass back for selection
+            const dateToSelect = normalizeDate(dueDate.toISOString());
+
             setTimeout(() => {
+                // Navigate back to TasksList with the date we want to select
                 navigation.navigate('TasksList', {
-                    selectDate: normalizeDate(dueDate.toISOString())
+                    selectDate: dateToSelect
                 });
             }, 500);
         } catch (error: any) {
@@ -464,41 +468,41 @@ const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }
                             </View>
                         </View>
 
-                        {/* Due Date Toggle */}
+                        {/* Due Date */}
                         <View style={styles.inputGroup}>
                             <View style={styles.dueDateLabelContainer}>
                                 <Ionicons name="calendar" size={20} color={COLORS.primary} />
                                 <Text style={styles.dueDateLabel}>Due Date & Time</Text>
                             </View>
 
-                                <View style={styles.dateTimeContainer}>
-                                    <TouchableOpacity
-                                        style={styles.dateTimeButton}
-                                        onPress={() => setShowDatePicker(true)}
-                                    >
-                                        <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-                                        <Text style={styles.dateTimeText}>
-                                            {dueDate.toLocaleDateString(undefined, {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric'
-                                            })}
-                                        </Text>
-                                    </TouchableOpacity>
+                            <View style={styles.dateTimeContainer}>
+                                <TouchableOpacity
+                                    style={styles.dateTimeButton}
+                                    onPress={() => setShowDatePicker(true)}
+                                >
+                                    <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+                                    <Text style={styles.dateTimeText}>
+                                        {dueDate.toLocaleDateString(undefined, {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric'
+                                        })}
+                                    </Text>
+                                </TouchableOpacity>
 
-                                    <TouchableOpacity
-                                        style={styles.dateTimeButton}
-                                        onPress={() => setShowTimePicker(true)}
-                                    >
-                                        <Ionicons name="time-outline" size={20} color={COLORS.primary} />
-                                        <Text style={styles.dateTimeText}>
-                                            {dueDate.toLocaleTimeString(undefined, {
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
+                                <TouchableOpacity
+                                    style={styles.dateTimeButton}
+                                    onPress={() => setShowTimePicker(true)}
+                                >
+                                    <Ionicons name="time-outline" size={20} color={COLORS.primary} />
+                                    <Text style={styles.dateTimeText}>
+                                        {dueDate.toLocaleTimeString(undefined, {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
 
                             {/* Date Time Picker Modals */}
                             <DateTimePickerModal
@@ -519,16 +523,12 @@ const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ navigation, route }
                             />
                         </View>
 
-                        {/* AI Task Breakdown */}
+                        {/* AI Task Breakdown - Visible by default */}
                         <View style={styles.aiInfoContainer}>
                             <View style={styles.aiBreakdownHeader}>
                                 <Ionicons name="sparkles" size={20} color={COLORS.primary} />
                                 <Text style={styles.aiBreakdownTitle}>AI Task Breakdown</Text>
                             </View>
-
-                            <Text style={styles.aiInfoText}>
-                                Let AI help break down your task into manageable subtasks
-                            </Text>
 
                             <TouchableOpacity
                                 style={[
@@ -782,6 +782,7 @@ const styles = StyleSheet.create({
     aiBreakdownHeader: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: SPACING.sm,
     },
     aiBreakdownTitle: {
         ...Typography.bodyMedium,
@@ -792,6 +793,7 @@ const styles = StyleSheet.create({
         borderRadius: RADIUS.md,
         padding: SPACING.md,
         marginTop: SPACING.sm,
+        marginBottom: SPACING.sm,
     },
     aiInfoText: {
         ...Typography.bodyMedium,
