@@ -8,10 +8,12 @@ import PomodoroScreen from "../screens/tasks/PomodoroScreen";
 
 // Define navigation types
 export type TasksStackParamList = {
-    TasksList: { selectDate?: string };
+    TasksList: { selectDate?: string, refreshTasks?: boolean };
     CreateTask: { selectedDate?: string };
     TaskDetail: { taskId: string };
+    PomodoroScreen: { task: any };
 };
+
 const Stack = createStackNavigator<TasksStackParamList>();
 
 const TasksNavigator = () => {

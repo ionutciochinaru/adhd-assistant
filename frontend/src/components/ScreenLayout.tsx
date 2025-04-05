@@ -1,9 +1,9 @@
-// src/components/ScreenLayout.tsx
 import React from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, Typography } from '../utils/styles';
 import StatusBarManager from './StatusBarManager';
+import {useTabBarHeight} from "../hooks/useTabBarHeight";
 
 type ScreenLayoutProps = {
     children: React.ReactNode;
@@ -17,13 +17,16 @@ type ScreenLayoutProps = {
 
 const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                                                        children,
-                                                       backgroundColor = COLORS.light,
+                                                       backgroundColor = COLORS.white,
                                                        edges = ['left', 'right'],
                                                        title,
                                                        leftComponent,
                                                        rightComponent,
-                                                       showHeader = true
+                                                       showHeader = true,
                                                    }) => {
+    // Use the new hook to get dynamic tab bar height
+    const tabBarHeight = useTabBarHeight();
+
     return (
         <StatusBarManager backgroundColor={showHeader ? COLORS.white : backgroundColor}>
             <SafeAreaView
@@ -41,7 +44,11 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                         </View>
                     </View>
                 )}
-                {children}
+
+                {/* Dynamic padding based on tab bar height */}
+                <View style={[styles.contentContainer, { paddingBottom: tabBarHeight / 2 }]}>
+                    {children}
+                </View>
             </SafeAreaView>
         </StatusBarManager>
     );
@@ -75,6 +82,9 @@ const styles = StyleSheet.create({
     headerRight: {
         minWidth: 40,
         alignItems: 'flex-end',
+    },
+    contentContainer: {
+        flex: 1,
     }
 });
 

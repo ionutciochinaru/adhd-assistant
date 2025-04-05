@@ -594,17 +594,20 @@ const TasksScreen = () => {
                                 tintColor={COLORS.primary}
                             />
                         }
-                        contentContainerStyle={styles.tasksListContainer}
+                        contentContainerStyle={[
+                            styles.tasksListContainer,
+                            sectionsData[0]?.data.length === 0 && styles.emptyListContainer
+                        ]}
                     />
                 )}
 
                 {/* Add Task Button */}
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => navigation.navigate('CreateTask', { selectedDate })}
-                >
-                    <Ionicons name="add" size={24} color={COLORS.white} />
-                </TouchableOpacity>
+                {/*<TouchableOpacity*/}
+                {/*    style={styles.addButton}*/}
+                {/*    onPress={() => navigation.navigate('CreateTask', { selectedDate })}*/}
+                {/*>*/}
+                {/*    <Ionicons name="add" size={24} color={COLORS.white} />*/}
+                {/*</TouchableOpacity>*/}
 
                 {/* Options Modal */}
                 <TaskOptionModal
@@ -646,6 +649,13 @@ const styles = StyleSheet.create({
         ...SHADOWS.small,
         height: 100,
         overflow: 'hidden', // Prevent content from spilling out
+    },
+    tasksListContainer: {
+        paddingBottom: SPACING.xxl,
+        flexGrow: 1,
+    },
+    emptyListContainer: {
+        flex: 1,
     },
     progressContainer: {
         backgroundColor: COLORS.white,
@@ -754,10 +764,6 @@ const styles = StyleSheet.create({
     },
     activeFilterBadgeText: {
         color: COLORS.white,
-    },
-    tasksListContainer: {
-        paddingBottom: SPACING.xxl,
-        flexGrow: 1,
     },
     loadingContainer: {
         flex: 1,

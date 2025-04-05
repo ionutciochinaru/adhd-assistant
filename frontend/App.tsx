@@ -4,7 +4,6 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-import {Ionicons} from '@expo/vector-icons';
 import {View, Text, ActivityIndicator, Platform, LogBox, StyleSheet} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import {registerForPushNotificationsAsync} from './src/services/NotificationService';
@@ -18,15 +17,17 @@ import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 // Import navigators
 import TasksNavigator from './src/navigation/TasksNavigator';
 // Import regular screens
-import CalendarScreen from './src/screens/calendar/CalendarScreen';
+import MoodJournalScreen from "./src/screens/journal/MoodJournalDetailScreen";
 import MedicationsScreen from './src/screens/medications/MedicationsScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
 
 // Import context
 import {AuthProvider, useAuth} from './src/context/AuthContext';
 import {GestureHandlerRootView} from "react-native-gesture-handler";
-import MoodJournalScreen from "./src/screens/journal/MoodJournalDetailScreen";
 import {patchTextComponent, patchTextRender} from './src/utils/patches';
+
+// Import our custom tab bar
+import CustomTabBar from './src/components/CustomTabBar';
 
 try {
     patchTextComponent();
@@ -55,10 +56,11 @@ type AuthStackParamList = {
 
 type MainTabParamList = {
     Tasks: undefined;
-    Calendar: undefined;
     MoodJournal: undefined;
     Medications: undefined;
     Profile: undefined;
+    // We're keeping Calendar in the types for proper navigation references
+    Calendar: undefined;
 };
 
 type RootStackParamList = {
@@ -82,46 +84,25 @@ const AuthNavigator = () => {
     );
 };
 
-// Main App Navigator with Bottom
+// Main App Navigator with Bottom Tab Navigation and Custom Tab Bar
 const MainNavigator = () => {
     return (
         <MainTab.Navigator
-            screenOptions={({route}) => ({
-                tabBarIcon: ({focused, color, size}) => {
-                    let iconName: keyof typeof Ionicons.glyphMap;
-
-                    if (route.name === 'Tasks') {
-                        iconName = focused ? 'checkbox' : 'checkbox-outline';
-                    } else if (route.name === 'Calendar') {
-                        iconName = focused ? 'calendar' : 'calendar-outline';
-                    } else if (route.name === 'MoodJournal') {
-                        iconName = focused ? 'journal' : 'journal-outline';
-                    } else if (route.name === 'Medications') {
-                        iconName = focused ? 'medical' : 'medical-outline';
-                    } else if (route.name === 'Profile') {
-                        iconName = focused ? 'person-circle' : 'person-circle-outline';
-                    } else {
-                        iconName = 'help-circle-outline';
-                    }
-
-                    return <Ionicons name={iconName} size={size} color={color}/>;
-                },
-                tabBarActiveTintColor: '#3498db',
-                tabBarInactiveTintColor: 'gray',
+            tabBar={props => <CustomTabBar {...props} />}
+            screenOptions={{
                 headerShown: false,
-                // Ensure proper spacing for the tab bar to not overlap with home indicator
-                tabBarStyle: {
-                    paddingBottom: Platform.OS === 'ios' ? 4 : 8,
-                    height: Platform.OS === 'ios' ? 88 : 60,
-                    paddingTop: 8,
-                }
-            })}
+            }}
         >
             <MainTab.Screen name="Tasks" component={TasksNavigator}/>
-            <MainTab.Screen name="Calendar" component={CalendarScreen}/>
             <MainTab.Screen name="MoodJournal" component={MoodJournalScreen}/>
             <MainTab.Screen name="Medications" component={MedicationsScreen}/>
             <MainTab.Screen name="Profile" component={ProfileScreen}/>
+            {/* We still add Calendar to the navigator but it won't be shown in CustomTabBar */}
+            <MainTab.Screen
+                name="Calendar"
+                component={MoodJournalScreen}
+                options={{ tabBarButton: () => null }}
+            />
         </MainTab.Navigator>
     );
 };
@@ -154,6 +135,7 @@ const RootNavigator = () => {
 LogBox.ignoreLogs([
     'Sending `onAnimatedValueUpdate` with no listeners registered.',
     'Non-serializable values were found in the navigation state',
+    'ViewPropTypes will be removed from React Native',
 ]);
 
 // Main App component with providers
