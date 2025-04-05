@@ -82,7 +82,7 @@ const AuthNavigator = () => {
     );
 };
 
-// Main App Navigator with Bottom Tabs
+// Main App Navigator with Bottom
 const MainNavigator = () => {
     return (
         <MainTab.Navigator
