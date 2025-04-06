@@ -11,14 +11,12 @@ type TaskItemProps = {
         subtasks_count?: number;
         subtasks_completed?: number;
     };
-    onPress: () => void;
     onPomodoroStart: (task: Task) => void;
     onOptionsPress: () => void;
 };
 
 const TaskItem: React.FC<TaskItemProps> = ({
                                                task,
-                                               onPress,
                                                onPomodoroStart,
                                                onOptionsPress
                                            }) => {
@@ -142,7 +140,6 @@ const TaskItem: React.FC<TaskItemProps> = ({
                 styles.container,
                 task.status === 'completed' && styles.completedContainer
             ]}
-            onPress={onPress}
             activeOpacity={0.8}
         >
             {/* Header with Date and Options */}

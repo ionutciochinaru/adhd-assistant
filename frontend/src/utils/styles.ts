@@ -43,7 +43,7 @@ export const COLORS = {
     white: '#FFFFFF',
     black: '#000000',
     gray: '#666666',
-    lightGray: '#666666',
+    lightGray: '#9a9a9a',
     transparent: 'transparent',
 
     // Card backgrounds with opacity for different contexts

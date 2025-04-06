@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.cardBlue,
         borderColor: COLORS.primary,
         borderWidth: 2,
-        borderRadius: 100,
+        borderRadius: 10,
     },
     separatorBetweenDates: {
         position: 'absolute',

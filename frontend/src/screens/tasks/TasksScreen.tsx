@@ -111,7 +111,8 @@ const TasksScreen = () => {
                 filteredTasks = dateFilteredTasks;
         }
 
-        const sections = [
+        // Only create a section if there are filtered tasks
+        const sections = filteredTasks.length > 0 ? [
             {
                 title: filter === 'all' ? 'All Tasks' :
                     filter === 'active' ? 'Active Tasks' :
@@ -119,7 +120,7 @@ const TasksScreen = () => {
                             'Overdue Tasks',
                 data: filteredTasks
             }
-        ];
+        ] : [];
 
         setSectionsData(sections);
     };
@@ -129,7 +130,7 @@ const TasksScreen = () => {
         const marks: MarkedDates = {};
 
         // Group tasks by date and calculate completion rate for each date
-        const tasksByDate = {};
+        const tasksByDate: any = {};
 
         taskList.forEach(task => {
             if (!task.due_date) return;
@@ -164,7 +165,7 @@ const TasksScreen = () => {
                 : 0;
 
             // Create dots for tasks
-            const dots = dateData.tasks.map(task => {
+            const dots = dateData.tasks.map((task: Task) => {
                 const dotColor = task.status === 'completed' ? COLORS.success :
                     task.priority === 'high' ? COLORS.highPriority :
                         task.priority === 'medium' ? COLORS.mediumPriority :
@@ -206,9 +207,6 @@ const TasksScreen = () => {
             const rate = Math.round((completedTasks / dateFilteredTasks.length) * 100);
             setCompletionRate(rate);
 
-            // Update motivational message based on completion rate
-            updateMotivationalMessage(rate);
-
             // Animate progress bar
             Animated.timing(progressAnim, {
                 toValue: rate,
@@ -217,29 +215,11 @@ const TasksScreen = () => {
             }).start();
         } else {
             setCompletionRate(0);
-            setMotivationalMessage("No tasks for today yet!");
             Animated.timing(progressAnim, {
                 toValue: 0,
                 duration: 500,
                 useNativeDriver: false
             }).start();
-        }
-    };
-
-    // NEW: Update motivational message based on completion rate
-    const updateMotivationalMessage = (rate: number) => {
-        if (rate === 0) {
-            setMotivationalMessage("Let's get started! You got this!");
-        } else if (rate < 25) {
-            setMotivationalMessage("Progress begins with a single step. Keep going!");
-        } else if (rate < 50) {
-            setMotivationalMessage("You're making great progress. Keep the momentum going!");
-        } else if (rate < 75) {
-            setMotivationalMessage("Getting closer! You've accomplished so much today!");
-        } else if (rate < 100) {
-            setMotivationalMessage("Almost there! Just a few more tasks to go!");
-        } else {
-            setMotivationalMessage("Amazing job! You've completed all your tasks for the day! 🎉");
         }
     };
 
@@ -358,7 +338,7 @@ const TasksScreen = () => {
 
             // Show success message
             Alert.alert('Success', 'Task deleted successfully');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error deleting task:', error.message);
             Alert.alert('Error', 'Failed to delete task');
         }
@@ -372,7 +352,7 @@ const TasksScreen = () => {
             const newStatus = selectedTask.status === 'active' ? 'completed' : 'active';
 
             // Update the task status optimistically in UI
-            const updatedTasks = tasks.map(task =>
+            const updatedTasks = tasks.map((task: Task) =>
                 task.id === selectedTask.id
                     ? {
                         ...task,
@@ -454,53 +434,12 @@ const TasksScreen = () => {
                     ? 'Start organizing your day by adding a task'
                     : `No tasks scheduled for this date`}
             </Text>
-            <TouchableOpacity
-                style={styles.addTaskButton}
-                onPress={() => navigation.navigate('CreateTask', { selectedDate })}
-            >
-                <Ionicons name="add" size={24} color={COLORS.white} />
-                <Text style={styles.addTaskButtonText}>Add New Task</Text>
-            </TouchableOpacity>
         </View>
     );
 
-    // Filter buttons
-    const FilterButton = ({ label, icon, type, isActive, onPress }) => (
-        <TouchableOpacity
-            style={[
-                styles.filterButton,
-                isActive && styles.activeFilterButton
-            ]}
-            onPress={onPress}
-        >
-            <Ionicons
-                name={icon}
-                size={16}
-                color={isActive ? COLORS.primary : COLORS.textSecondary}
-            />
-            <Text
-                style={[
-                    styles.filterButtonText,
-                    isActive && styles.activeFilterButtonText
-                ]}
-            >
-                {label}
-            </Text>
-            {getFilterCount(type) > 0 && (
-                <View style={[
-                    styles.filterBadge,
-                    isActive && styles.activeFilterBadge
-                ]}>
-                    <Text style={[
-                        styles.filterBadgeText,
-                        isActive && styles.activeFilterBadgeText
-                    ]}>
-                        {getFilterCount(type)}
-                    </Text>
-                </View>
-            )}
-        </TouchableOpacity>
-    );
+    const showEmptyState = sectionsData.length === 0 ||
+        (sectionsData.length > 0 && sectionsData[0].data.length === 0) ||
+        tasks.filter(task => task.due_date && normalizeDate(task.due_date) === selectedDate).length === 0;
 
     return (
         <ScreenLayout
@@ -540,12 +479,20 @@ const TasksScreen = () => {
                         renderItem={({ item }) => (
                             <TaskItem
                                 task={item}
-                                onPress={() => handleTaskPress(item.id)}
                                 onPomodoroStart={handlePomodoroStart}
                                 onOptionsPress={() => handleOptionsPress(item)}
                             />
                         )}
-                        ListEmptyComponent={renderEmptyState}
+                        ListEmptyComponent={() => {
+                            if (sectionsData.length === 0 || (sectionsData.length > 0 && sectionsData[0].data.length === 0)) {
+                                return renderEmptyState();
+                            }
+                            return null;
+                        }}
+                        contentContainerStyle={[
+                            styles.tasksListContainer,
+                            showEmptyState && styles.emptyListContainer
+                        ]}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
@@ -554,20 +501,9 @@ const TasksScreen = () => {
                                 tintColor={COLORS.primary}
                             />
                         }
-                        contentContainerStyle={[
-                            styles.tasksListContainer,
-                            sectionsData[0]?.data.length === 0 && styles.emptyListContainer
-                        ]}
                     />
-                )}
 
-                {/* Add Task Button */}
-                {/*<TouchableOpacity*/}
-                {/*    style={styles.addButton}*/}
-                {/*    onPress={() => navigation.navigate('CreateTask', { selectedDate })}*/}
-                {/*>*/}
-                {/*    <Ionicons name="add" size={24} color={COLORS.white} />*/}
-                {/*</TouchableOpacity>*/}
+                )}
 
                 {/* Options Modal */}
                 <TaskOptionModal
@@ -615,6 +551,8 @@ const styles = StyleSheet.create({
     },
     emptyListContainer: {
         flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     progressContainer: {
         backgroundColor: COLORS.white,

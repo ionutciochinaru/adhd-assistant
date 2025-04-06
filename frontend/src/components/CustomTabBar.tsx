@@ -129,7 +129,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 style={[
                     styles.fabMenuItem,
                     {
-                        bottom: 80 + insets.bottom,
+                        bottom: 30 + insets.bottom,
                         right: 20,
                         opacity: firstItemAnimation,
                         transform: [
@@ -166,7 +166,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 style={[
                     styles.fabMenuItem,
                     {
-                        bottom: 80 + insets.bottom,
+                        bottom: 30 + insets.bottom,
                         right: 20,
                         opacity: secondItemAnimation,
                         transform: [
@@ -375,6 +375,28 @@ const styles = StyleSheet.create({
         ...SHADOWS.medium,
         borderWidth: 4,
         borderColor: 'rgba(0,0,0,0.1)',
+    },
+    fabMenuItemLabelContainer: {
+        backgroundColor: COLORS.white,
+        borderRadius: RADIUS.sm,
+        paddingHorizontal: SPACING.xxs,
+        paddingVertical: SPACING.xxs,
+        marginRight: SPACING.xs,
+    },
+    fabMenuItemLabel: {
+        color: COLORS.black,
+        borderRadius: RADIUS.sm,
+        paddingHorizontal: SPACING.xxs,
+        paddingVertical: SPACING.xxs,
+    },
+    backdrop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 5,
     },
 });
 
