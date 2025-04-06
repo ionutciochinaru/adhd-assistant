@@ -20,7 +20,7 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import { COLORS, SPACING, FONTS, Typography, CommonStyles } from '../../utils/styles';
+import { COLORS, SPACING, Typography, CommonStyles } from '../../utils/styles';
 
 // Define navigation param list type
 type AuthStackParamList = {
@@ -132,199 +132,158 @@ const LoginScreen = ({ navigation }: Props) => {
 
     return (
         <KeyboardAvoidingView
-            style={CommonStyles.container}
+            style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
             >
-                <Animated.View
-                    style={[
-                        styles.contentContainer,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: moveAnim }]
-                        }
-                    ]}
-                >
-                    <View style={styles.logoContainer}>
-                        <Image
-                            source={require('../../../assets/adaptive-icon.png')}
-                            style={styles.logo}
-                            resizeMode="contain"
+                <View style={styles.logoContainer}>
+                    <Image
+                        source={require('../../../assets/adaptive-icon.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
+                    <Text style={styles.title}>Login</Text>
+                    <Text style={styles.subtitle}>Welcome back to ADHD Assistant</Text>
+                </View>
+
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Email</Text>
+                    <View style={styles.inputWrapper}>
+                        <Ionicons
+                            name="mail-outline"
+                            size={20}
+                            style={styles.inputIcon}
                         />
-                        <Text style={styles.title}>ADHD Assistant</Text>
-                        <Text style={styles.subtitle}>Stay focused, get things done</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your email"
+                            placeholderTextColor={COLORS.textTertiary}
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
+                        />
                     </View>
+                </View>
 
-                    <View style={styles.formContainer}>
-                        <View style={styles.inputContainer}>
-                            <Text style={Typography.label}>Email</Text>
-                            <View style={styles.inputWrapper}>
-                                <Ionicons name="mail-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter your email"
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    autoCapitalize="none"
-                                    keyboardType="email-address"
-                                    returnKeyType="next"
-                                    autoComplete="email"
-                                    textContentType="emailAddress"
-                                />
-                                {email.length > 0 && (
-                                    <TouchableOpacity
-                                        onPress={() => setEmail('')}
-                                        style={styles.clearButton}
-                                    >
-                                        <Ionicons name="close-circle" size={18} color={COLORS.gray} />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-
-                        <View style={styles.inputContainer}>
-                            <Text style={Typography.label}>Password</Text>
-                            <View style={styles.inputWrapper}>
-                                <Ionicons name="lock-closed-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter your password"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={!showPassword}
-                                    returnKeyType="done"
-                                    onSubmitEditing={handleLogin}
-                                    autoComplete="password"
-                                    textContentType="password"
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    style={styles.visibilityButton}
-                                >
-                                    <Ionicons
-                                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                                        size={22}
-                                        color={COLORS.gray}
-                                    />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        <View style={styles.rememberContainer}>
-                            <View style={styles.rememberMeRow}>
-                                <Switch
-                                    value={rememberMe}
-                                    onValueChange={setRememberMe}
-                                    trackColor={{ false: '#D1D1D6', true: COLORS.primaryLight }}
-                                    thumbColor={rememberMe ? COLORS.primary : '#F4F4F4'}
-                                />
-                                <Text style={styles.rememberMeText}>Remember me</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={styles.forgotPasswordContainer}
-                                onPress={() => navigation.navigate('ForgotPassword')}
-                            >
-                                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <TouchableOpacity
-                            style={styles.loginButton}
-                            onPress={handleLogin}
-                            disabled={loading}
-                            activeOpacity={0.8}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color={COLORS.white} />
-                            ) : (
-                                <>
-                                    <Ionicons name="log-in-outline" size={20} color={COLORS.white} style={{marginRight: 8}} />
-                                    <Text style={styles.loginButtonText}>Login</Text>
-                                </>
-                            )}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Password</Text>
+                    <View style={styles.inputWrapper}>
+                        <Ionicons
+                            name="lock-closed-outline"
+                            size={20}
+                            style={styles.inputIcon}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your password"
+                            placeholderTextColor={COLORS.textTertiary}
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry={!showPassword}
+                        />
+                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                            <Ionicons
+                                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                                size={20}
+                                style={styles.inputIcon}
+                            />
                         </TouchableOpacity>
-
-                        <View style={styles.signupContainer}>
-                            <Text style={styles.signupText}>Don't have an account? </Text>
-                            <TouchableOpacity
-                                onPress={() => navigation.navigate('Signup')}
-                                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-                            >
-                                <Text style={styles.signupLink}>Sign Up</Text>
-                            </TouchableOpacity>
-                        </View>
                     </View>
-                </Animated.View>
+                </View>
+
+                <View style={styles.rememberContainer}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Switch
+                            value={rememberMe}
+                            onValueChange={setRememberMe}
+                            trackColor={{
+                                false: COLORS.border,
+                                true: COLORS.primaryLight
+                            }}
+                            thumbColor={rememberMe ? COLORS.primary : COLORS.textTertiary}
+                        />
+                        <Text style={styles.rememberText}>Remember me</Text>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('ForgotPassword')}
+                    >
+                        <Text style={styles.signupLink}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                    style={styles.loginButton}
+                    onPress={handleLogin}
+                >
+                    <Text style={styles.loginButtonText}>
+                        {loading ? <ActivityIndicator color={COLORS.white} /> : 'Login'}
+                    </Text>
+                </TouchableOpacity>
+
+                <View style={styles.signupContainer}>
+                    <Text style={styles.signupText}>Don't have an account?</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+                        <Text style={styles.signupLink}>Sign Up</Text>
+                    </TouchableOpacity>
+                </View>
             </ScrollView>
         </KeyboardAvoidingView>
     );
 };
 
 const styles = StyleSheet.create({
+    container: {
+        ...CommonStyles.container,
+        justifyContent: 'center',
+    },
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
         padding: SPACING.md,
-        minHeight: 500,
-    },
-    contentContainer: {
-        width: '100%',
     },
     logoContainer: {
         alignItems: 'center',
         marginBottom: SPACING.xl,
-        width: '100%',
     },
     logo: {
         width: 100,
         height: 100,
         marginBottom: SPACING.md,
+        tintColor: COLORS.primary,
     },
     title: {
-        fontSize: FONTS.size.xxxl,
-        fontWeight: FONTS.weight.bold,
-        color: COLORS.primary,
-        marginBottom: SPACING.xs,
+        ...Typography.h2,
+        marginBottom: SPACING.sm,
+        textAlign: 'center',
     },
     subtitle: {
-        fontSize: FONTS.size.md,
-        color: COLORS.gray,
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
         textAlign: 'center',
-        marginHorizontal: SPACING.md,
-        maxWidth: '100%'
-    },
-    formContainer: {
-        width: '100%',
+        marginBottom: SPACING.lg,
     },
     inputContainer: {
         marginBottom: SPACING.md,
     },
+    label: {
+        ...Typography.label,
+    },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        borderRadius: 8,
-        overflow: 'hidden',
-    },
-    inputIcon: {
-        paddingHorizontal: SPACING.sm,
+        ...CommonStyles.input,
     },
     input: {
         flex: 1,
-        padding: SPACING.sm,
-        fontSize: FONTS.size.md,
-        color: COLORS.dark,
+        ...Typography.bodyMedium,
     },
-    clearButton: {
-        padding: SPACING.xs,
-    },
-    visibilityButton: {
-        padding: SPACING.xs,
+    inputIcon: {
+        color: COLORS.textSecondary,
+        marginRight: SPACING.sm,
     },
     rememberContainer: {
         flexDirection: 'row',
@@ -332,65 +291,31 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: SPACING.md,
     },
-    rememberMeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    rememberMeText: {
-        marginLeft: SPACING.xs,
-        fontSize: FONTS.size.sm,
-        color: COLORS.gray,
-    },
-    forgotPasswordContainer: {
-        paddingVertical: SPACING.xs,
-        paddingHorizontal: SPACING.xs,
-    },
-    forgotPasswordText: {
-        color: COLORS.primary,
-        fontSize: FONTS.size.sm,
-        fontWeight: FONTS.weight.medium,
+    rememberText: {
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
     },
     loginButton: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.primary,
-        borderRadius: 8,
-        padding: SPACING.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: SPACING.sm,
-    },
-    loginButtonText: {
-        color: COLORS.white,
-        fontSize: FONTS.size.md,
-        fontWeight: FONTS.weight.semiBold,
-    },
-    quickLoginButton: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.success,
-        borderRadius: 8,
-        padding: SPACING.sm,
-        alignItems: 'center',
-        justifyContent: 'center',
+        ...CommonStyles.buttonLarge,
         marginBottom: SPACING.md,
     },
-    quickLoginText: {
+    loginButtonText: {
+        ...Typography.bodyMedium,
         color: COLORS.white,
-        fontSize: FONTS.size.sm,
-        fontWeight: FONTS.weight.semiBold,
     },
     signupContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: SPACING.xs,
+        alignItems: 'center',
     },
     signupText: {
-        color: COLORS.gray,
-        fontSize: FONTS.size.sm,
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
     },
     signupLink: {
+        ...Typography.bodySmall,
         color: COLORS.primary,
-        fontSize: FONTS.size.sm,
-        fontWeight: FONTS.weight.semiBold,
+        marginLeft: SPACING.xs,
     },
 });
 

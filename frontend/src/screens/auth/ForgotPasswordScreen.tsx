@@ -15,6 +15,7 @@ import {
 import { StackScreenProps } from '@react-navigation/stack';
 import { useAuth } from '../../context/AuthContext';
 import ActionButtons from "../../components/ActionButtons";
+import { COLORS, CommonStyles, SPACING, Typography, RADIUS, SHADOWS } from '../../utils/styles';
 
 // Define navigation param list type
 type AuthStackParamList = {
@@ -47,6 +48,59 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
             setIsSubmitted(true);
         }
     };
+
+    const styles = StyleSheet.create({
+        container: {
+            ...CommonStyles.container,
+            justifyContent: 'center',
+        },
+        scrollContent: {
+            flexGrow: 1,
+            justifyContent: 'center',
+            padding: SPACING.md,
+        },
+        successContainer: {
+            ...CommonStyles.card,
+            alignItems: 'center',
+            padding: SPACING.xl,
+        },
+        logo: {
+            width: 100,
+            height: 100,
+            marginBottom: SPACING.md,
+            tintColor: COLORS.primary,
+        },
+        successTitle: {
+            ...Typography.h3,
+            color: COLORS.success,
+            marginBottom: SPACING.md,
+        },
+        successText: {
+            ...Typography.bodyMedium,
+            color: COLORS.textSecondary,
+            textAlign: 'center',
+            marginBottom: SPACING.lg,
+        },
+        backButton: {
+            ...CommonStyles.buttonLarge,
+            backgroundColor: COLORS.primary,
+            marginTop: SPACING.md,
+        },
+        backButtonText: {
+            ...Typography.bodyMedium,
+            color: COLORS.white,
+        },
+        inputContainer: {
+            marginBottom: SPACING.md,
+        },
+        label: {
+            ...Typography.label,
+        },
+        input: {
+            ...CommonStyles.input,
+            marginTop: SPACING.xs,
+        },
+    });
 
     if (isSubmitted) {
         return (
@@ -81,22 +135,25 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
             >
-                <View style={styles.logoContainer}>
+                <View style={{alignItems: 'center', marginBottom: SPACING.xl}}>
                     <Image
                         source={require('../../../assets/adaptive-icon.png')}
                         style={styles.logo}
                         resizeMode="contain"
                     />
-                    <Text style={styles.title}>Reset Password</Text>
-                    <Text style={styles.subtitle}>Enter your email to receive reset instructions</Text>
+                    <Text style={Typography.h2}>Reset Password</Text>
+                    <Text style={[Typography.bodyMedium, {color: COLORS.textSecondary, marginTop: SPACING.sm}]}>
+                        Enter your email to receive reset instructions
+                    </Text>
                 </View>
 
-                <View style={styles.formContainer}>
+                <View>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Email</Text>
                         <TextInput
                             style={styles.input}
                             placeholder="Enter your email"
+                            placeholderTextColor={COLORS.textTertiary}
                             value={email}
                             onChangeText={setEmail}
                             autoCapitalize="none"
@@ -119,107 +176,5 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
         </KeyboardAvoidingView>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F7F9FC',
-    },
-    scrollContent: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        padding: 20,
-    },
-    logoContainer: {
-        alignItems: 'center',
-        marginBottom: 40,
-    },
-    logo: {
-        width: 100,
-        height: 100,
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#3498db',
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-    },
-    formContainer: {
-        width: '100%',
-    },
-    inputContainer: {
-        marginBottom: 20,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '500',
-        marginBottom: 8,
-        color: '#333',
-    },
-    input: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-    },
-    resetButton: {
-        backgroundColor: '#3498db',
-        borderRadius: 8,
-        padding: 15,
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    resetButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    backToLoginContainer: {
-        alignItems: 'center',
-    },
-    backToLoginText: {
-        color: '#3498db',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    successContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    successTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#2ecc71',
-        marginBottom: 16,
-    },
-    successText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginBottom: 24,
-    },
-    backButton: {
-        backgroundColor: '#3498db',
-        borderRadius: 8,
-        padding: 15,
-        alignItems: 'center',
-        width: '100%',
-    },
-    backButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-});
 
 export default ForgotPasswordScreen;

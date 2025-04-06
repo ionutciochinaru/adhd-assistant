@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { useAuth } from '../../context/AuthContext';
+import { COLORS, SPACING, Typography, CommonStyles } from '../../utils/styles';
 
 // Define navigation param list type
 type AuthStackParamList = {
@@ -64,6 +65,83 @@ const SignupScreen = ({ navigation }: Props) => {
         }
     };
 
+    const styles = StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: COLORS.background,
+        },
+        scrollContent: {
+            flexGrow: 1,
+            justifyContent: 'center',
+            padding: SPACING.md,
+        },
+        logoContainer: {
+            alignItems: 'center',
+            marginBottom: 40,
+        },
+        logo: {
+            width: 100,
+            height: 100,
+            marginBottom: 16,
+            tintColor: COLORS.primary,
+        },
+        title: {
+            ...Typography.h2,
+            color: COLORS.textPrimary,
+            marginBottom: 8,
+            textAlign: 'center',
+        },
+        subtitle: {
+            ...Typography.bodyMedium,
+            color: COLORS.textSecondary,
+            textAlign: 'center',
+        },
+        formContainer: {
+            width: '100%',
+        },
+        inputContainer: {
+            marginBottom: 20,
+        },
+        label: {
+            ...Typography.label,
+            color: COLORS.textSecondary,
+        },
+        input: {
+            backgroundColor: COLORS.inputBackground,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16,
+            color: COLORS.textPrimary,
+        },
+        signupButton: {
+            backgroundColor: COLORS.primary,
+            borderRadius: 8,
+            padding: 15,
+            alignItems: 'center',
+            marginBottom: 20,
+        },
+        signupButtonText: {
+            color: COLORS.white,
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        loginContainer: {
+            flexDirection: 'row',
+            justifyContent: 'center',
+        },
+        loginText: {
+            color: COLORS.textSecondary,
+            fontSize: 14,
+        },
+        loginLink: {
+            color: COLORS.primary,
+            fontSize: 14,
+            fontWeight: '600',
+        },
+    });
+
     return (
         <KeyboardAvoidingView
             style={styles.container}
@@ -89,6 +167,7 @@ const SignupScreen = ({ navigation }: Props) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Enter your email"
+                            placeholderTextColor={COLORS.textTertiary}
                             value={email}
                             onChangeText={setEmail}
                             autoCapitalize="none"
@@ -102,6 +181,7 @@ const SignupScreen = ({ navigation }: Props) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Create a password"
+                            placeholderTextColor={COLORS.textTertiary}
                             value={password}
                             onChangeText={setPassword}
                             secureTextEntry
@@ -114,6 +194,7 @@ const SignupScreen = ({ navigation }: Props) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Confirm your password"
+                            placeholderTextColor={COLORS.textTertiary}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
                             secureTextEntry
@@ -145,81 +226,5 @@ const SignupScreen = ({ navigation }: Props) => {
         </KeyboardAvoidingView>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F7F9FC',
-    },
-    scrollContent: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        padding: 20,
-    },
-    logoContainer: {
-        alignItems: 'center',
-        marginBottom: 40,
-    },
-    logo: {
-        width: 100,
-        height: 100,
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#3498db',
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
-    },
-    formContainer: {
-        width: '100%',
-    },
-    inputContainer: {
-        marginBottom: 20,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '500',
-        marginBottom: 8,
-        color: '#333',
-    },
-    input: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-    },
-    signupButton: {
-        backgroundColor: '#3498db',
-        borderRadius: 8,
-        padding: 15,
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    signupButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    loginContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-    },
-    loginText: {
-        color: '#666',
-        fontSize: 14,
-    },
-    loginLink: {
-        color: '#3498db',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-});
 
 export default SignupScreen;

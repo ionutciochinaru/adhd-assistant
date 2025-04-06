@@ -657,6 +657,103 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.textTertiary,
         opacity: 0.7,
     },
+    aiInfoContainer: {
+        backgroundColor: COLORS.cardBlue, // A deep, calming blue that's attention-grabbing but not jarring
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        marginTop: SPACING.sm,
+        marginBottom: SPACING.sm,
+        borderWidth: 1,
+        borderColor: COLORS.primary, // Subtle border to define the container
+        shadowColor: COLORS.primary, // Soft glow effect
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    aiBreakdownHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.sm,
+    },
+    aiBreakdownTitle: {
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.sm,
+        color: COLORS.textPrimary, // Ensure good readability
+        fontWeight: '600', // Slightly bolder for emphasis
+    },
+    aiBreakdownButton: {
+        backgroundColor: COLORS.primary, // Keeps the primary action color
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.primaryDark, // Subtle border for depth
+    },
+    aiBreakdownButtonText: {
+        color: COLORS.white,
+        fontSize: FONTS.size.md,
+        fontWeight: '600',
+        marginLeft: SPACING.xs,
+    },
+    input: {
+        backgroundColor: COLORS.inputBackground,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        fontSize: FONTS.size.md,
+        color: COLORS.textPrimary,
+        ...SHADOWS.small,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    textArea: {
+        backgroundColor: COLORS.inputBackground,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        fontSize: FONTS.size.md,
+        color: COLORS.textPrimary,
+        minHeight: 120,
+        textAlignVertical: 'top',
+        ...SHADOWS.small,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    subtaskItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.card,
+        padding: SPACING.md,
+        borderRadius: RADIUS.md,
+        marginBottom: SPACING.sm,
+        ...SHADOWS.small,
+    },
+    subtaskInput: {
+        flex: 1,
+        backgroundColor: COLORS.inputBackground,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        fontSize: FONTS.size.md,
+        color: COLORS.textPrimary,
+        marginRight: SPACING.sm,
+        ...SHADOWS.small,
+    },
+    dateTimeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        marginHorizontal: SPACING.xxs,
+        ...SHADOWS.small,
+    },
+    label: {
+        ...Typography.label,
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.xs,
+    },
     createButtonText: {
         color: COLORS.white,
         fontSize: FONTS.size.sm,
@@ -665,10 +762,6 @@ const styles = StyleSheet.create({
     inputGroup: {
         marginBottom: SPACING.lg,
     },
-    label: {
-        ...Typography.label,
-        marginBottom: SPACING.xs,
-    },
     requiredStar: {
         color: COLORS.danger,
     },
@@ -676,24 +769,6 @@ const styles = StyleSheet.create({
         ...Typography.caption,
         textAlign: 'right',
         marginTop: SPACING.xs,
-    },
-    input: {
-        backgroundColor: COLORS.white,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
-        fontSize: FONTS.size.md,
-        color: COLORS.textPrimary,
-        ...SHADOWS.small,
-    },
-    textArea: {
-        backgroundColor: COLORS.white,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
-        fontSize: FONTS.size.md,
-        color: COLORS.textPrimary,
-        minHeight: 120,
-        textAlignVertical: 'top',
-        ...SHADOWS.small,
     },
     inputError: {
         borderWidth: 1,
@@ -710,29 +785,33 @@ const styles = StyleSheet.create({
     },
     priorityOption: {
         flex: 1,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
+        borderRadius: 20, // More pill-like shape
+        paddingVertical: SPACING.xs, // Reduced vertical padding
+        paddingHorizontal: SPACING.sm, // Horizontal padding
         marginHorizontal: SPACING.xxs,
         alignItems: 'center',
         justifyContent: 'center',
+        flexDirection: 'row', // Align icon and text horizontally
         borderWidth: 2,
         borderColor: 'transparent',
         ...SHADOWS.small,
     },
-    selectedPriorityOption: {
-        borderWidth: 2,
-    },
     priorityIconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: RADIUS.sm,
+        width: 20, // Smaller icon
+        height: 20, // Smaller icon
+        borderRadius: 10, // Fully rounded
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: SPACING.xs,
+        marginRight: SPACING.xs, // Space between icon and text
     },
     priorityText: {
         ...Typography.bodySmall,
         fontWeight: '500',
+        fontSize: FONTS.size.xs, // Smaller text
+    },
+    selectedPriorityOption: {
+        borderWidth: 2,
+        borderColor: COLORS.primary, // Highlight selected with border
     },
     dueDateContainer: {
         flexDirection: 'row',
@@ -756,16 +835,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
-    dateTimeButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
-        marginHorizontal: SPACING.xxs,
-        ...SHADOWS.small,
-    },
     dateTimeText: {
         ...Typography.bodyMedium,
         marginLeft: SPACING.sm,
@@ -779,51 +848,12 @@ const styles = StyleSheet.create({
         padding: SPACING.md,
         ...SHADOWS.small,
     },
-    aiBreakdownHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
-    },
-    aiBreakdownTitle: {
-        ...Typography.bodyMedium,
-        marginLeft: SPACING.sm,
-    },
-    aiInfoContainer: {
-        backgroundColor: COLORS.primaryLight,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
-        marginTop: SPACING.sm,
-        marginBottom: SPACING.sm,
-    },
     aiInfoText: {
         ...Typography.bodyMedium,
         marginBottom: SPACING.md,
     },
-    aiBreakdownButton: {
-        backgroundColor: COLORS.primary,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
-        alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'center',
-    },
-    aiBreakdownButtonText: {
-        color: COLORS.white,
-        fontSize: FONTS.size.md,
-        fontWeight: '600',
-        marginLeft: SPACING.xs,
-    },
     subtasksContainer: {
         marginBottom: SPACING.md,
-    },
-    subtaskItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.white,
-        padding: SPACING.md,
-        borderRadius: RADIUS.md,
-        marginBottom: SPACING.sm,
-        ...SHADOWS.small,
     },
     subtaskBullet: {
         marginRight: SPACING.xs,
@@ -838,16 +868,6 @@ const styles = StyleSheet.create({
     addSubtaskContainer: {
         flexDirection: 'row',
         marginBottom: SPACING.xs,
-    },
-    subtaskInput: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-        borderRadius: RADIUS.md,
-        padding: SPACING.md,
-        fontSize: FONTS.size.md,
-        color: COLORS.textPrimary,
-        marginRight: SPACING.sm,
-        ...SHADOWS.small,
     },
     addSubtaskButton: {
         width: 48,

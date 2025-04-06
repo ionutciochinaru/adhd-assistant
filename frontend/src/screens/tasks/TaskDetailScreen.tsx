@@ -24,7 +24,7 @@ import {useTaskNotifications} from '../../hooks/useTaskNotifications';
 import BackButton from "../../components/BackButton";
 import ActionButtons from "../../components/ActionButtons";
 import ScreenLayout from '../../components/ScreenLayout';
-import {COLORS, SPACING, FONTS, Typography, CommonStyles} from '../../utils/styles';
+import {COLORS, SPACING, FONTS, Typography, CommonStyles, RADIUS, SHADOWS} from '../../utils/styles';
 import {Ionicons} from '@expo/vector-icons';
 
 // Navigation types
@@ -703,7 +703,7 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
             title={isEditing ? "Edit Task" : "Task Details"}
         >
             <KeyboardAvoidingView
-                style={{flex: 1}}
+                style={styles.keyboardAvoidingView}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <ScrollView
@@ -712,7 +712,7 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
                 >
                     <Animated.View style={[
                         styles.container,
-                        {opacity: fadeAnim}
+                        { opacity: fadeAnim }
                     ]}>
                         {isEditing ? (
                             // Edit Mode
@@ -723,6 +723,7 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
                                     value={editedTitle}
                                     onChangeText={setEditedTitle}
                                     placeholder="Task title"
+                                    placeholderTextColor={COLORS.textTertiary}
                                     autoCapitalize="sentences"
                                     maxLength={100}
                                 />
@@ -733,6 +734,7 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
                                     value={editedDescription}
                                     onChangeText={setEditedDescription}
                                     placeholder="Add details about this task..."
+                                    placeholderTextColor={COLORS.textTertiary}
                                     multiline
                                     numberOfLines={4}
                                     textAlignVertical="top"
@@ -740,62 +742,38 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
 
                                 <Text style={styles.label}>Priority:</Text>
                                 <View style={styles.priorityPickerContainer}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.priorityOption,
-                                            editedPriority === 'low' && styles.selectedPriorityOption,
-                                            {backgroundColor: editedPriority === 'low' ? COLORS.lowPriority : COLORS.lightGray}
-                                        ]}
-                                        onPress={() => setEditedPriority('low')}
-                                    >
-                                        <Ionicons
-                                            name="checkmark-circle"
-                                            size={16}
-                                            color={editedPriority === 'low' ? COLORS.white : COLORS.dark}
-                                        />
-                                        <Text style={[
-                                            styles.priorityOptionText,
-                                            editedPriority === 'low' && styles.selectedPriorityOptionText
-                                        ]}>Low</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.priorityOption,
-                                            editedPriority === 'medium' && styles.selectedPriorityOption,
-                                            {backgroundColor: editedPriority === 'medium' ? COLORS.mediumPriority : COLORS.lightGray}
-                                        ]}
-                                        onPress={() => setEditedPriority('medium')}
-                                    >
-                                        <Ionicons
-                                            name="alert"
-                                            size={16}
-                                            color={editedPriority === 'medium' ? COLORS.white : COLORS.dark}
-                                        />
-                                        <Text style={[
-                                            styles.priorityOptionText,
-                                            editedPriority === 'medium' && styles.selectedPriorityOptionText
-                                        ]}>Medium</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.priorityOption,
-                                            editedPriority === 'high' && styles.selectedPriorityOption,
-                                            {backgroundColor: editedPriority === 'high' ? COLORS.highPriority : COLORS.lightGray}
-                                        ]}
-                                        onPress={() => setEditedPriority('high')}
-                                    >
-                                        <Ionicons
-                                            name="alert-circle"
-                                            size={16}
-                                            color={editedPriority === 'high' ? COLORS.white : COLORS.dark}
-                                        />
-                                        <Text style={[
-                                            styles.priorityOptionText,
-                                            editedPriority === 'high' && styles.selectedPriorityOptionText
-                                        ]}>High</Text>
-                                    </TouchableOpacity>
+                                    {(['low', 'medium', 'high'] as const).map((priority) => (
+                                        <TouchableOpacity
+                                            key={priority}
+                                            style={[
+                                                styles.priorityOption,
+                                                editedPriority === priority && styles.selectedPriorityOption,
+                                                {
+                                                    backgroundColor: editedPriority === priority
+                                                        ? priority === 'low' ? COLORS.lowPriority
+                                                            : priority === 'medium' ? COLORS.mediumPriority
+                                                                : COLORS.highPriority
+                                                        : COLORS.lightGray
+                                                }
+                                            ]}
+                                            onPress={() => setEditedPriority(priority)}
+                                        >
+                                            <Ionicons
+                                                name={
+                                                    priority === 'low' ? 'checkmark-circle' :
+                                                        priority === 'medium' ? 'alert' : 'alert-circle'
+                                                }
+                                                size={16}
+                                                color={editedPriority === priority ? COLORS.white : COLORS.black}
+                                            />
+                                            <Text style={[
+                                                styles.priorityOptionText,
+                                                editedPriority === priority && styles.selectedPriorityOptionText
+                                            ]}>
+                                                {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
                                 </View>
 
                                 <Text style={styles.label}>Due Date:</Text>
@@ -804,8 +782,12 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
                                         style={styles.datePickerButton}
                                         onPress={() => setShowDatePicker(true)}
                                     >
-                                        <Ionicons name="calendar" size={18} color={COLORS.primary}
-                                                  style={styles.datePickerIcon}/>
+                                        <Ionicons
+                                            name="calendar"
+                                            size={18}
+                                            color={COLORS.primary}
+                                            style={styles.datePickerIcon}
+                                        />
                                         <Text style={styles.datePickerButtonText}>
                                             {editedDueDate ? editedDueDate.toLocaleDateString() : 'Select a date'}
                                         </Text>
@@ -917,8 +899,7 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
                                                 Progress: {completionPercentage}%
                                             </Text>
                                             <Text style={styles.progressSubtitle}>
-                                                {subtasks.filter(s => s.status === 'completed').length} of {subtasks.length} subtasks
-                                                completed
+                                                {subtasks.filter(s => s.status === 'completed').length} of {subtasks.length} subtasks completed
                                             </Text>
                                         </View>
 
@@ -1105,6 +1086,7 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
                                     value={newSubtask}
                                     onChangeText={setNewSubtask}
                                     placeholder="Add a new subtask..."
+                                    placeholderTextColor={COLORS.textTertiary}
                                     returnKeyType="done"
                                     onSubmitEditing={addSubtask}
                                 />
@@ -1134,7 +1116,137 @@ const TaskDetailScreen = ({route, navigation}: Props) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.light,
+        backgroundColor: COLORS.background,
+    },
+    input: {
+        ...CommonStyles.input,
+        backgroundColor: COLORS.inputBackground,
+        color: COLORS.textPrimary,
+        marginBottom: SPACING.md,
+    },
+    keyboardAvoidingView: {
+        flex: 1,
+    },
+    datePickerIcon: {
+        marginRight: SPACING.xs,
+    },
+    datePickerButtonText: {
+        ...Typography.bodyRegular,
+        color: COLORS.textPrimary,
+        marginLeft: SPACING.xs,
+    },
+    timePickerButtonText: {
+        ...Typography.bodyRegular,
+        color: COLORS.textPrimary,
+        marginLeft: SPACING.xs,
+    },
+    clearDateButtonText: {
+        ...Typography.bodyRegular,
+        color: COLORS.danger,
+        marginLeft: SPACING.xs,
+    },
+    dateTimeActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    clearDateButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.sm,
+    },
+    priorityPickerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: SPACING.md,
+    },
+    dueDateContainer: {
+        marginBottom: SPACING.md,
+    },
+    textArea: {
+        ...CommonStyles.textArea,
+        backgroundColor: COLORS.inputBackground,
+        color: COLORS.textPrimary,
+    },
+    addSubtaskInput: {
+        flex: 1,
+        backgroundColor: COLORS.inputBackground,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: RADIUS.sm,
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: SPACING.sm,
+        marginRight: SPACING.sm,
+        ...Typography.bodyRegular,
+        color: COLORS.textPrimary,
+    },
+    datePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: RADIUS.sm,
+        padding: SPACING.sm,
+        marginBottom: SPACING.sm,
+    },
+    timePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: RADIUS.sm,
+        padding: SPACING.sm,
+        flex: 1,
+        marginRight: SPACING.sm,
+    },
+    subtaskItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: SPACING.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    descriptionContainer: {
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.sm,
+        padding: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    editFormContainer: {
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        marginBottom: SPACING.md,
+        ...SHADOWS.small,
+    },
+    label: {
+        ...Typography.label,
+        color: COLORS.textSecondary,
+    },
+    priorityOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: SPACING.sm,
+        borderRadius: RADIUS.xs,
+        marginHorizontal: SPACING.xxs,
+        backgroundColor: COLORS.inputBackground,
+    },
+    selectedPriorityOption: {
+        borderWidth: 0,
+    },
+    priorityOptionText: {
+        ...Typography.bodyMedium,
+        marginLeft: SPACING.xs,
+        color: COLORS.textPrimary,
+    },
+    selectedPriorityOptionText: {
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     scrollView: {
         flex: 1,
@@ -1150,7 +1262,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         ...Typography.bodyMedium,
-        color: COLORS.gray,
+        color: COLORS.textTertiary,
         marginTop: SPACING.md,
     },
     errorContainer: {
@@ -1168,7 +1280,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         paddingVertical: SPACING.sm,
         paddingHorizontal: SPACING.md,
-        borderRadius: SPACING.xs,
+        borderRadius: RADIUS.xs,
     },
     backButtonText: {
         color: COLORS.white,
@@ -1181,7 +1293,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.md,
-        borderRadius: SPACING.xs,
+        borderRadius: RADIUS.xs,
         marginRight: SPACING.sm,
     },
     editButtonText: {
@@ -1193,7 +1305,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.danger,
         paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.md,
-        borderRadius: SPACING.xs,
+        borderRadius: RADIUS.xs,
     },
     deleteButtonText: {
         color: COLORS.white,
@@ -1203,11 +1315,11 @@ const styles = StyleSheet.create({
 
     // Task Details View Styles
     taskDetailsContainer: {
-        backgroundColor: COLORS.white,
-        borderRadius: SPACING.md,
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.md,
         padding: SPACING.md,
         marginBottom: SPACING.md,
-        ...CommonStyles.card,
+        ...SHADOWS.small,
     },
     taskHeader: {
         marginBottom: SPACING.md,
@@ -1217,7 +1329,7 @@ const styles = StyleSheet.create({
     },
     taskTitle: {
         ...Typography.h2,
-        fontSize: 22,
+        fontSize: FONTS.size.xxl,
         marginBottom: SPACING.xs,
     },
     statusBadge: {
@@ -1225,7 +1337,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.sm,
-        borderRadius: 16,
+        borderRadius: RADIUS.round,
         alignSelf: 'flex-start',
         marginBottom: SPACING.xs,
     },
@@ -1252,7 +1364,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: SPACING.xs,
         paddingHorizontal: SPACING.sm,
-        borderRadius: 16,
+        borderRadius: RADIUS.round,
         alignSelf: 'flex-start',
     },
     priorityBadgeText: {
@@ -1288,29 +1400,29 @@ const styles = StyleSheet.create({
     },
     progressBarContainer: {
         height: 8,
-        backgroundColor: COLORS.lightGray,
-        borderRadius: 4,
+        backgroundColor: COLORS.divider,
+        borderRadius: RADIUS.round,
         overflow: 'hidden',
     },
     progressBar: {
         height: '100%',
         backgroundColor: COLORS.primary,
-        borderRadius: 4,
+        borderRadius: RADIUS.round,
     },
     completedProgressBar: {
         backgroundColor: COLORS.success,
     },
     timeSection: {
-        backgroundColor: COLORS.lightGray,
-        borderRadius: SPACING.sm,
+        backgroundColor: COLORS.divider,
+        borderRadius: RADIUS.sm,
         padding: SPACING.sm,
         marginBottom: SPACING.md,
     },
     overdueTimeSection: {
-        backgroundColor: '#ffebee', // Light red
+        backgroundColor: COLORS.cardRed,
     },
     dueSoonTimeSection: {
-        backgroundColor: '#fff8e1', // Light yellow
+        backgroundColor: COLORS.cardOrange,
     },
     dueDateRow: {
         flexDirection: 'row',
@@ -1345,9 +1457,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.card,
         padding: SPACING.sm,
-        borderRadius: SPACING.sm,
+        borderRadius: RADIUS.sm,
         marginBottom: SPACING.md,
         borderWidth: 1,
         borderColor: COLORS.border,
@@ -1363,16 +1475,9 @@ const styles = StyleSheet.create({
         fontSize: FONTS.size.lg,
         marginBottom: SPACING.sm,
     },
-    descriptionContainer: {
-        backgroundColor: COLORS.white,
-        borderRadius: SPACING.sm,
-        padding: SPACING.md,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
     descriptionText: {
         ...Typography.bodyRegular,
-        lineHeight: 22,
+        lineHeight: FONTS.lineHeight.normal * FONTS.size.md,
     },
     datesSection: {
         marginBottom: SPACING.md,
@@ -1393,24 +1498,16 @@ const styles = StyleSheet.create({
 
     // Subtasks Section
     subtasksContainer: {
-        backgroundColor: COLORS.white,
-        borderRadius: SPACING.md,
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.md,
         padding: SPACING.md,
-        ...CommonStyles.card,
+        ...SHADOWS.small,
     },
     noSubtasksText: {
         ...Typography.bodyRegular,
-        color: COLORS.gray,
+        color: COLORS.textTertiary,
         fontStyle: 'italic',
         marginBottom: SPACING.md,
-    },
-    subtaskItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: SPACING.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
     },
     subtaskCheckboxContainer: {
         flex: 1,
@@ -1420,9 +1517,9 @@ const styles = StyleSheet.create({
     subtaskCheckbox: {
         width: 24,
         height: 24,
-        borderRadius: 6,
+        borderRadius: RADIUS.sm,
         borderWidth: 2,
-        borderColor: COLORS.gray,
+        borderColor: COLORS.textTertiary,
         marginRight: SPACING.sm,
         justifyContent: 'center',
         alignItems: 'center',
@@ -1433,7 +1530,7 @@ const styles = StyleSheet.create({
     },
     completedSubtaskText: {
         textDecorationLine: 'line-through',
-        color: COLORS.gray,
+        color: COLORS.textTertiary,
     },
     deleteSubtaskButton: {
         padding: SPACING.sm,
@@ -1442,123 +1539,17 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         marginTop: SPACING.md,
     },
-    addSubtaskInput: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        borderRadius: SPACING.xs,
-        paddingHorizontal: SPACING.sm,
-        paddingVertical: SPACING.sm,
-        marginRight: SPACING.sm,
-        ...Typography.bodyRegular,
-    },
     addSubtaskButton: {
         backgroundColor: COLORS.primary,
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: RADIUS.round,
         justifyContent: 'center',
         alignItems: 'center',
     },
     disabledAddSubtaskButton: {
-        backgroundColor: COLORS.gray,
+        backgroundColor: COLORS.textTertiary,
         opacity: 0.5,
-    },
-
-    // Edit Mode Styles
-    editFormContainer: {
-        backgroundColor: COLORS.white,
-        borderRadius: SPACING.md,
-        padding: SPACING.md,
-        marginBottom: SPACING.md,
-        ...CommonStyles.card,
-    },
-    label: {
-        ...Typography.label,
-        marginBottom: SPACING.xs,
-    },
-    input: {
-        ...CommonStyles.input,
-        marginBottom: SPACING.md,
-    },
-    textArea: {
-        height: 100,
-        textAlignVertical: 'top',
-    },
-    priorityPickerContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: SPACING.md,
-    },
-    priorityOption: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: SPACING.sm,
-        borderRadius: SPACING.xs,
-        marginHorizontal: SPACING.xxs,
-    },
-    selectedPriorityOption: {
-        borderWidth: 0,
-    },
-    priorityOptionText: {
-        ...Typography.bodyMedium,
-        marginLeft: SPACING.xs,
-    },
-    selectedPriorityOptionText: {
-        color: COLORS.white,
-        fontWeight: FONTS.weight.semiBold,
-    },
-    dueDateContainer: {
-        marginBottom: SPACING.md,
-    },
-    datePickerButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        borderRadius: SPACING.xs,
-        padding: SPACING.sm,
-        marginBottom: SPACING.sm,
-    },
-    datePickerIcon: {
-        marginRight: SPACING.sm,
-    },
-    datePickerButtonText: {
-        ...Typography.bodyRegular,
-    },
-    dateTimeActions: {
-        flexDirection: 'row',
-    },
-    timePickerButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        borderRadius: SPACING.xs,
-        padding: SPACING.sm,
-        flex: 1,
-        marginRight: SPACING.sm,
-    },
-    timePickerButtonText: {
-        ...Typography.bodyRegular,
-        marginLeft: SPACING.xs,
-    },
-    clearDateButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.lightGray,
-        borderRadius: SPACING.xs,
-        padding: SPACING.sm,
-    },
-    clearDateButtonText: {
-        ...Typography.bodyRegular,
-        color: COLORS.danger,
-        marginLeft: SPACING.xs,
     },
 });
 
