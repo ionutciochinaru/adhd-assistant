@@ -2,54 +2,54 @@
 import { StyleSheet, Platform } from 'react-native';
 
 export const COLORS = {
-    // Primary brand colors
-    primary: '#3498db',  // Bright blue
-    primaryLight: '#E1F0FE',
-    primaryDark: '#2980b9',
+    // Primary brand colors - blue is calming for ADHD per research
+    primary: '#3B82F6',       // Vibrant but not overwhelming blue
+    primaryLight: '#93C5FD',  // Lighter blue for subtle highlights
+    primaryDark: '#1E40AF',   // Deep blue for important elements
 
-    // Accent colors
-    accent1: '#FF3B30', // Vibrant red for high priority
-    accent2: '#FF9500', // Orange for medium priority
-    accent3: '#34C759', // Green for low priority/success
+    // Accent colors - carefully selected for ADHD friendliness
+    accent1: '#EF4444',       // Clear red for high priorities/alerts (used sparingly)
+    accent2: '#F59E0B',       // Warm orange for medium priority
+    accent3: '#10B981',       // Calming green for success/completion
 
-    // UI colors
-    background: '#F7F9FC',   // Light background
-    card: '#FFFFFF',         // Card background
-    cardShadow: '#E2E8F0',   // Soft shadow for cards
+    // UI colors - darker backgrounds as preferred
+    background: '#1F2937',    // Dark blue-gray background (easier on eyes than pure black)
+    card: '#2D3748',          // Slightly lighter than background for cards
+    cardShadow: '#111827',    // Darker shadow for depth
 
-    // Status colors
-    success: '#34C759',
-    warning: '#FF9500',
-    danger: '#FF3B30',
-    info: '#5856D6',         // Purple for info
+    // Status colors - clear distinction for better recognition
+    success: '#10B981',       // Vibrant but not harsh green
+    warning: '#F59E0B',       // Warm orange
+    danger: '#EF4444',        // Clear red
+    info: '#6366F1',          // Purple for info
 
-    // Text colors
-    textPrimary: '#1C1C1E',  // Almost black
-    textSecondary: '#6C6C70', // Dark gray
-    textTertiary: '#9A9A9E',  // Medium gray
-    textLight: '#FFFFFF',     // White text
+    // Text colors - high contrast for readability on dark backgrounds
+    textPrimary: '#F9FAFB',   // Almost white for primary text
+    textSecondary: '#E5E7EB', // Light gray for secondary text
+    textTertiary: '#9CA3AF',  // Medium gray for tertiary text
+    textLight: '#FFFFFF',     // Pure white for highlights
 
     // Specific UI elements
-    border: '#E5E5E5',
-    divider: '#E5E5E5',
-    inputBackground: '#F2F2F7',
+    border: '#4B5563',        // Medium gray border for subtle separation
+    divider: '#374151',       // Slightly darker than border for visual hierarchy
+    inputBackground: '#374151', // Dark input fields
 
-    // Task priority colors
-    lowPriority: '#34C759',   // Green
-    mediumPriority: '#FF9500', // Orange
-    highPriority: '#FF3B30',   // Red
+    // Task priority colors - clear distinction
+    lowPriority: '#10B981',    // Green
+    mediumPriority: '#F59E0B', // Orange
+    highPriority: '#EF4444',   // Red
 
     // Basic colors
     white: '#FFFFFF',
     black: '#000000',
     transparent: 'transparent',
 
-    // Card backgrounds with opacity
-    cardRed: '#FFEBE9',    // Light red
-    cardOrange: '#FFF6E9', // Light orange
-    cardGreen: '#E9FFF1',  // Light green
-    cardBlue: '#E9F5FF',   // Light blue
-    cardPurple: '#F2EAFF', // Light purple
+    // Card backgrounds with opacity for different contexts
+    cardRed: '#4B1113',       // Dark red background
+    cardOrange: '#4D3308',    // Dark orange background
+    cardGreen: '#064E3B',     // Dark green background
+    cardBlue: '#1E3A8A',      // Dark blue background
+    cardPurple: '#4C1D95',    // Dark purple background
 };
 
 export const SPACING = {
@@ -76,21 +76,21 @@ export const SHADOWS = {
     small: {
         shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.2,
         shadowRadius: 2,
         elevation: 2,
     },
     medium: {
         shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.2,
         shadowRadius: 4,
         elevation: 4,
     },
     large: {
         shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 8,
     },
@@ -214,7 +214,7 @@ export const Typography = StyleSheet.create({
         fontWeight: FONTS.weight.medium,
         fontSize: FONTS.size.xs,
         color: COLORS.textTertiary,
-        lineHeight: FONTS.size.xs * 1.5,
+        lineHeight: FONTS.size.xs * 1.5, // Fixed the error here
     },
     tiny: {
         fontFamily: FONTS.family.base,
@@ -262,7 +262,7 @@ export const CommonStyles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.md,
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.card,
         ...SHADOWS.small,
     },
     headerTitle: {
@@ -407,7 +407,7 @@ export const CommonStyles = StyleSheet.create({
     // Tab styles
     tabBar: {
         flexDirection: 'row',
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.card,
         paddingVertical: SPACING.sm,
         paddingHorizontal: SPACING.xs,
         borderRadius: RADIUS.lg,

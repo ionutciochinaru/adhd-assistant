@@ -130,39 +130,57 @@ const TasksScreen = () => {
     const updateMarkedDates = (taskList: Task[]) => {
         const marks: MarkedDates = {};
 
-        // Group tasks by date
+        // Group tasks by date and calculate completion rate for each date
+        const tasksByDate = {};
+
         taskList.forEach(task => {
             if (!task.due_date) return;
 
             const date = normalizeDate(task.due_date);
             if (!date) return;
 
-            // If this date is already in marks, update it
-            if (marks[date]) {
-                // If there are no dots yet, create the array
-                if (!marks[date].dots) {
-                    marks[date].dots = [];
-                }
-
-                // Add a dot for this task, color based on priority and status
-                const dotColor = task.status === 'completed' ? COLORS.success :
-                    task.priority === 'high' ? COLORS.highPriority :
-                        task.priority === 'medium' ? COLORS.mediumPriority :
-                            COLORS.lowPriority;
-
-                marks[date].dots.push({ color: dotColor });
-            } else {
-                // First task for this date
-                const dotColor = task.status === 'completed' ? COLORS.success :
-                    task.priority === 'high' ? COLORS.highPriority :
-                        task.priority === 'medium' ? COLORS.mediumPriority :
-                            COLORS.lowPriority;
-
-                marks[date] = {
-                    marked: true,
-                    dots: [{ color: dotColor }]
+            // Initialize the date data if it doesn't exist
+            if (!tasksByDate[date]) {
+                tasksByDate[date] = {
+                    tasks: [],
+                    completedCount: 0,
+                    totalCount: 0
                 };
             }
+
+            // Add task to the date's task list
+            tasksByDate[date].tasks.push(task);
+            tasksByDate[date].totalCount++;
+
+            // Increment completed count if the task is completed
+            if (task.status === 'completed') {
+                tasksByDate[date].completedCount++;
+            }
+        });
+
+        // Calculate completion rates and create marks
+        Object.keys(tasksByDate).forEach(date => {
+            const dateData = tasksByDate[date];
+            const completionRate = dateData.totalCount > 0
+                ? Math.round((dateData.completedCount / dateData.totalCount) * 100)
+                : 0;
+
+            // Create dots for tasks
+            const dots = dateData.tasks.map(task => {
+                const dotColor = task.status === 'completed' ? COLORS.success :
+                    task.priority === 'high' ? COLORS.highPriority :
+                        task.priority === 'medium' ? COLORS.mediumPriority :
+                            COLORS.lowPriority;
+
+                return { color: dotColor };
+            });
+
+            // Add mark data for this date
+            marks[date] = {
+                dots,
+                completionRate,  // Include completion rate
+                marked: true
+            };
         });
 
         // Mark selected date
@@ -506,14 +524,17 @@ const TasksScreen = () => {
                     selectedDate={selectedDate}
                     onDateSelect={handleDateSelect}
                     markedDates={markedDates}
-                />
-                <TasksHeaderSection
-                    completionRate={completionRate}
-                    motivationalMessage={motivationalMessage}
                     filter={filter}
                     setFilter={setFilter}
                     getFilterCount={getFilterCount}
                 />
+                {/*<TasksHeaderSection*/}
+                {/*    completionRate={completionRate}*/}
+                {/*    motivationalMessage={motivationalMessage}*/}
+                {/*    filter={filter}*/}
+                {/*    setFilter={setFilter}*/}
+                {/*    getFilterCount={getFilterCount}*/}
+                {/*/>*/}
 
                 {/* Tasks List */}
                 {loading ? (
