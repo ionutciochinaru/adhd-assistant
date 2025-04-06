@@ -26,6 +26,7 @@ import {MarkedDates} from "react-native-calendars/src/types";
 import moment from "moment";
 import {TasksStackParamList} from "../../navigation/TasksNavigator";
 import {StackNavigationProp} from "@react-navigation/stack";
+import TasksHeaderSection from "../../components/TaskHeaderSection";
 
 const TasksScreen = () => {
     const navigation = useNavigation<StackNavigationProp<TasksStackParamList>>();
@@ -506,66 +507,13 @@ const TasksScreen = () => {
                     onDateSelect={handleDateSelect}
                     markedDates={markedDates}
                 />
-                {/* Progress section */}
-                <View style={styles.progressContainer}>
-                    <View style={styles.progressHeader}>
-                        <View style={styles.progressHeader}>
-                            <Text style={styles.progressTitle}>
-                                {selectedDate === moment().format('YYYY-MM-DD') ? "Today's Progress" : `Progress for ${moment(selectedDate).format('MMMM D')}`}
-                            </Text>
-                        </View>
-                        <Text style={styles.progressPercentage}>{completionRate}%</Text>
-                    </View>
-
-                    <View style={styles.progressBarContainer}>
-                        <Animated.View
-                            style={[
-                                styles.progressBar,
-                                {
-                                    width: progressAnim.interpolate({
-                                        inputRange: [0, 100],
-                                        outputRange: ['0%', '100%']
-                                    })
-                                },
-                                completionRate === 100 ? styles.progressBarComplete : null
-                            ]}
-                        />
-                    </View>
-
-                    <Text style={styles.motivationalMessage}>{motivationalMessage}</Text>
-                </View>
-
-                {/* Filter Buttons */}
-                <View style={styles.filterContainer}>
-                    <FilterButton
-                        label="All"
-                        icon="list-outline"
-                        type="all"
-                        isActive={filter === 'all'}
-                        onPress={() => setFilter('all')}
-                    />
-                    <FilterButton
-                        label="Active"
-                        icon="checkbox-outline"
-                        type="active"
-                        isActive={filter === 'active'}
-                        onPress={() => setFilter('active')}
-                    />
-                    <FilterButton
-                        label="Overdue"
-                        icon="alert-circle"
-                        type="overdue"
-                        isActive={filter === 'overdue'}
-                        onPress={() => setFilter('overdue')}
-                    />
-                    <FilterButton
-                        label="Done"
-                        icon="checkmark-done-circle-outline"
-                        type="completed"
-                        isActive={filter === 'completed'}
-                        onPress={() => setFilter('completed')}
-                    />
-                </View>
+                <TasksHeaderSection
+                    completionRate={completionRate}
+                    motivationalMessage={motivationalMessage}
+                    filter={filter}
+                    setFilter={setFilter}
+                    getFilterCount={getFilterCount}
+                />
 
                 {/* Tasks List */}
                 {loading ? (
@@ -647,11 +595,10 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.white,
         paddingBottom: SPACING.sm,
         ...SHADOWS.small,
-        height: 100,
-        overflow: 'hidden', // Prevent content from spilling out
+        overflow: 'hidden',
     },
     tasksListContainer: {
-        paddingBottom: SPACING.xxl,
+        paddingBottom: SPACING.md,
         flexGrow: 1,
     },
     emptyListContainer: {
