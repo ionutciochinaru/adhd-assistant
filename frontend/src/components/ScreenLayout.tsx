@@ -1,44 +1,62 @@
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, SPACING, Typography } from '../utils/styles';
+import { COLORS, SPACING, Typography, RADIUS, SHADOWS } from '../utils/styles';
 import StatusBarManager from './StatusBarManager';
-import {useTabBarHeight} from "../hooks/useTabBarHeight";
+import { useTabBarHeight } from "../hooks/useTabBarHeight";
 
 type ScreenLayoutProps = {
     children: React.ReactNode;
     backgroundColor?: string;
-    edges?: Array<'left' | 'right' | 'bottom'>;
+    edges?: Array<'top' | 'left' | 'right' | 'bottom'>;
     title?: string;
     leftComponent?: React.ReactNode;
     rightComponent?: React.ReactNode;
     showHeader?: boolean;
+    headerStyle?: object;
+    contentContainerStyle?: object;
 };
 
 const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                                                        children,
-                                                       backgroundColor = COLORS.white,
+                                                       backgroundColor = COLORS.background,
                                                        edges = ['left', 'right'],
                                                        title,
                                                        leftComponent,
                                                        rightComponent,
                                                        showHeader = true,
+                                                       headerStyle,
+                                                       contentContainerStyle,
                                                    }) => {
-    // Use the new hook to get dynamic tab bar height
+    // Use the hook to get dynamic tab bar height
     const tabBarHeight = useTabBarHeight();
 
+    // Determine if we need dark status bar based on background color
+    const isDarkBackground = backgroundColor === COLORS.background ||
+        backgroundColor === COLORS.card ||
+        backgroundColor === COLORS.black;
+
+    const barStyle = isDarkBackground ? 'light' : 'dark';
+
     return (
-        <StatusBarManager backgroundColor={showHeader ? COLORS.white : backgroundColor}>
+        <StatusBarManager
+            backgroundColor={showHeader ? COLORS.card : backgroundColor}
+            barStyle={barStyle}
+        >
             <SafeAreaView
                 style={[styles.container, { backgroundColor }]}
                 edges={edges}
             >
                 {showHeader && (
-                    <View style={styles.header}>
+                    <View style={[styles.header, headerStyle]}>
                         <View style={styles.headerLeft}>
                             {leftComponent}
                         </View>
-                        {title && <Text style={styles.headerTitle}>{title}</Text>}
+                        {title && (
+                            <Text style={styles.headerTitle} numberOfLines={1}>
+                                {title}
+                            </Text>
+                        )}
                         <View style={styles.headerRight}>
                             {rightComponent}
                         </View>
@@ -46,7 +64,13 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                 )}
 
                 {/* Dynamic padding based on tab bar height */}
-                <View style={[styles.contentContainer, { paddingBottom: tabBarHeight / 2 }]}>
+                <View
+                    style={[
+                        styles.contentContainer,
+                        { paddingBottom: tabBarHeight ? tabBarHeight + SPACING.md : SPACING.xl },
+                        contentContainerStyle
+                    ]}
+                >
                     {children}
                 </View>
             </SafeAreaView>
@@ -57,6 +81,7 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        paddingTop: SPACING.md,
     },
     header: {
         flexDirection: 'row',
@@ -64,20 +89,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.md,
-        backgroundColor: COLORS.white,
-        borderBottomWidth: 0,
-        borderBottomColor: COLORS.border,
+        marginHorizontal: SPACING.md,
+        borderRadius: RADIUS.xl,
+        backgroundColor: COLORS.card,
+        ...SHADOWS.small,
     },
     headerLeft: {
         minWidth: 40,
         alignItems: 'flex-start',
     },
     headerTitle: {
-        ...Typography.label,
+        ...Typography.h3,
         flex: 1,
         textAlign: 'center',
-        fontSize: 18,
-        fontWeight: '600',
+        color: COLORS.textPrimary,
+        paddingHorizontal: SPACING.sm,
     },
     headerRight: {
         minWidth: 40,
@@ -85,6 +111,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         flex: 1,
+        marginTop: 0,
     }
 });
 

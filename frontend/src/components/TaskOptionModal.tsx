@@ -1,19 +1,15 @@
-// src/components/TaskOptionModal.tsx
 import React from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    Modal
-} from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Task } from '../utils/supabase';
 import { COLORS, SPACING, Typography, RADIUS, SHADOWS } from '../utils/styles';
 
 type TaskOptionModalProps = {
     visible: boolean;
-    task: Task | null;
+    task: {
+        id: string;
+        title: string;
+        status: 'pending' | 'in-progress' | 'completed';
+    } | null;
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
@@ -44,65 +40,69 @@ const TaskOptionModal: React.FC<TaskOptionModalProps> = ({
                 activeOpacity={1}
                 onPress={onClose}
             >
-                <View style={styles.container}>
+                <TouchableOpacity
+                    style={styles.container}
+                    activeOpacity={1}
+                    onPress={(e) => e.stopPropagation()}
+                >
                     <View style={styles.content}>
                         <Text style={styles.title}>
                             Task Options
                         </Text>
 
                         <View style={styles.taskPreview}>
-                            <Text style={styles.taskTitle} numberOfLines={1}>
+                            <Text
+                                style={styles.taskTitle}
+                                numberOfLines={1}
+                            >
                                 {task.title}
                             </Text>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.option}
+                        <TaskOptionButton
+                            icon="create-outline"
+                            iconColor={COLORS.primary}
+                            text="Edit Task"
                             onPress={onEdit}
-                        >
-                            <Ionicons name="create-outline" size={24} color={COLORS.primary} />
-                            <Text style={styles.optionText}>Edit Task</Text>
-                        </TouchableOpacity>
+                        />
 
-                        <TouchableOpacity
-                            style={styles.option}
+                        <TaskOptionButton
+                            icon="timer-outline"
+                            iconColor={COLORS.primary}
+                            text="Start Pomodoro"
                             onPress={onStartPomodoro}
-                        >
-                            <Ionicons name="timer-outline" size={24} color={COLORS.primary} />
-                            <Text style={styles.optionText}>Start Pomodoro</Text>
-                        </TouchableOpacity>
+                        />
 
                         {task.status !== 'completed' ? (
-                            <TouchableOpacity
-                                style={styles.option}
+                            <TaskOptionButton
+                                icon="checkmark-circle-outline"
+                                iconColor={COLORS.success}
+                                text="Mark as Complete"
+                                textColor={COLORS.success}
                                 onPress={() => {
                                     onClose();
                                     onCompleteTask();
                                 }}
-                            >
-                                <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
-                                <Text style={[styles.optionText, { color: COLORS.success }]}>Mark as Complete</Text>
-                            </TouchableOpacity>
+                            />
                         ) : (
-                            <TouchableOpacity
-                                style={styles.option}
+                            <TaskOptionButton
+                                icon="refresh-outline"
+                                iconColor={COLORS.primary}
+                                text="Mark as Incomplete"
                                 onPress={() => {
                                     onClose();
                                     onCompleteTask();
                                 }}
-                            >
-                                <Ionicons name="refresh-outline" size={24} color={COLORS.primary} />
-                                <Text style={styles.optionText}>Mark as Incomplete</Text>
-                            </TouchableOpacity>
+                            />
                         )}
 
-                        <TouchableOpacity
-                            style={styles.option}
+                        <TaskOptionButton
+                            icon="trash-outline"
+                            iconColor={COLORS.danger}
+                            text="Delete Task"
+                            textColor={COLORS.danger}
                             onPress={onDelete}
-                        >
-                            <Ionicons name="trash-outline" size={24} color={COLORS.danger} />
-                            <Text style={[styles.optionText, styles.deleteText]}>Delete Task</Text>
-                        </TouchableOpacity>
+                        />
 
                         <TouchableOpacity
                             style={styles.closeButton}
@@ -111,11 +111,33 @@ const TaskOptionModal: React.FC<TaskOptionModalProps> = ({
                             <Text style={styles.closeButtonText}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </TouchableOpacity>
             </TouchableOpacity>
         </Modal>
     );
 };
+
+// Extracted button component for reusability
+const TaskOptionButton: React.FC<{
+    icon: string;
+    iconColor: string;
+    text: string;
+    textColor?: string;
+    onPress: () => void;
+}> = ({ icon, iconColor, text, textColor, onPress }) => (
+    <TouchableOpacity
+        style={styles.option}
+        onPress={onPress}
+    >
+        <Ionicons name={icon} size={24} color={iconColor} />
+        <Text style={[
+            styles.optionText,
+            textColor ? { color: textColor } : {}
+        ]}>
+            {text}
+        </Text>
+    </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
     overlay: {
@@ -127,10 +149,9 @@ const styles = StyleSheet.create({
     container: {
         width: '80%',
         maxWidth: 400,
-        backgroundColor: 'transparent',
     },
     content: {
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.card,
         borderRadius: RADIUS.lg,
         padding: SPACING.lg,
         ...SHADOWS.large,
@@ -160,9 +181,6 @@ const styles = StyleSheet.create({
     optionText: {
         ...Typography.bodyMedium,
         marginLeft: SPACING.md,
-    },
-    deleteText: {
-        color: COLORS.danger,
     },
     closeButton: {
         marginTop: SPACING.md,

@@ -339,6 +339,7 @@ const styles = StyleSheet.create({
         fontSize: FONTS.size.md,
         flex: 1,
         marginRight: SPACING.sm,
+        color: COLORS.textPrimary,
     },
     completedTitle: {
         textDecorationLine: 'line-through',

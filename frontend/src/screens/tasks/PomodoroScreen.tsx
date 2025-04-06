@@ -1,31 +1,22 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
     Alert,
-    BackHandler,
     ScrollView,
     FlatList
 } from 'react-native';
-import {useNavigation, useRoute} from '@react-navigation/native';
-import {StackNavigationProp} from '@react-navigation/stack';
-import {Ionicons} from '@expo/vector-icons';
-import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
-    Easing,
-    interpolate,
-} from 'react-native-reanimated';
-import Svg, {Circle} from 'react-native-svg';
-import BackButton from "../../components/BackButton";
-import {COLORS, RADIUS, SHADOWS, SPACING, Typography} from "../../utils/styles";
-import ScreenLayout from "../../components/ScreenLayout";
-import {supabase} from '../../utils/supabase';
-import {Task, Subtask} from "../../utils/supabase";
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
+import BackButton from "../../components/BackButton";
+import { COLORS, RADIUS, SHADOWS, SPACING, Typography, CommonStyles } from "../../utils/styles";
+import ScreenLayout from "../../components/ScreenLayout";
+import { supabase } from '../../utils/supabase';
+import { Task, Subtask } from "../../utils/supabase";
 
 type PomodoroScreenParams = {
     task: Task;
@@ -50,7 +41,7 @@ const MOTIVATIONAL_QUOTES = [
 const PomodoroScreen: React.FC = () => {
     const navigation = useNavigation<StackNavigationProp<any>>();
     const route = useRoute();
-    const {task} = route.params as PomodoroScreenParams;
+    const { task } = route.params as PomodoroScreenParams;
 
     const [timeLeft, setTimeLeft] = useState(POMODORO_DURATION);
     const [isRunning, setIsRunning] = useState(true);
@@ -64,10 +55,6 @@ const PomodoroScreen: React.FC = () => {
     const [totalTimeSpent, setTotalTimeSpent] = useState(0);
     const [motivationalQuote, setMotivationalQuote] = useState('');
 
-    // Animation values
-    const progress = useSharedValue(0);
-    const buttonScale = useSharedValue(1);
-
     // Fetch subtasks on component mount
     useEffect(() => {
         fetchSubtasks();
@@ -78,7 +65,7 @@ const PomodoroScreen: React.FC = () => {
     // Fetch subtasks for the current task
     const fetchSubtasks = async () => {
         try {
-            const {data, error} = await supabase
+            const { data, error } = await supabase
                 .from('subtasks')
                 .select('*')
                 .eq('task_id', task.id);
@@ -118,14 +105,6 @@ const PomodoroScreen: React.FC = () => {
         };
     }, [isRunning, mode]);
 
-    // Update progress animation
-    useEffect(() => {
-        progress.value = withTiming(1 - (timeLeft / POMODORO_DURATION), {
-            duration: 1000,
-            easing: Easing.linear
-        });
-    }, [timeLeft]);
-
     // Handle timer completion
     const handleTimerComplete = () => {
         if (timerRef.current) {
@@ -157,9 +136,6 @@ const PomodoroScreen: React.FC = () => {
 
     // Toggle timer state
     const toggleTimer = () => {
-        buttonScale.value = withTiming(1.2, {duration: 100}, () => {
-            buttonScale.value = withTiming(1, {duration: 100});
-        });
         setIsRunning(!isRunning);
     };
 
@@ -174,13 +150,13 @@ const PomodoroScreen: React.FC = () => {
             Alert.alert(
                 'Incomplete Subtasks',
                 'Please complete all subtasks before marking the task as done.',
-                [{text: "OK"}]
+                [{ text: "OK" }]
             );
             return;
         }
 
         try {
-            const {error} = await supabase
+            const { error } = await supabase
                 .from('tasks')
                 .update({
                     status: 'completed',
@@ -207,7 +183,7 @@ const PomodoroScreen: React.FC = () => {
             const newStatus = subtask.status === 'active' ? 'completed' : 'active';
 
             // Update in database
-            const {error} = await supabase
+            const { error } = await supabase
                 .from('subtasks')
                 .update({
                     status: newStatus,
@@ -233,27 +209,53 @@ const PomodoroScreen: React.FC = () => {
         }
     };
 
+    // Determine mode color and title
+    const getModeConfig = () => {
+        switch (mode) {
+            case 'pomodoro':
+                return {
+                    title: 'Focus Session',
+                    color: COLORS.primary,
+                    backgroundColor: COLORS.primaryLight
+                };
+            case 'shortBreak':
+                return {
+                    title: 'Short Break',
+                    color: COLORS.accent2,
+                    backgroundColor: COLORS.primaryLight
+                };
+            case 'longBreak':
+                return {
+                    title: 'Long Break',
+                    color: COLORS.accent3,
+                    backgroundColor: COLORS.primaryLight
+                };
+        }
+    };
+
+    const modeConfig = getModeConfig();
+
     return (
         <ScreenLayout
-            leftComponent={<BackButton onPress={() => navigation.goBack()}/>}
-            title={mode === 'pomodoro' ? 'Focus Session' :
-                mode === 'shortBreak' ? 'Short Break' :
-                    'Long Break'}
+            leftComponent={<BackButton onPress={() => navigation.goBack()} />}
+            title={modeConfig.title}
         >
             <ScrollView
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Timer Card */}
-                <View style={styles.timerCard}>
+                <View style={[styles.timerCard, { backgroundColor: modeConfig.backgroundColor }]}>
                     {/* Motivational Quote */}
                     <View style={styles.timerHeaderContainer}>
-                        <Text style={styles.progressText}>{motivationalQuote}</Text>
+                        <Text style={styles.progressText}>
+                            {motivationalQuote}
+                        </Text>
                     </View>
 
-                    {/* Timer Text - Updated with more space */}
+                    {/* Timer Text */}
                     <View style={styles.timerTextContainer}>
-                        <Text style={styles.timerText}>
+                        <Text style={[styles.timerText, { color: modeConfig.color }]}>
                             {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
                         </Text>
                     </View>
@@ -261,28 +263,28 @@ const PomodoroScreen: React.FC = () => {
                     {/* Timer Controls */}
                     <View style={styles.timerControlsContainer}>
                         <TouchableOpacity
-                            style={styles.controlButton}
+                            style={[styles.controlButton, { backgroundColor: modeConfig.color }]}
                             onPress={() => switchMode('pomodoro')}
                         >
-                            <Ionicons name="play" size={20} color={COLORS.white}/>
+                            <Ionicons name="play" size={20} color={COLORS.white} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.controlButton}
+                            style={[styles.controlButton, { backgroundColor: modeConfig.color }]}
                             onPress={toggleTimer}
                         >
                             {isRunning ? (
-                                <Ionicons name="pause" size={20} color={COLORS.white}/>
+                                <Ionicons name="pause" size={20} color={COLORS.white} />
                             ) : (
-                                <Ionicons name="play" size={20} color={COLORS.white}/>
+                                <Ionicons name="play" size={20} color={COLORS.white} />
                             )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.controlButton}
+                            style={[styles.controlButton, { backgroundColor: modeConfig.color }]}
                             onPress={() => switchMode('shortBreak')}
                         >
-                            <Ionicons name="sunny" size={20} color={COLORS.white}/>
+                            <Ionicons name="sunny" size={20} color={COLORS.white} />
                         </TouchableOpacity>
                     </View>
 
@@ -352,7 +354,7 @@ const PomodoroScreen: React.FC = () => {
                         <FlatList
                             data={subtasks}
                             keyExtractor={(item) => item.id}
-                            renderItem={({item}) => (
+                            renderItem={({ item }) => (
                                 <TouchableOpacity
                                     style={[
                                         styles.subtaskItem,
@@ -406,44 +408,21 @@ const styles = StyleSheet.create({
         paddingBottom: SPACING.xl,
     },
     timerCard: {
-        backgroundColor: COLORS.white,
+        ...CommonStyles.card,
         marginHorizontal: SPACING.md,
         marginVertical: SPACING.md,
-        borderRadius: RADIUS.lg,
-        ...SHADOWS.medium,
-        padding: SPACING.lg, // Increased padding for better spacing
-        paddingBottom: SPACING.md, // Less padding at bottom
-    },
-    modeHeaderContainer: {
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
-    },
-    modeHeaderText: {
-        ...Typography.h3,
-        color: COLORS.primary,
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
+        padding: SPACING.lg,
+        paddingBottom: SPACING.md,
     },
     timerHeaderContainer: {
         alignItems: 'center',
         marginBottom: SPACING.md,
-    },
-    timerTitle: {
-        ...Typography.h3,
-        color: COLORS.textPrimary,
     },
     progressText: {
         ...Typography.bodySmall,
         color: COLORS.textSecondary,
         textAlign: 'center',
         fontStyle: 'italic',
-        marginTop: SPACING.xs,
-    },
-    background: {
-        position: 'relative',
-        borderRadius: 75,
-        backgroundColor: COLORS.white,
     },
     timerTextContainer: {
         alignItems: 'center',
@@ -453,13 +432,8 @@ const styles = StyleSheet.create({
     timerText: {
         ...Typography.h2,
         fontSize: 50,
-        color: COLORS.textPrimary,
         lineHeight: 60,
-    },
-    timerModeText: {
-        ...Typography.bodySmall,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.xs,
+        fontWeight: 'bold',
     },
     timerControlsContainer: {
         flexDirection: 'row',
@@ -468,19 +442,18 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.md,
     },
     controlButton: {
-        backgroundColor: COLORS.primary,
-        width: 50,
-        height: 50,
+        width: 60,
+        height: 60,
         borderRadius: RADIUS.round,
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: SPACING.sm,
-        ...SHADOWS.small,
+        ...SHADOWS.medium,
     },
     sessionStatsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primaryLight,
+        backgroundColor: COLORS.card,
         borderRadius: RADIUS.md,
         padding: SPACING.sm,
     },
@@ -501,16 +474,8 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.md,
         marginTop: SPACING.lg,
     },
-    sectionTitle: {
-        ...Typography.h3,
-        marginBottom: SPACING.md,
-        color: COLORS.textPrimary,
-    },
     taskInfoCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: RADIUS.lg,
-        padding: SPACING.md,
-        ...SHADOWS.small,
+        ...CommonStyles.card,
     },
     taskTitle: {
         ...Typography.h2,
@@ -538,6 +503,11 @@ const styles = StyleSheet.create({
     subtasksContainer: {
         marginHorizontal: SPACING.md,
         marginTop: SPACING.lg,
+    },
+    sectionTitle: {
+        ...Typography.h3,
+        marginBottom: SPACING.md,
+        color: COLORS.textPrimary,
     },
     noSubtasksText: {
         ...Typography.bodyMedium,
@@ -567,13 +537,10 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
     },
     completeTaskButton: {
+        ...CommonStyles.buttonLarge,
         backgroundColor: COLORS.success,
         marginHorizontal: SPACING.md,
         marginTop: SPACING.lg,
-        paddingVertical: SPACING.md,
-        borderRadius: RADIUS.round,
-        alignItems: 'center',
-        ...SHADOWS.medium,
     },
     completeTaskButtonText: {
         ...Typography.bodyLarge,

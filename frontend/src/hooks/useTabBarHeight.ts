@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Dimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const useTabBarHeight = () => {

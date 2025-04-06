@@ -1,8 +1,7 @@
-// frontend/src/components/CustomTabBar.tsx
 import React, { useState, useRef } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SHADOWS, SPACING } from '../utils/styles';
+import { COLORS, SHADOWS, SPACING, RADIUS, Typography } from '../utils/styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommonActions } from '@react-navigation/native';
 
@@ -120,6 +119,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         toggleFab();
                         return true;
                     }}
+                    accessibilityLabel="Close menu"
+                    accessibilityRole="button"
                 />
             )}
 
@@ -154,6 +155,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                             selectedDate: new Date().toISOString().split('T')[0]
                         });
                     }}
+                    accessibilityLabel="Create new task"
+                    accessibilityRole="button"
                 >
                     <Ionicons name="add-circle" size={24} color={COLORS.white} />
                 </TouchableOpacity>
@@ -189,6 +192,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         // Voice recording functionality will be added later
                         alert('Voice recording functionality coming soon!');
                     }}
+                    accessibilityLabel="Record new task with voice"
+                    accessibilityRole="button"
                 >
                     <Ionicons name="mic" size={24} color={COLORS.white} />
                 </TouchableOpacity>
@@ -245,7 +250,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                                 key={route.key}
                                 accessibilityRole="button"
                                 accessibilityState={isFocused ? { selected: true } : {}}
-                                accessibilityLabel={options.tabBarAccessibilityLabel}
+                                accessibilityLabel={options.tabBarAccessibilityLabel || `${label} tab`}
                                 testID={options.tabBarTestID}
                                 onPress={onPress}
                                 style={styles.tabItem}
@@ -260,20 +265,12 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                                         color={isFocused ? COLORS.primary : COLORS.textTertiary}
                                     />
                                 </View>
-                                <Text
-                                    style={[
-                                        styles.tabLabel,
-                                        { color: isFocused ? COLORS.primary : COLORS.textTertiary },
-                                    ]}
-                                >
-                                    {label}
-                                </Text>
                             </TouchableOpacity>
                         );
                     })}
                 </View>
 
-                {/* FAB button that transforms into X - now with proper zIndex */}
+                {/* FAB button that transforms into X */}
                 <Animated.View
                     style={[
                         styles.fabButtonContainer,
@@ -287,6 +284,9 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         style={styles.fabButton}
                         onPress={toggleFab}
                         activeOpacity={0.8}
+                        accessibilityLabel={fabOpen ? "Close menu" : "Open menu"}
+                        accessibilityRole="button"
+                        accessibilityHint="Double tap to open or close the action menu"
                     >
                         <Ionicons name="add" size={26} color={COLORS.white} />
                     </TouchableOpacity>
@@ -305,39 +305,42 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
+        paddingHorizontal: SPACING.md,
     },
     container: {
         flexDirection: 'row',
-        backgroundColor: COLORS.white,
-        borderRadius: 30,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.xl,
+        paddingVertical: SPACING.sm,
         alignItems: 'center',
         justifyContent: 'space-around',
         flex: 1,
-        marginRight: 10,
+        marginRight: SPACING.sm,
         ...SHADOWS.medium,
-        height: 80,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     tabItem: {
         alignItems: 'center',
         justifyContent: 'center',
+        flex: 1,
     },
     iconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: RADIUS.round,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: COLORS.primaryLight,
+        backgroundColor: COLORS.background,
     },
     activeIconContainer: {
         backgroundColor: COLORS.primaryLight,
+        ...SHADOWS.small,
     },
     tabLabel: {
-        fontSize: 12,
-        marginTop: 1,
+        ...Typography.tiny,
+        marginTop: SPACING.xxs,
+        fontWeight: '600',
     },
     fabButtonContainer: {
         width: 56,
@@ -348,21 +351,14 @@ const styles = StyleSheet.create({
     fabButton: {
         width: 56,
         height: 56,
-        borderRadius: 28,
+        borderRadius: RADIUS.round,
         backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
         ...SHADOWS.medium,
         zIndex: 15,
-    },
-    backdrop: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        zIndex: 5,
+        borderWidth: 2,
+        borderColor: COLORS.primaryDark,
     },
     fabMenuItem: {
         position: 'absolute',
@@ -372,25 +368,14 @@ const styles = StyleSheet.create({
     fabMenuItemButton: {
         width: 56,
         height: 56,
-        borderRadius: 24,
+        borderRadius: RADIUS.round,
         backgroundColor: COLORS.accent3,
         justifyContent: 'center',
         alignItems: 'center',
         ...SHADOWS.medium,
+        borderWidth: 4,
+        borderColor: 'rgba(0,0,0,0.1)',
     },
-    fabMenuItemLabelContainer: {
-        backgroundColor: COLORS.white,
-        paddingVertical: 4,
-        paddingHorizontal: 6,
-        borderRadius: 8,
-        marginRight: 12,
-        ...SHADOWS.small,
-    },
-    fabMenuItemLabel: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: COLORS.textPrimary,
-    }
 });
 
 export default CustomTabBar;

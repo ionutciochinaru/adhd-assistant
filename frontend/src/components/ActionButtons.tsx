@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS, SPACING } from '../utils/styles';
+import { COLORS, SPACING, Typography, RADIUS, SHADOWS } from '../utils/styles';
 
 type ActionButtonsProps = {
     onCancel: () => void;
@@ -41,7 +41,7 @@ const ActionButtons = ({
                 accessibilityRole="button"
             >
                 {loading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={COLORS.white} />
                 ) : (
                     <Text style={styles.saveButtonText}>{saveText}</Text>
                 )}
@@ -53,31 +53,42 @@ const ActionButtons = ({
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
+        justifyContent: 'flex-end',
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.md,
     },
     cancelButton: {
         paddingVertical: SPACING.sm,
         paddingHorizontal: SPACING.md,
-        marginRight: SPACING.sm,
+        marginRight: SPACING.md,
+        borderRadius: RADIUS.md,
+        // A bit of visual contrast for easier clicking
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: COLORS.background,
     },
     cancelButtonText: {
-        color: COLORS.gray,
-        fontSize: 16,
-        fontWeight: '500',
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
     },
     saveButton: {
+        ...SHADOWS.small,
         backgroundColor: COLORS.primary,
         paddingVertical: SPACING.sm,
         paddingHorizontal: SPACING.md,
-        borderRadius: 4,
+        borderRadius: RADIUS.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 100,
     },
     disabledSaveButton: {
-        backgroundColor: COLORS.gray,
+        backgroundColor: COLORS.border,
         opacity: 0.7,
     },
     saveButtonText: {
+        ...Typography.bodyMedium,
         color: COLORS.white,
-        fontSize: 16,
-        fontWeight: '600',
+        fontWeight: 'bold',
     },
 });
 

@@ -33,17 +33,18 @@ type SingleRowCalendarProps = {
     getFilterCount?: (filter: string) => number;
 };
 
-const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendarProps>(({
-                                                                                            onDateSelect,
-                                                                                            selectedDate,
-                                                                                            markedDates = {},
-                                                                                            filter = 'all',
-                                                                                            setFilter = () => {
-                                                                                            },
-                                                                                            getFilterCount = () => 0,
-                                                                                        }, ref) => {
+export const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendarProps>(({
+                                                                                                   onDateSelect,
+                                                                                                   selectedDate,
+                                                                                                   markedDates = {},
+                                                                                                   filter = 'all',
+                                                                                                   setFilter = () => {},
+                                                                                                   getFilterCount = () => 0,
+                                                                                               }, ref) => {
     const [dates, setDates] = useState<moment.Moment[]>([]);
     const [currentMonth, setCurrentMonth] = useState<string>('');
+    const [isFadingLeft, setIsFadingLeft] = useState(false);
+    const [isFadingRight, setIsFadingRight] = useState(true);
     const scrollViewRef = useRef<ScrollView>(null);
     const initialized = useRef(false);
     const today = moment().format('YYYY-MM-DD');
@@ -210,10 +211,14 @@ const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendar
         >
             {React.cloneElement(icon, {
                 color: currentFilter === key ? COLORS.white : COLORS.textSecondary,
-                size: 18
+                size: 16
             })}
             {getCountFn(key) > 0 && (
-                <View style={styles.badge}>
+                <View style={[
+                    styles.badge,
+                    key === 'overdue' ? styles.badgeOverdue : null,
+                    key === 'completed' ? styles.badgeCompleted : null
+                ]}>
                     <Text style={styles.badgeText}>{getCountFn(key)}</Text>
                 </View>
             )}
@@ -226,35 +231,35 @@ const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendar
         </TouchableOpacity>
     );
 
-    // SVG paths for the progress indicator - simplified and more consistent
-    const getProgressPath = (size) => {
-        // Calculate dimensions for a perfect square with rounded corners
-        const radius = 14; // Match the card's border radius
-        const padding = PROGRESS_STROKE_WIDTH / 2;
+    // SVG paths for the progress indicator - adjusted for rectangular shape
+    const getProgressPath = (size, width) => {
+        // Calculate dimensions for a rounded rectangle
+        const radius = 10; // Match the card's border radius
+        const padding = PROGRESS_STROKE_WIDTH;
 
         // Adjusted to create a perfect rounded rectangle path
         const left = padding;
         const top = padding;
-        const right = size - padding;
+        const right = width - padding;
         const bottom = size - padding;
 
         // Create a single continuous path
         return `
-            M ${left + radius},${top}
-            L ${right - radius},${top}
-            Q ${right},${top} ${right},${top + radius}
-            L ${right},${bottom - radius}
-            Q ${right},${bottom} ${right - radius},${bottom}
-            L ${left + radius},${bottom}
-            Q ${left},${bottom} ${left},${bottom - radius}
-            L ${left},${top + radius}
-            Q ${left},${top} ${left + radius},${top}
-        `;
+        M ${left + radius},${top}
+        L ${right - radius},${top}
+        Q ${right},${top} ${right},${top + radius}
+        L ${right},${bottom - radius}
+        Q ${right},${bottom} ${right - radius},${bottom}
+        L ${left + radius},${bottom}
+        Q ${left},${bottom} ${left},${bottom - radius}
+        L ${left},${top + radius}
+        Q ${left},${top} ${left + radius},${top}
+    `;
     };
 
-    // Simplified progress indicator that's more visually consistent
-    const renderProgressIndicator = (completionRate = 0, size = DATE_CARD_WIDTH) => {
-        const path = getProgressPath(size);
+// Modify the renderProgressIndicator to pass width
+    const renderProgressIndicator = (completionRate = 0, size = DATE_CARD_WIDTH, width = DATE_CARD_WIDTH - 10) => {
+        const path = getProgressPath(size, width);
         const pathLength = 270; // Approximate path length
         const dashOffset = pathLength - ((pathLength * completionRate) / 100);
 
@@ -273,7 +278,17 @@ const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendar
         }
 
         return (
-            <View style={[styles.progressSvgContainer, {width: size, height: size}]}>
+            <View style={[
+                styles.progressSvgContainer,
+                {
+                    width: size + 10,
+                    height: size + 15,
+                    position: 'absolute',
+                    left: 0, // Center horizontally
+                    top: 0, // Align with the top of the date card
+                    zIndex: 5
+                }
+            ]}>
                 <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                     {/* Background path - darker in dark mode */}
                     <Path
@@ -303,7 +318,18 @@ const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendar
 
     // Improved DateComponent for better readability and visual clarity
     const DateComponent = ({date, selected}: { date: moment.Moment, selected: boolean }) => {
+        const currentMoment = moment();
         const isToday = date.isSame(moment(), 'day');
+        const isPastDay = date.isBefore(moment(), 'day');
+        const isFutureDay = date.isAfter(moment(), 'day');
+
+        const shouldShowSeparator = () => {
+            if (!isToday) return false;
+
+            const previousDate = moment(date).subtract(1, 'day');
+            return previousDate.isBefore(currentMoment, 'day');
+        };
+
         const day = date.format('ddd').toUpperCase();
         const dayNumber = date.format('D');
         const fullDate = date.format('YYYY-MM-DD');
@@ -333,27 +359,17 @@ const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendar
                         styles.taskIndicator,
                         selected && styles.selectedTaskIndicator,
                         isComplete && styles.completeTaskIndicator,
+                        isPastDay && !isComplete && styles.pastDayTaskIndicator
                     ]}>
                         <View style={styles.taskCountContainer}>
-                            {isComplete ? (
-                                // Show checkmark for completed days
-                                <Text style={[
-                                    styles.taskCountText,
-                                    selected && styles.selectedTaskCountText,
-                                    isComplete && styles.completeTaskCountText
-                                ]}>
-                                    {`${completedTasksCount}/${taskCount}`}
-                                </Text>
-                            ) : (
-                                // Show task ratio for incomplete days
-                                <Text style={[
-                                    styles.taskCountText,
-                                    selected && styles.selectedTaskCountText,
-                                    isComplete && styles.completeTaskCountText
-                                ]}>
-                                    {`${completedTasksCount}/${taskCount}`}
-                                </Text>
-                            )}
+                            <Text style={[
+                                styles.taskCountText,
+                                selected && styles.selectedTaskCountText,
+                                isComplete && styles.completeTaskCountText,
+                                isPastDay && !isComplete && !selected && styles.pastDayTaskCountText
+                            ]}>
+                                {`${completedTasksCount}/${taskCount}`}
+                            </Text>
                         </View>
                     </View>
                 )}
@@ -361,34 +377,51 @@ const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendar
                 <TouchableOpacity
                     onPress={handleDateSelect}
                     style={[
-                        styles.dateCardContainer,
-                        selected && styles.selectedDateCardContainer,
+                        styles.dateCardContainer
                     ]}
-                    accessibilityLabel={`${isToday ? 'Today' : day} ${dayNumber} with ${taskCount} tasks, ${completedTasksCount} completed`}
+                    accessibilityLabel={`${isToday ? 'Today, ' : ''}${day} ${dayNumber} with ${taskCount} tasks, ${completedTasksCount} completed`}
                     accessibilityRole="button"
                     accessibilityState={{selected}}
                 >
+                    {/* Today Label */}
+                    {isToday && !selected && (
+                        <View style={styles.todayLabel}>
+                            <Text style={styles.todayLabelText}>TODAY</Text>
+                        </View>
+                    )}
+
                     {/* SVG Progress Indicator */}
                     {hasTasks && renderProgressIndicator(completionRate, DATE_CARD_WIDTH)}
 
+                    {/* Separator between past days and today/future */}
+                    {shouldShowSeparator() && (
+                        <View style={styles.separatorBetweenDates} />
+                    )}
+
                     <View style={[
                         styles.dateCard,
-                        selected && styles.selectedDateCard,
-                        isToday && styles.todayDateCard
+                        isPastDay && !selected && styles.pastDateCard,
+                        isToday && !selected && styles.todayDateCard,
+                        isFutureDay && !selected && styles.futureDateCard,
+                        selected && styles.selectedDateCard
                     ]}>
                         <Text style={[
                             styles.dayText,
-                            isWeekend && styles.weekendText,
+                            isWeekend && !isPastDay && styles.weekendText,
                             selected && styles.selectedDayText,
-                            isToday && styles.todayText,
+                            isToday && !selected && styles.todayText,
+                            isPastDay && !selected && styles.pastDayText,
+                            isFutureDay && !selected && !isWeekend && styles.futureDayText
                         ]}>
                             {day}
                         </Text>
                         <Text style={[
                             styles.dateText,
-                            isWeekend && styles.weekendText,
+                            isWeekend && !isPastDay && styles.weekendText,
                             selected && styles.selectedDateText,
-                            isToday && styles.todayText,
+                            isToday && !selected && styles.todayText,
+                            isPastDay && !selected && styles.pastDayText,
+                            isFutureDay && !selected && !isWeekend && styles.futureDayText
                         ]}>
                             {dayNumber}
                         </Text>
@@ -399,60 +432,63 @@ const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowCalendar
     };
 
     return (
-        <View style={styles.container}>
-            {/* Improved header with clearer organization */}
-            <View style={styles.headerContainer}>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.monthText}>{currentMonth}</Text>
-                    <TouchableOpacity
-                        onPress={scrollToToday}
-                        style={styles.todayButton}
-                        accessibilityLabel="Go to today"
-                        accessibilityRole="button"
-                    >
-                        <Text style={styles.todayButtonText}>Today</Text>
-                    </TouchableOpacity>
-                </View>
+        <>
+            <View style={styles.container}>
+                {/* Improved header with clearer organization */}
+                <View style={styles.headerContainer}>
+                    <View style={styles.headerTitleContainer}>
+                        <Text style={styles.monthText}>{currentMonth}</Text>
+                        <TouchableOpacity
+                            onPress={scrollToToday}
+                            style={styles.todayButton}
+                            accessibilityLabel="Go to today"
+                            accessibilityRole="button"
+                        >
+                            <Feather name="calendar" size={14} color={COLORS.white} style={styles.todayButtonIcon} />
+                            <Text style={styles.todayButtonText}>Today</Text>
+                        </TouchableOpacity>
+                    </View>
 
-                {/* Filter Buttons with labels for better clarity */}
-                <View style={styles.filterContainer}>
-                    {renderFilter('all', 'All', filter, setFilter, getFilterCount, <Feather name="grid"/>)}
-                    {renderFilter('active', 'Active', filter, setFilter, getFilterCount, <Feather name="clock"/>)}
-                    {renderFilter('overdue', 'Overdue', filter, setFilter, getFilterCount, <Feather
-                        name="alert-triangle"/>)}
-                    {renderFilter('completed', 'Done', filter, setFilter, getFilterCount, <Feather
-                        name="check-circle"/>)}
+                    {/* Calendar scroll area with fade effect */}
+                    <View style={styles.scrollViewContainer}>
+                        <ScrollView
+                            ref={scrollViewRef}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.scrollContent}
+                            decelerationRate="normal"
+                            scrollEventThrottle={16}
+                            bounces={false}
+                            removeClippedSubviews={true}
+                            pagingEnabled={false}
+                            directionalLockEnabled={true}
+                        >
+                            {dates.map((date, index) => (
+                                <DateComponent
+                                    key={index}
+                                    date={date}
+                                    selected={date.format('YYYY-MM-DD') === selectedDate}
+                                />
+                            ))}
+                        </ScrollView>
+                    </View>
                 </View>
             </View>
 
-            {/* Calendar scroll area */}
-            <ScrollView
-                ref={scrollViewRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-                decelerationRate="normal"
-                scrollEventThrottle={16}
-                bounces={false}
-                removeClippedSubviews={true}
-                pagingEnabled={false}
-                directionalLockEnabled={true}
-            >
-                {dates.map((date, index) => (
-                    <DateComponent
-                        key={index}
-                        date={date}
-                        selected={date.format('YYYY-MM-DD') === selectedDate}
-                    />
-                ))}
-            </ScrollView>
-        </View>
+            {/* Filter Buttons with labels for better clarity - now outside the main container */}
+            <View style={styles.filterContainer}>
+                {renderFilter('all', 'All', filter, setFilter, getFilterCount, <Feather name="list" />)}
+                {renderFilter('active', 'Active', filter, setFilter, getFilterCount, <Feather name="clock" />)}
+                {renderFilter('overdue', 'Overdue', filter, setFilter, getFilterCount, <Feather name="alert-triangle" />)}
+                {renderFilter('completed', 'Done', filter, setFilter, getFilterCount, <Feather name="check-circle" />)}
+            </View>
+        </>
     );
 });
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.card,
         borderRadius: RADIUS.lg,
         paddingVertical: SPACING.md,
         paddingHorizontal: SPACING.md,
@@ -460,6 +496,8 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.md,
         overflow: 'visible',
         ...SHADOWS.medium,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     headerContainer: {
         paddingBottom: SPACING.sm,
@@ -472,36 +510,45 @@ const styles = StyleSheet.create({
     },
     monthText: {
         ...Typography.h4,
-        color: COLORS.textPrimary, // Deeper black #111827
+        color: COLORS.textPrimary,
         fontWeight: '600',
     },
     todayButton: {
-        backgroundColor: COLORS.primary, // Deeper blue #2563EB
+        backgroundColor: COLORS.primary,
         borderRadius: RADIUS.md,
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.xs,
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 2},
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
+        ...SHADOWS.small,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    todayButtonIcon: {
+        marginRight: SPACING.xs,
     },
     todayButtonText: {
         color: COLORS.white,
         fontWeight: 'bold',
         fontSize: 14,
     },
+    scrollViewContainer: {
+        position: 'relative',
+        height: 80,
+        overflow: 'visible',
+    },
     scrollContent: {
         paddingVertical: SPACING.sm,
-        paddingHorizontal: 20, // Add horizontal padding to ensure first and last items are properly visible
+        paddingHorizontal: 40,
     },
     filterContainer: {
+        paddingVertical: SPACING.xs,
+        paddingHorizontal: SPACING.md,
+        marginHorizontal: SPACING.xs,
+        marginBottom: SPACING.xs,
+        overflow: 'visible',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: SPACING.sm,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border, // Slightly darker border #D1D5DB
     },
     filterButton: {
         flexDirection: 'row',
@@ -509,41 +556,52 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: SPACING.xs,
         borderRadius: RADIUS.md,
-        backgroundColor: 'transparent',
         flex: 1,
         marginHorizontal: 2,
+        paddingVertical: SPACING.sm,
+        position: 'relative',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     activeFilterButton: {
-        backgroundColor: COLORS.primary, // Deeper blue #2563EB
-        // Add a subtle border for better definition when active
+        backgroundColor: COLORS.primary,
         borderWidth: 1,
-        borderColor: COLORS.primaryDark, // Deeper shade #1E40AF
+        borderColor: COLORS.primaryDark,
     },
     filterLabel: {
-        fontSize: 12,
-        color: COLORS.textSecondary, // Darker gray #4B5563
+        ...Typography.tiny,
+        color: COLORS.textSecondary,
         marginLeft: 4,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     activeFilterLabel: {
         color: COLORS.white,
     },
     badge: {
         position: 'absolute',
-        top: -4,
-        right: -4,
-        backgroundColor: COLORS.accent1, // More vibrant red #DC2626
-        borderRadius: 10,
+        top: -6,
+        right: -6,
+        backgroundColor: COLORS.primary,
+        borderRadius: RADIUS.round,
         paddingHorizontal: 4,
-        minWidth: 16,
-        height: 16,
+        minWidth: 18,
+        height: 18,
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.background,
+        ...SHADOWS.small,
+    },
+    badgeOverdue: {
+        backgroundColor: COLORS.accent1,
+    },
+    badgeCompleted: {
+        backgroundColor: COLORS.success,
     },
     badgeText: {
-        color: 'white',
+        color: COLORS.white,
         fontSize: 10,
-        fontWeight: '600'
+        fontWeight: '700',
     },
     dateContainer: {
         alignItems: 'center',
@@ -556,38 +614,74 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         width: DATE_CARD_WIDTH,
-        height: 70,
+        height: 80,
     },
     progressSvgContainer: {
         position: 'absolute',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1,
+        zIndex: 5,
+        transform: [{scale: 1.1}],
+    },
+    todayLabel: {
+        position: 'absolute',
+        top: -20,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 3,
+    },
+    todayLabelText: {
+        ...Typography.tiny,
+        color: COLORS.success,
+        fontWeight: 'bold',
+        fontSize: 8,
     },
     dateCard: {
-        backgroundColor: COLORS.background, // Slightly cooler background #F8FAFC
         borderRadius: 14,
         padding: SPACING.xs,
         alignItems: 'center',
         justifyContent: 'center',
-        height: DATE_CARD_WIDTH - 10,
+        height: DATE_CARD_WIDTH,
         width: DATE_CARD_WIDTH - 10,
         zIndex: 2,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     selectedDateCard: {
-        backgroundColor: COLORS.primary, // Deeper blue #2563EB
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primaryDark,
+        borderRadius: 10,
     },
     todayDateCard: {
-        borderWidth: 3, // Increased for better visibility
-        borderColor: COLORS.success, // Deeper green #059669
+        backgroundColor: COLORS.cardBlue,
+        borderColor: COLORS.primary,
+        borderWidth: 2,
+        borderRadius: 100,
     },
-    selectedDateCardContainer: {
-        transform: [{scale: 1.05}],
+    separatorBetweenDates: {
+        position: 'absolute',
+        width: 3,
+        borderRadius: 4,
+        backgroundColor: COLORS.textTertiary,
+        height: '50%',
+        left: -4,
+        zIndex: 10,
+        top: 20,
+    },
+    pastDateCard: {
+        backgroundColor: COLORS.cardShadow,
+        opacity: 0.75,
+    },
+    futureDateCard: {
+        backgroundColor: COLORS.background,
+        borderColor: COLORS.border,
     },
     dayText: {
         fontSize: 12,
         fontWeight: '600',
-        color: COLORS.textSecondary, // Darker gray #4B5563
+        color: COLORS.textSecondary,
         marginBottom: 4,
         letterSpacing: 0.5,
     },
@@ -595,47 +689,56 @@ const styles = StyleSheet.create({
         color: COLORS.white,
     },
     todayText: {
-        color: COLORS.success, // Deeper green #059669
-        fontWeight: 'bold'
+        color: COLORS.primary,
+        fontWeight: 'bold',
+    },
+    pastDayText: {
+        color: COLORS.textTertiary,
+        fontWeight: '400',
+    },
+    futureDayText: {
+        color: COLORS.textPrimary,
+        fontWeight: '500',
     },
     dateText: {
         fontSize: 20,
         fontWeight: '700',
-        color: COLORS.textPrimary, // Deeper black #111827
+        color: COLORS.textPrimary,
     },
     selectedDateText: {
         color: COLORS.white,
     },
     weekendText: {
-        color: COLORS.accent2, // Warmer orange #F59E0B
+        color: COLORS.accent2,
     },
     taskIndicator: {
         position: 'absolute',
         top: -8,
         height: 20,
-        backgroundColor: COLORS.white,
-        borderWidth: 1.5, // Slightly thicker for better visibility
-        borderColor: COLORS.border, // Slightly darker border #D1D5DB
-        borderRadius: 10,
+        backgroundColor: COLORS.background,
+        borderWidth: 1.5,
+        borderColor: COLORS.border,
+        borderRadius: RADIUS.round,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 6,
         zIndex: 10,
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 1},
-        shadowOpacity: 0.1,
-        shadowRadius: 1,
-        elevation: 2,
+        ...SHADOWS.small,
         minWidth: 36,
     },
     selectedTaskIndicator: {
-        backgroundColor: COLORS.primaryLight, // Slightly more saturated #DBEAFE
-        borderColor: COLORS.primary, // Deeper blue #2563EB
+        backgroundColor: COLORS.primaryLight,
+        borderColor: COLORS.primary,
     },
     completeTaskIndicator: {
-        backgroundColor: COLORS.success, // Deeper green #059669
-        borderColor: COLORS.success, // Deeper green #059669
+        backgroundColor: COLORS.success,
+        borderColor: COLORS.success,
+    },
+    pastDayTaskIndicator: {
+        backgroundColor: COLORS.cardShadow,
+        borderColor: COLORS.border,
+        opacity: 0.7,
     },
     taskCountContainer: {
         minWidth: 16,
@@ -643,15 +746,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     taskCountText: {
-        color: COLORS.textPrimary, // Deeper black #111827 for better readability
+        color: COLORS.textPrimary,
         fontSize: 10,
         fontWeight: 'bold',
     },
     selectedTaskCountText: {
-        color: COLORS.primaryDark, // Deeper blue #1E40AF
+        color: COLORS.primaryDark,
     },
     completeTaskCountText: {
         color: COLORS.white,
+    },
+    pastDayTaskCountText: {
+        color: COLORS.textTertiary,
     },
 });
 

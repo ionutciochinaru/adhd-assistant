@@ -23,10 +23,8 @@ import { COLORS, SPACING, FONTS, Typography, RADIUS, SHADOWS } from '../../utils
 import { normalizeDate } from '../../utils/dateUtils';
 import SingleRowCalendar, {SingleRowCalendarMethods} from "../../components/SingleRowCalendar";
 import {MarkedDates} from "react-native-calendars/src/types";
-import moment from "moment";
 import {TasksStackParamList} from "../../navigation/TasksNavigator";
 import {StackNavigationProp} from "@react-navigation/stack";
-import TasksHeaderSection from "../../components/TaskHeaderSection";
 
 const TasksScreen = () => {
     const navigation = useNavigation<StackNavigationProp<TasksStackParamList>>();
@@ -528,13 +526,6 @@ const TasksScreen = () => {
                     setFilter={setFilter}
                     getFilterCount={getFilterCount}
                 />
-                {/*<TasksHeaderSection*/}
-                {/*    completionRate={completionRate}*/}
-                {/*    motivationalMessage={motivationalMessage}*/}
-                {/*    filter={filter}*/}
-                {/*    setFilter={setFilter}*/}
-                {/*    getFilterCount={getFilterCount}*/}
-                {/*/>*/}
 
                 {/* Tasks List */}
                 {loading ? (
@@ -748,6 +739,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: SPACING.xl,
+        backgroundColor: COLORS.background,
     },
     emptyImage: {
         width: 120,
