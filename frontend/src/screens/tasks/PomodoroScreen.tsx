@@ -5,8 +5,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     Alert,
-    ScrollView,
-    FlatList
+    ScrollView
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -216,19 +215,19 @@ const PomodoroScreen: React.FC = () => {
                 return {
                     title: 'Focus Session',
                     color: COLORS.primary,
-                    backgroundColor: COLORS.primaryLight
+                    backgroundColor: COLORS.cardBlue
                 };
             case 'shortBreak':
                 return {
                     title: 'Short Break',
                     color: COLORS.accent2,
-                    backgroundColor: COLORS.primaryLight
+                    backgroundColor: COLORS.cardOrange
                 };
             case 'longBreak':
                 return {
                     title: 'Long Break',
                     color: COLORS.accent3,
-                    backgroundColor: COLORS.primaryLight
+                    backgroundColor: COLORS.cardGreen
                 };
         }
     };
@@ -292,15 +291,15 @@ const PomodoroScreen: React.FC = () => {
                     <View style={styles.sessionStatsContainer}>
                         <View style={styles.statItem}>
                             <Text style={styles.statLabel}>Sessions</Text>
-                            <Text style={styles.statValue}>{totalSessions}</Text>
+                            <Text style={[styles.statValue, { color: modeConfig.color }]}>{totalSessions}</Text>
                         </View>
                         <View style={styles.statItem}>
                             <Text style={styles.statLabel}>Breaks</Text>
-                            <Text style={styles.statValue}>{totalBreaks}</Text>
+                            <Text style={[styles.statValue, { color: modeConfig.color }]}>{totalBreaks}</Text>
                         </View>
                         <View style={styles.statItem}>
                             <Text style={styles.statLabel}>Time Spent</Text>
-                            <Text style={styles.statValue}>
+                            <Text style={[styles.statValue, { color: modeConfig.color }]}>
                                 {Math.floor(totalTimeSpent / 60)}m {totalTimeSpent % 60}s
                             </Text>
                         </View>
@@ -351,11 +350,10 @@ const PomodoroScreen: React.FC = () => {
                     {subtasks.length === 0 ? (
                         <Text style={styles.noSubtasksText}>No subtasks</Text>
                     ) : (
-                        <FlatList
-                            data={subtasks}
-                            keyExtractor={(item) => item.id}
-                            renderItem={({ item }) => (
+                        <View>
+                            {subtasks.map((item) => (
                                 <TouchableOpacity
+                                    key={item.id}
                                     style={[
                                         styles.subtaskItem,
                                         item.status === 'completed' && styles.completedSubtask
@@ -384,14 +382,14 @@ const PomodoroScreen: React.FC = () => {
                                         {item.title}
                                     </Text>
                                 </TouchableOpacity>
-                            )}
-                        />
+                            ))}
+                        </View>
                     )}
                 </View>
 
                 {/* Complete Task Button */}
                 <TouchableOpacity
-                    style={styles.completeTaskButton}
+                    style={[styles.completeTaskButton, { backgroundColor: COLORS.success }]}
                     onPress={handleCompleteTask}
                 >
                     <Text style={styles.completeTaskButtonText}>Complete Task</Text>
@@ -420,7 +418,7 @@ const styles = StyleSheet.create({
     },
     progressText: {
         ...Typography.bodySmall,
-        color: COLORS.textSecondary,
+        color: COLORS.textLight,
         textAlign: 'center',
         fontStyle: 'italic',
     },
@@ -468,7 +466,6 @@ const styles = StyleSheet.create({
     statValue: {
         ...Typography.bodyMedium,
         fontWeight: '600',
-        color: COLORS.primary,
     },
     taskDetailsContainer: {
         marginHorizontal: SPACING.md,
@@ -476,6 +473,7 @@ const styles = StyleSheet.create({
     },
     taskInfoCard: {
         ...CommonStyles.card,
+        backgroundColor: COLORS.card,
     },
     taskTitle: {
         ...Typography.h2,
@@ -518,7 +516,7 @@ const styles = StyleSheet.create({
     subtaskItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.card,
         padding: SPACING.md,
         borderRadius: RADIUS.md,
         marginBottom: SPACING.sm,
@@ -531,6 +529,7 @@ const styles = StyleSheet.create({
         ...Typography.bodyMedium,
         marginLeft: SPACING.md,
         flex: 1,
+        color: COLORS.textPrimary,
     },
     completedSubtaskText: {
         textDecorationLine: 'line-through',
@@ -538,7 +537,6 @@ const styles = StyleSheet.create({
     },
     completeTaskButton: {
         ...CommonStyles.buttonLarge,
-        backgroundColor: COLORS.success,
         marginHorizontal: SPACING.md,
         marginTop: SPACING.lg,
     },
