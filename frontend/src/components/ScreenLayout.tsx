@@ -29,7 +29,7 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                                                        contentContainerStyle,
                                                    }) => {
     // Use the hook to get dynamic tab bar height
-    const tabBarHeight = useTabBarHeight();
+    const tabBarHeight = 0;
 
     // Determine if we need dark status bar based on background color
     const isDarkBackground = backgroundColor === COLORS.background ||

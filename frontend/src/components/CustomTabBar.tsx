@@ -260,10 +260,13 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                                     isFocused && styles.activeIconContainer
                                 ]}>
                                     <Ionicons
-                                        name={iconName}
+                                        name='navigate'
                                         size={24}
                                         color={isFocused ? COLORS.primary : COLORS.textTertiary}
                                     />
+                                    <Text>
+                                        {route.name}
+                                    </Text>
                                 </View>
                             </TouchableOpacity>
                         );
