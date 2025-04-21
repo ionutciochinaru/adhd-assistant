@@ -257,14 +257,15 @@ export const SingleRowCalendar = forwardRef<SingleRowCalendarMethods, SingleRowC
     `;
     };
 
-// Modify the renderProgressIndicator to pass width
+    // Modify the renderProgressIndicator to pass width
     const renderProgressIndicator = (completionRate = 0, size = DATE_CARD_WIDTH, width = DATE_CARD_WIDTH - 10) => {
         const path = getProgressPath(size, width);
-        const pathLength = 270; // Approximate path length
+        const pathLength = 170; // Approximate path length
         const dashOffset = pathLength - ((pathLength * completionRate) / 100);
 
         // Enhanced color based on completion rate for better ADHD distinction
         let color;
+        console.log('Completion Rate:', completionRate);
         if (completionRate === 100) {
             color = COLORS.success; // Green for completion
         } else if (completionRate >= 75) {
