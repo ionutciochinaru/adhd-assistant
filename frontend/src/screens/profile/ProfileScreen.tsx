@@ -11,6 +11,7 @@ import {
     Image,
     TextInput,
     ActivityIndicator,
+    Animated,
 } from 'react-native';
 import {useAuth} from '../../context/AuthContext';
 import {useTaskNotifications} from '../../hooks/useTaskNotifications';
@@ -18,7 +19,8 @@ import * as Notifications from 'expo-notifications';
 import {supabase} from '../../utils/supabase';
 import ScreenLayout from "../../components/ScreenLayout";
 import ActionButtons from "../../components/ActionButtons";
-import {COLORS, SPACING} from "../../utils/styles";
+import {COLORS, SPACING, RADIUS, Typography, SHADOWS, FONTS, CommonStyles} from "../../utils/styles";
+import {Ionicons} from '@expo/vector-icons';
 
 const ProfileScreen = () => {
     const {user, signOut, updateUser} = useAuth();
@@ -37,11 +39,29 @@ const ProfileScreen = () => {
         medicationReminders: true,
     });
 
+    // Animations
+    const fadeAnim = useState(new Animated.Value(0))[0];
+    const translateYAnim = useState(new Animated.Value(20))[0];
+
     // Load user profile data on mount
     useEffect(() => {
         if (user) {
             loadUserData();
             checkNotificationPermissions();
+
+            // Start fade-in animation
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 600,
+                    useNativeDriver: true
+                }),
+                Animated.timing(translateYAnim, {
+                    toValue: 0,
+                    duration: 600,
+                    useNativeDriver: true
+                })
+            ]).start();
         }
     }, [user]);
 
@@ -235,153 +255,194 @@ const ProfileScreen = () => {
         );
     };
 
+    // Render a single preference toggle item
+    const renderPreferenceItem = (
+        title: string,
+        description: string,
+        setting: keyof typeof notifications,
+        icon: string
+    ) => (
+        <View style={styles.preferenceItem}>
+            <View style={styles.preferenceIconContainer}>
+                <Ionicons name={icon as any} size={24} color={COLORS.primary} />
+            </View>
+            <View style={styles.preferenceContent}>
+                <Text style={styles.preferenceTitle}>{title}</Text>
+                <Text style={styles.preferenceDescription}>{description}</Text>
+            </View>
+            <Switch
+                value={notifications[setting]}
+                onValueChange={(value) => toggleNotificationSetting(setting, value)}
+                trackColor={{false: COLORS.cardShadow, true: COLORS.primaryLight}}
+                thumbColor={notifications[setting] ? COLORS.primary : COLORS.border}
+                disabled={!notificationPermission || loadingPreferences}
+                style={styles.preferenceSwitch}
+            />
+        </View>
+    );
+
+    const renderMenuItem = (title: string, icon: string, onPress: () => void) => (
+        <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+            <View style={styles.menuIconContainer}>
+                <Ionicons name={icon as any} size={24} color={COLORS.primary} />
+            </View>
+            <Text style={styles.menuItemText}>{title}</Text>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
+        </TouchableOpacity>
+    );
+
     return (
         <ScreenLayout
             title="Profile"
-            showHeader={false}
+            backgroundColor={COLORS.background}
         >
-            <ScrollView style={styles.container}>
-                <View style={styles.header}>
-                    <View style={styles.profileImageContainer}>
-                        <Image
-                            source={require('../../../assets/adaptive-icon.png')}
-                            style={styles.profileImage}
-                        />
-                        <TouchableOpacity style={styles.editImageButton}>
-                            <Text style={styles.editImageText}>Edit</Text>
-                        </TouchableOpacity>
+            <ScrollView
+                style={styles.container}
+                showsVerticalScrollIndicator={false}
+            >
+                <Animated.View style={[
+                    styles.content,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: translateYAnim }]
+                    }
+                ]}>
+                    <View style={styles.header}>
+                        <View style={styles.profileImageContainer}>
+                            <Image
+                                source={require('../../../assets/adaptive-icon.png')}
+                                style={styles.profileImage}
+                            />
+                            <TouchableOpacity style={styles.editImageButton}>
+                                <Ionicons name="camera" size={14} color={COLORS.white} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.profileInfo}>
+                            {isEditing ? (
+                                <View style={styles.editNameContainer}>
+                                    <TextInput
+                                        style={styles.nameInput}
+                                        value={name}
+                                        onChangeText={setName}
+                                        placeholder="Enter your name"
+                                        placeholderTextColor={COLORS.textTertiary}
+                                    />
+                                    <ActionButtons
+                                        onCancel={() => setIsEditing(false)}
+                                        onSave={handleUpdateProfile}
+                                        loading={loading}
+                                    />
+                                </View>
+                            ) : (
+                                <View style={styles.nameContainer}>
+                                    <Text style={styles.name}>{name || 'Add your name'}</Text>
+                                    <TouchableOpacity
+                                        style={styles.editNameButton}
+                                        onPress={() => setIsEditing(true)}
+                                    >
+                                        <Ionicons name="pencil" size={16} color={COLORS.white} />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                            <Text style={styles.email}>{user?.email}</Text>
+                        </View>
                     </View>
 
-                    <View style={styles.profileInfo}>
-                        {isEditing ? (
-                            <View style={styles.editNameContainer}>
-                                <TextInput
-                                    style={styles.nameInput}
-                                    value={name}
-                                    onChangeText={setName}
-                                    placeholder="Enter your name"
-                                />
-                                <ActionButtons
-                                    onCancel={() => setIsEditing(false)}
-                                    onSave={handleUpdateProfile}
-                                    loading={loading}
-                                />
-                            </View>
-                        ) : (
-                            <View style={styles.nameContainer}>
-                                <Text style={styles.name}>{name || 'Add your name'}</Text>
+                    {!notificationPermission && (
+                        <View style={styles.notificationPermissionContainer}>
+                            <Ionicons name="notifications-off" size={24} color={COLORS.danger} style={styles.notificationIcon} />
+                            <View style={styles.notificationTextContainer}>
+                                <Text style={styles.notificationPermissionText}>
+                                    Notifications are disabled. Enable them to get reminders for your tasks.
+                                </Text>
                                 <TouchableOpacity
-                                    style={styles.editNameButton}
-                                    onPress={() => setIsEditing(true)}
+                                    style={styles.notificationPermissionButton}
+                                    onPress={requestNotificationPermissions}
                                 >
-                                    <Text style={styles.editNameText}>Edit</Text>
+                                    <Text style={styles.notificationPermissionButtonText}>
+                                        Enable Notifications
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
-                        )}
-                        <Text style={styles.email}>{user?.email}</Text>
-                    </View>
-                </View>
-
-                {!notificationPermission && (
-                    <View style={styles.notificationPermissionContainer}>
-                        <Text style={styles.notificationPermissionText}>
-                            Notifications are disabled. Enable them to get reminders for your tasks.
-                        </Text>
-                        <TouchableOpacity
-                            style={styles.notificationPermissionButton}
-                            onPress={requestNotificationPermissions}
-                        >
-                            <Text style={styles.notificationPermissionButtonText}>
-                                Enable Notifications
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Notification Preferences</Text>
-
-                    {loadingPreferences ? (
-                        <ActivityIndicator style={{margin: 20}} size="small" color="#3498db"/>
-                    ) : (
-                        <>
-                            <View style={styles.preferenceItem}>
-                                <Text style={styles.preferenceText}>Task Reminders</Text>
-                                <Switch
-                                    value={notifications.taskReminders}
-                                    onValueChange={(value) => toggleNotificationSetting('taskReminders', value)}
-                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
-                                    thumbColor={notifications.taskReminders ? '#3498db' : '#F4F4F4'}
-                                    disabled={!notificationPermission || loadingPreferences}
-                                />
-                            </View>
-
-                            <View style={styles.preferenceItem}>
-                                <Text style={styles.preferenceText}>Daily Task Digest</Text>
-                                <Switch
-                                    value={notifications.dailyDigest}
-                                    onValueChange={(value) => toggleNotificationSetting('dailyDigest', value)}
-                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
-                                    thumbColor={notifications.dailyDigest ? '#3498db' : '#F4F4F4'}
-                                    disabled={!notificationPermission || loadingPreferences}
-                                />
-                            </View>
-
-                            <View style={styles.preferenceItem}>
-                                <Text style={styles.preferenceText}>Weekly Progress Report</Text>
-                                <Switch
-                                    value={notifications.weeklyReport}
-                                    onValueChange={(value) => toggleNotificationSetting('weeklyReport', value)}
-                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
-                                    thumbColor={notifications.weeklyReport ? '#3498db' : '#F4F4F4'}
-                                    disabled={!notificationPermission || loadingPreferences}
-                                />
-                            </View>
-
-                            <View style={styles.preferenceItem}>
-                                <Text style={styles.preferenceText}>Medication Reminders</Text>
-                                <Switch
-                                    value={notifications.medicationReminders}
-                                    onValueChange={(value) => toggleNotificationSetting('medicationReminders', value)}
-                                    trackColor={{false: '#D1D1D6', true: '#BFE9FF'}}
-                                    thumbColor={notifications.medicationReminders ? '#3498db' : '#F4F4F4'}
-                                    disabled={!notificationPermission || loadingPreferences}
-                                />
-                            </View>
-                        </>
+                        </View>
                     )}
-                </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Account</Text>
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Notification Preferences</Text>
 
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuItemText}>Change Password</Text>
+                        {loadingPreferences ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color={COLORS.primary} />
+                                <Text style={styles.loadingText}>Loading preferences...</Text>
+                            </View>
+                        ) : (
+                            <View style={styles.preferencesContainer}>
+                                {renderPreferenceItem(
+                                    'Task Reminders',
+                                    'Receive notifications for upcoming tasks and deadlines',
+                                    'taskReminders',
+                                    'checkmark-circle'
+                                )}
+
+                                {renderPreferenceItem(
+                                    'Daily Task Digest',
+                                    'Get a daily summary of your tasks at 8:00 AM',
+                                    'dailyDigest',
+                                    'calendar'
+                                )}
+
+                                {renderPreferenceItem(
+                                    'Weekly Progress Report',
+                                    'Receive a summary of your completed tasks each week',
+                                    'weeklyReport',
+                                    'bar-chart'
+                                )}
+
+                                {renderPreferenceItem(
+                                    'Medication Reminders',
+                                    'Get reminders for taking your medications',
+                                    'medicationReminders',
+                                    'medical'
+                                )}
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Account Settings</Text>
+
+                        <View style={styles.menuContainer}>
+                            {renderMenuItem('Change Password', 'lock-closed', () => {
+                                Alert.alert('Coming Soon', 'This feature will be available soon!');
+                            })}
+
+                            {renderMenuItem('Data & Privacy', 'shield-checkmark', () => {
+                                Alert.alert('Coming Soon', 'This feature will be available soon!');
+                            })}
+
+                            {renderMenuItem('Help & Support', 'help-circle', () => {
+                                Alert.alert('Coming Soon', 'This feature will be available soon!');
+                            })}
+
+                            {renderMenuItem('About', 'information-circle', () => {
+                                Alert.alert('Coming Soon', 'This feature will be available soon!');
+                            })}
+                        </View>
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.signOutButton}
+                        onPress={handleSignOut}
+                    >
+                        <Ionicons name="exit-outline" size={20} color={COLORS.white} style={styles.signOutIcon} />
+                        <Text style={styles.signOutButtonText}>Sign Out</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuItemText}>Data & Privacy</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuItemText}>Help & Support</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuItemText}>About</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                    style={styles.signOutButton}
-                    onPress={handleSignOut}
-                >
-                    <Text style={styles.signOutButtonText}>Sign Out</Text>
-                </TouchableOpacity>
-
-                <View style={styles.versionContainer}>
-                    <Text style={styles.versionText}>Version 1.0.0</Text>
-                </View>
+                    <View style={styles.versionContainer}>
+                        <Text style={styles.versionText}>Version 1.0.0</Text>
+                    </View>
+                </Animated.View>
             </ScrollView>
         </ScreenLayout>
     );
@@ -390,37 +451,43 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.light,
+        backgroundColor: COLORS.background,
+    },
+    content: {
+        flex: 1,
+        paddingBottom: SPACING.xl,
     },
     header: {
-        padding: SPACING.xl,
-        backgroundColor: COLORS.white,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.lg,
+        margin: SPACING.md,
+        ...SHADOWS.medium,
     },
     profileImageContainer: {
         position: 'relative',
-        marginRight: 20,
+        marginRight: SPACING.md,
     },
     profileImage: {
         width: 80,
         height: 80,
         borderRadius: 40,
+        borderWidth: 3,
+        borderColor: COLORS.primary,
     },
     editImageButton: {
         position: 'absolute',
         bottom: 0,
         right: 0,
-        backgroundColor: '#3498db',
-        borderRadius: 10,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-    },
-    editImageText: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...SHADOWS.small,
     },
     profileInfo: {
         flex: 1,
@@ -428,144 +495,181 @@ const styles = StyleSheet.create({
     nameContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 4,
+        marginBottom: SPACING.sm,
     },
     name: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginRight: 8,
+        ...Typography.h3,
+        color: COLORS.textPrimary,
+        marginRight: SPACING.sm,
     },
     editNameButton: {
-        backgroundColor: '#F0F0F0',
-        borderRadius: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-    },
-    editNameText: {
-        color: '#666',
-        fontSize: 12,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.small,
     },
     email: {
-        fontSize: 14,
-        color: '#666',
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
     },
     editNameContainer: {
-        marginBottom: 8,
+        marginBottom: SPACING.sm,
     },
     nameInput: {
+        ...CommonStyles.input,
+        marginBottom: SPACING.sm,
+        backgroundColor: COLORS.inputBackground,
+        color: COLORS.textPrimary,
         borderWidth: 1,
-        borderColor: '#DDE3ED',
-        borderRadius: 6,
-        padding: 8,
-        fontSize: 16,
-        backgroundColor: '#FFFFFF',
-        marginBottom: 8,
-    },
-    editButtonsRow: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-    },
-    editButton: {
-        borderRadius: 4,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        marginLeft: 8,
-    },
-    cancelButton: {
-        backgroundColor: '#F0F0F0',
-    },
-    cancelButtonText: {
-        color: '#666',
-    },
-    saveButton: {
-        backgroundColor: '#3498db',
-    },
-    saveButtonText: {
-        color: '#FFFFFF',
+        borderColor: COLORS.border,
+        marginTop: 0,
     },
     notificationPermissionContainer: {
-        backgroundColor: '#f8d7da',
-        margin: 16,
-        padding: 16,
-        borderRadius: 8,
+        backgroundColor: COLORS.cardRed,
+        margin: SPACING.md,
+        padding: SPACING.md,
+        borderRadius: RADIUS.lg,
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.danger,
+        flexDirection: 'row',
+        alignItems: 'center',
+        ...SHADOWS.small,
+    },
+    notificationIcon: {
+        marginRight: SPACING.sm,
+    },
+    notificationTextContainer: {
+        flex: 1,
     },
     notificationPermissionText: {
-        fontSize: 14,
-        color: '#721c24',
-        marginBottom: 8,
+        ...Typography.bodySmall,
+        color: COLORS.textPrimary,
+        marginBottom: SPACING.sm,
     },
     notificationPermissionButton: {
-        backgroundColor: '#3498db',
-        padding: 10,
-        borderRadius: 4,
+        backgroundColor: COLORS.danger,
+        padding: SPACING.sm,
+        borderRadius: RADIUS.md,
         alignItems: 'center',
+        ...SHADOWS.small,
     },
     notificationPermissionButtonText: {
-        color: '#ffffff',
-        fontWeight: '600',
+        ...Typography.bodyMedium,
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     section: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        marginHorizontal: 16,
-        marginTop: 20,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 1},
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        margin: SPACING.md,
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.lg,
+        overflow: 'hidden',
+        ...SHADOWS.medium,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginBottom: 16,
-        color: '#333',
+        ...Typography.h4,
+        color: COLORS.textPrimary,
+        padding: SPACING.md,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    loadingContainer: {
+        padding: SPACING.xl,
+        alignItems: 'center',
+    },
+    loadingText: {
+        ...Typography.bodyMedium,
+        color: COLORS.textSecondary,
+        marginTop: SPACING.sm,
+    },
+    preferencesContainer: {
+        paddingTop: SPACING.sm,
     },
     preferenceItem: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.md,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: COLORS.border,
     },
-    preferenceText: {
-        fontSize: 16,
-        color: '#333',
+    preferenceIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.cardBlue,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.md,
+    },
+    preferenceContent: {
+        flex: 1,
+    },
+    preferenceTitle: {
+        ...Typography.bodyMedium,
+        color: COLORS.textPrimary,
+        marginBottom: 2,
+    },
+    preferenceDescription: {
+        ...Typography.bodySmall,
+        color: COLORS.textSecondary,
+    },
+    preferenceSwitch: {
+        marginLeft: SPACING.md,
+    },
+    menuContainer: {
+        paddingTop: SPACING.xs,
     },
     menuItem: {
-        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.md,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: COLORS.border,
+    },
+    menuIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.cardBlue,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.md,
     },
     menuItemText: {
-        fontSize: 16,
-        color: '#333',
+        ...Typography.bodyMedium,
+        color: COLORS.textPrimary,
+        flex: 1,
     },
     signOutButton: {
-        backgroundColor: '#FF3B30',
-        marginHorizontal: 16,
-        marginTop: 20,
-        marginBottom: 10,
-        padding: 14,
-        borderRadius: 8,
+        backgroundColor: COLORS.danger,
+        margin: SPACING.md,
+        padding: SPACING.md,
+        borderRadius: RADIUS.lg,
         alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        ...SHADOWS.medium,
+    },
+    signOutIcon: {
+        marginRight: SPACING.sm,
     },
     signOutButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
+        ...Typography.bodyMedium,
+        color: COLORS.white,
+        fontWeight: FONTS.weight.semiBold,
     },
     versionContainer: {
         alignItems: 'center',
-        marginBottom: 30,
-        marginTop: 10,
+        marginTop: SPACING.md,
+        marginBottom: SPACING.xl,
     },
     versionText: {
-        color: '#999',
-        fontSize: 14,
+        ...Typography.bodySmall,
+        color: COLORS.textTertiary,
     },
 });
 
-export default ProfileScreen
+export default ProfileScreen;
