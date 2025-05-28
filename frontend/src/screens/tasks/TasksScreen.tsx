@@ -546,7 +546,8 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     tasksListContainer: {
-        paddingBottom: SPACING.md,
+        paddingBottom: 80,
+
         flexGrow: 1,
     },
     emptyListContainer: {

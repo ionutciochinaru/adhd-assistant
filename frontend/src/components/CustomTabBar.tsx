@@ -4,8 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS, SPACING, RADIUS, Typography } from '../utils/styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommonActions } from '@react-navigation/native';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
-const CustomTabBar = ({ state, descriptors, navigation }) => {
+const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
     const [fabOpen, setFabOpen] = useState(false);
     const insets = useSafeAreaInsets();
 
@@ -76,7 +78,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
     };
 
     // Navigation to nested screen
-    const navigateToNestedScreen = (stackName, screenName, params = {}) => {
+    const navigateToNestedScreen = (stackName: string, screenName: string, params = {}) => {
         toggleFab();
         // Navigate to the Tasks stack first
         navigation.dispatch(
@@ -121,6 +123,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                     }}
                     accessibilityLabel="Close menu"
                     accessibilityRole="button"
+                    accessibilityHint="Double tap to open or close the action menu"
                 />
             )}
 
@@ -209,7 +212,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 {/* Floating Tab Bar */}
                 <View style={styles.container}>
                     {visibleRoutes.slice(0, 4).map((route, index) => {
-                        const { options } = descriptors[route.key];
+                        const { options } = descriptors[route.key] as { options: BottomTabNavigationOptions & { tabBarTestID?: string } };
                         const label =
                             options.tabBarLabel !== undefined
                                 ? options.tabBarLabel
@@ -220,7 +223,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         const isFocused = state.index === state.routes.indexOf(route);
 
                         // Determine icon name based on route and focus state
-                        let iconName;
+                        let iconName: string;
                         if (route.name === 'Tasks') {
                             iconName = isFocused ? 'checkbox' : 'checkbox-outline';
                         } else if (route.name === 'MoodJournal') {
@@ -241,7 +244,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                             });
 
                             if (!isFocused && !event.defaultPrevented) {
-                                navigation.navigate({ name: route.name, merge: true });
+                                navigation.navigate(route.name);
                             }
                         };
 
@@ -260,13 +263,10 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                                     isFocused && styles.activeIconContainer
                                 ]}>
                                     <Ionicons
-                                        name='navigate'
+                                        name={iconName as any}
                                         size={24}
                                         color={isFocused ? COLORS.primary : COLORS.textTertiary}
                                     />
-                                    <Text>
-                                        {route.name}
-                                    </Text>
                                 </View>
                             </TouchableOpacity>
                         );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
     View,
     Text,
@@ -7,15 +7,15 @@ import {
     Alert,
     ScrollView
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {Ionicons} from '@expo/vector-icons';
 import moment from 'moment';
 import BackButton from "../../components/BackButton";
-import { COLORS, RADIUS, SHADOWS, SPACING, Typography, CommonStyles } from "../../utils/styles";
+import {COLORS, RADIUS, SHADOWS, SPACING, Typography, CommonStyles} from "../../utils/styles";
 import ScreenLayout from "../../components/ScreenLayout";
-import { supabase } from '../../utils/supabase';
-import { Task, Subtask } from "../../utils/supabase";
+import {supabase} from '../../utils/supabase';
+import {Task, Subtask} from "../../utils/supabase";
 
 type PomodoroScreenParams = {
     task: Task;
@@ -40,7 +40,7 @@ const MOTIVATIONAL_QUOTES = [
 const PomodoroScreen: React.FC = () => {
     const navigation = useNavigation<StackNavigationProp<any>>();
     const route = useRoute();
-    const { task } = route.params as PomodoroScreenParams;
+    const {task} = route.params as PomodoroScreenParams;
 
     const [timeLeft, setTimeLeft] = useState(POMODORO_DURATION);
     const [isRunning, setIsRunning] = useState(true);
@@ -64,7 +64,7 @@ const PomodoroScreen: React.FC = () => {
     // Fetch subtasks for the current task
     const fetchSubtasks = async () => {
         try {
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('subtasks')
                 .select('*')
                 .eq('task_id', task.id);
@@ -149,13 +149,13 @@ const PomodoroScreen: React.FC = () => {
             Alert.alert(
                 'Incomplete Subtasks',
                 'Please complete all subtasks before marking the task as done.',
-                [{ text: "OK" }]
+                [{text: "OK"}]
             );
             return;
         }
 
         try {
-            const { error } = await supabase
+            const {error} = await supabase
                 .from('tasks')
                 .update({
                     status: 'completed',
@@ -182,7 +182,7 @@ const PomodoroScreen: React.FC = () => {
             const newStatus = subtask.status === 'active' ? 'completed' : 'active';
 
             // Update in database
-            const { error } = await supabase
+            const {error} = await supabase
                 .from('subtasks')
                 .update({
                     status: newStatus,
@@ -236,164 +236,166 @@ const PomodoroScreen: React.FC = () => {
 
     return (
         <ScreenLayout
-            leftComponent={<BackButton onPress={() => navigation.goBack()} />}
+            leftComponent={<BackButton onPress={() => navigation.goBack()}/>}
             title={modeConfig.title}
         >
             <ScrollView
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Timer Card */}
-                <View style={[styles.timerCard, { backgroundColor: modeConfig.backgroundColor }]}>
-                    {/* Motivational Quote */}
-                    <View style={styles.timerHeaderContainer}>
-                        <Text style={styles.progressText}>
-                            {motivationalQuote}
-                        </Text>
-                    </View>
-
-                    {/* Timer Text */}
-                    <View style={styles.timerTextContainer}>
-                        <Text style={[styles.timerText, { color: modeConfig.color }]}>
-                            {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
-                        </Text>
-                    </View>
-
-                    {/* Timer Controls */}
-                    <View style={styles.timerControlsContainer}>
-                        <TouchableOpacity
-                            style={[styles.controlButton, { backgroundColor: modeConfig.color }]}
-                            onPress={() => switchMode('pomodoro')}
-                        >
-                            <Ionicons name="play" size={20} color={COLORS.white} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.controlButton, { backgroundColor: modeConfig.color }]}
-                            onPress={toggleTimer}
-                        >
-                            {isRunning ? (
-                                <Ionicons name="pause" size={20} color={COLORS.white} />
-                            ) : (
-                                <Ionicons name="play" size={20} color={COLORS.white} />
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.controlButton, { backgroundColor: modeConfig.color }]}
-                            onPress={() => switchMode('shortBreak')}
-                        >
-                            <Ionicons name="sunny" size={20} color={COLORS.white} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Session Stats */}
-                    <View style={styles.sessionStatsContainer}>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statLabel}>Sessions</Text>
-                            <Text style={[styles.statValue, { color: modeConfig.color }]}>{totalSessions}</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statLabel}>Breaks</Text>
-                            <Text style={[styles.statValue, { color: modeConfig.color }]}>{totalBreaks}</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statLabel}>Time Spent</Text>
-                            <Text style={[styles.statValue, { color: modeConfig.color }]}>
-                                {Math.floor(totalTimeSpent / 60)}m {totalTimeSpent % 60}s
+                <View style={[styles.content]}>
+                    {/* Timer Card */}
+                    <View style={[styles.timerCard, {backgroundColor: modeConfig.backgroundColor}]}>
+                        {/* Motivational Quote */}
+                        <View style={styles.timerHeaderContainer}>
+                            <Text style={styles.progressText}>
+                                {motivationalQuote}
                             </Text>
                         </View>
-                    </View>
-                </View>
 
-                {/* Task Details */}
-                <View style={styles.taskDetailsContainer}>
-                    <View style={styles.taskInfoCard}>
-                        <Text style={styles.taskTitle}>{task.title}</Text>
-                        {task.description && (
-                            <Text style={styles.taskDescription}>{task.description}</Text>
-                        )}
-                        <View style={styles.taskMetaContainer}>
-                            <View style={styles.taskMetaItem}>
-                                <Ionicons
-                                    name="calendar-outline"
-                                    size={16}
-                                    color={COLORS.textSecondary}
-                                />
-                                <Text style={styles.taskMetaText}>
-                                    {task.due_date
-                                        ? moment(task.due_date).format('MMM D, YYYY')
-                                        : 'No due date'}
-                                </Text>
+                        {/* Timer Text */}
+                        <View style={styles.timerTextContainer}>
+                            <Text style={[styles.timerText, {color: modeConfig.color}]}>
+                                {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+                            </Text>
+                        </View>
+
+                        {/* Timer Controls */}
+                        <View style={styles.timerControlsContainer}>
+                            <TouchableOpacity
+                                style={[styles.controlButton, {backgroundColor: modeConfig.color}]}
+                                onPress={() => switchMode('pomodoro')}
+                            >
+                                <Ionicons name="play" size={20} color={COLORS.white}/>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.controlButton, {backgroundColor: modeConfig.color}]}
+                                onPress={toggleTimer}
+                            >
+                                {isRunning ? (
+                                    <Ionicons name="pause" size={20} color={COLORS.white}/>
+                                ) : (
+                                    <Ionicons name="play" size={20} color={COLORS.white}/>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.controlButton, {backgroundColor: modeConfig.color}]}
+                                onPress={() => switchMode('shortBreak')}
+                            >
+                                <Ionicons name="sunny" size={20} color={COLORS.white}/>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Session Stats */}
+                        <View style={styles.sessionStatsContainer}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>Sessions</Text>
+                                <Text style={[styles.statValue, {color: modeConfig.color}]}>{totalSessions}</Text>
                             </View>
-                            <View style={styles.taskMetaItem}>
-                                <Ionicons
-                                    name="flag-outline"
-                                    size={16}
-                                    color={
-                                        task.priority === 'high' ? COLORS.highPriority :
-                                            task.priority === 'medium' ? COLORS.mediumPriority :
-                                                COLORS.lowPriority
-                                    }
-                                />
-                                <Text style={styles.taskMetaText}>
-                                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>Breaks</Text>
+                                <Text style={[styles.statValue, {color: modeConfig.color}]}>{totalBreaks}</Text>
+                            </View>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>Time Spent</Text>
+                                <Text style={[styles.statValue, {color: modeConfig.color}]}>
+                                    {Math.floor(totalTimeSpent / 60)}m {totalTimeSpent % 60}s
                                 </Text>
                             </View>
                         </View>
                     </View>
-                </View>
 
-                {/* Subtasks */}
-                <View style={styles.subtasksContainer}>
-                    <Text style={styles.sectionTitle}>Subtasks</Text>
-                    {subtasks.length === 0 ? (
-                        <Text style={styles.noSubtasksText}>No subtasks</Text>
-                    ) : (
-                        <View>
-                            {subtasks.map((item) => (
-                                <TouchableOpacity
-                                    key={item.id}
-                                    style={[
-                                        styles.subtaskItem,
-                                        item.status === 'completed' && styles.completedSubtask
-                                    ]}
-                                    onPress={() => toggleSubtaskCompletion(item)}
-                                >
+                    {/* Complete Task Button */}
+                    <TouchableOpacity
+                        style={[styles.completeTaskButton, {backgroundColor: COLORS.success}]}
+                        onPress={handleCompleteTask}
+                    >
+                        <Text style={styles.completeTaskButtonText}>Complete Task</Text>
+                    </TouchableOpacity>
+
+                    {/* Task Details */}
+                    <View style={styles.taskDetailsContainer}>
+                        <View style={styles.taskInfoCard}>
+                            <Text style={styles.taskTitle}>{task.title}</Text>
+                            {task.description && (
+                                <Text style={styles.taskDescription}>{task.description}</Text>
+                            )}
+                            <View style={styles.taskMetaContainer}>
+                                <View style={styles.taskMetaItem}>
                                     <Ionicons
-                                        name={
-                                            item.status === 'completed'
-                                                ? "checkbox"
-                                                : "square-outline"
-                                        }
-                                        size={24}
+                                        name="calendar-outline"
+                                        size={16}
+                                        color={COLORS.textSecondary}
+                                    />
+                                    <Text style={styles.taskMetaText}>
+                                        {task.due_date
+                                            ? moment(task.due_date).format('MMM D, YYYY')
+                                            : 'No due date'}
+                                    </Text>
+                                </View>
+                                <View style={styles.taskMetaItem}>
+                                    <Ionicons
+                                        name="flag-outline"
+                                        size={16}
                                         color={
-                                            item.status === 'completed'
-                                                ? COLORS.success
-                                                : COLORS.textSecondary
+                                            task.priority === 'high' ? COLORS.highPriority :
+                                                task.priority === 'medium' ? COLORS.mediumPriority :
+                                                    COLORS.lowPriority
                                         }
                                     />
-                                    <Text
-                                        style={[
-                                            styles.subtaskText,
-                                            item.status === 'completed' && styles.completedSubtaskText
-                                        ]}
-                                    >
-                                        {item.title}
+                                    <Text style={styles.taskMetaText}>
+                                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
                                     </Text>
-                                </TouchableOpacity>
-                            ))}
+                                </View>
+                            </View>
                         </View>
-                    )}
-                </View>
+                    </View>
 
-                {/* Complete Task Button */}
-                <TouchableOpacity
-                    style={[styles.completeTaskButton, { backgroundColor: COLORS.success }]}
-                    onPress={handleCompleteTask}
-                >
-                    <Text style={styles.completeTaskButtonText}>Complete Task</Text>
-                </TouchableOpacity>
+                    {/* Subtasks */}
+                    <View style={styles.subtasksContainer}>
+                        <Text style={styles.sectionTitle}>Subtasks</Text>
+                        {subtasks.length === 0 ? (
+                            <Text style={styles.noSubtasksText}>No subtasks</Text>
+                        ) : (
+                            <View>
+                                {subtasks.map((item) => (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        style={[
+                                            styles.subtaskItem,
+                                            item.status === 'completed' && styles.completedSubtask
+                                        ]}
+                                        onPress={() => toggleSubtaskCompletion(item)}
+                                    >
+                                        <Ionicons
+                                            name={
+                                                item.status === 'completed'
+                                                    ? "checkbox"
+                                                    : "square-outline"
+                                            }
+                                            size={24}
+                                            color={
+                                                item.status === 'completed'
+                                                    ? COLORS.success
+                                                    : COLORS.textSecondary
+                                            }
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.subtaskText,
+                                                item.status === 'completed' && styles.completedSubtaskText
+                                            ]}
+                                        >
+                                            {item.title}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
             </ScrollView>
         </ScreenLayout>
     );
@@ -405,12 +407,15 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.background,
         paddingBottom: SPACING.xl,
     },
+    content: {
+        flex: 1,
+        marginBottom: SPACING.bottomNavBar,
+    },
     timerCard: {
         ...CommonStyles.card,
         marginHorizontal: SPACING.md,
         marginVertical: SPACING.md,
         padding: SPACING.lg,
-        paddingBottom: SPACING.md,
     },
     timerHeaderContainer: {
         alignItems: 'center',

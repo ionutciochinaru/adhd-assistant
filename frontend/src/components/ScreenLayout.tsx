@@ -3,7 +3,6 @@ import { View, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, Typography, RADIUS, SHADOWS } from '../utils/styles';
 import StatusBarManager from './StatusBarManager';
-import { useTabBarHeight } from "../hooks/useTabBarHeight";
 
 type ScreenLayoutProps = {
     children: React.ReactNode;
@@ -48,17 +47,19 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                 edges={edges}
             >
                 {showHeader && (
-                    <View style={[styles.header, headerStyle]}>
-                        <View style={styles.headerLeft}>
-                            {leftComponent}
-                        </View>
-                        {title && (
-                            <Text style={styles.headerTitle} numberOfLines={1}>
-                                {title}
-                            </Text>
-                        )}
-                        <View style={styles.headerRight}>
-                            {rightComponent}
+                    <View style={[styles.headerContainer, headerStyle]}>
+                        <View style={[styles.header, headerStyle]}>
+                            <View style={styles.headerLeft}>
+                                {leftComponent}
+                            </View>
+                            {title && (
+                                <Text style={styles.headerTitle} numberOfLines={1}>
+                                    {title}
+                                </Text>
+                            )}
+                            <View style={styles.headerRight}>
+                                {rightComponent}
+                            </View>
                         </View>
                     </View>
                 )}
@@ -67,7 +68,6 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
                 <View
                     style={[
                         styles.contentContainer,
-                        { paddingBottom: tabBarHeight ? tabBarHeight + SPACING.md : SPACING.xl },
                         contentContainerStyle
                     ]}
                 >
@@ -81,15 +81,18 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: SPACING.md,
+    },
+    headerContainer: {
+        paddingHorizontal: SPACING.xs,
+        marginTop: SPACING.md,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.md,
-        marginHorizontal: SPACING.md,
+        paddingHorizontal: SPACING.md,
+        marginHorizontal: SPACING.xs,
         borderRadius: RADIUS.xl,
         backgroundColor: COLORS.card,
         ...SHADOWS.small,
@@ -111,7 +114,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         flex: 1,
-        marginTop: 0,
+        marginTop: SPACING.md,
     }
 });
 

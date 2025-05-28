@@ -62,6 +62,7 @@ export const SPACING = {
     lg: 24,
     xl: 32,
     xxl: 48,
+    bottomNavBar: 60
 };
 
 export const RADIUS = {

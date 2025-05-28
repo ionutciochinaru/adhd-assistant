@@ -633,6 +633,7 @@ const styles = StyleSheet.create({
     },
     formContainer: {
         padding: SPACING.md,
+        marginBottom: SPACING.xl,
     },
     headerImageContainer: {
         alignItems: 'center',

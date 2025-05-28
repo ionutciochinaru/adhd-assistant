@@ -295,6 +295,7 @@ const ProfileScreen = () => {
         <ScreenLayout
             title="Profile"
             backgroundColor={COLORS.background}
+            showHeader={false}
         >
             <ScrollView
                 style={styles.container}
@@ -455,7 +456,7 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingBottom: SPACING.xl,
+        marginBottom: SPACING.bottomNavBar,
     },
     header: {
         flexDirection: 'row',
