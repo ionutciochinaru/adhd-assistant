@@ -1,4 +1,3 @@
-// frontend/src/utils/styles.ts
 import { StyleSheet, Platform } from 'react-native';
 
 export const COLORS = {
@@ -52,6 +51,29 @@ export const COLORS = {
     cardGreen: '#064E3B',     // Dark green background
     cardBlue: '#1E3A8A',      // Dark blue background
     cardPurple: '#4C1D95',    // Dark purple background
+
+    // New Mood Colors for MoodJournalListScreen
+    moodTerrible: '#EF4444', // Rating 1 (Danger red)
+    moodBad: '#F87171',      // Rating 2 (Lighter red/pinkish)
+    moodOkay: '#F59E0B',     // Rating 3 (Warning orange)
+    moodGood: '#34D399',     // Rating 4 (Lighter green)
+    moodGreat: '#10B981',    // Rating 5 (Success green)
+};
+
+export const MOOD_EMOJI_MAP = {
+    1: '😰', // Terrible
+    2: '😕', // Bad
+    3: '😐', // Okay
+    4: '🙂', // Good
+    5: '😄', // Great
+};
+
+export const MOOD_COLOR_MAP = {
+    1: COLORS.moodTerrible,
+    2: COLORS.moodBad,
+    3: COLORS.moodOkay,
+    4: COLORS.moodGood,
+    5: COLORS.moodGreat,
 };
 
 export const SPACING = {
@@ -217,7 +239,7 @@ export const Typography = StyleSheet.create({
         fontWeight: FONTS.weight.medium,
         fontSize: FONTS.size.xs,
         color: COLORS.textTertiary,
-        lineHeight: FONTS.size.xs * 1.5, // Fixed the error here
+        lineHeight: FONTS.size.xs * 1.5,
     },
     tiny: {
         fontFamily: FONTS.family.base,

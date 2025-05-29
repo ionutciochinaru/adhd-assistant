@@ -28,6 +28,7 @@ import {patchTextComponent, patchTextRender} from './src/utils/patches';
 
 // Import our custom tab bar
 import CustomTabBar from './src/components/CustomTabBar';
+import JournalNavigator from "./src/navigation/JournalNavigator";
 
 try {
     patchTextComponent();
@@ -94,7 +95,7 @@ const MainNavigator = () => {
             }}
         >
             <MainTab.Screen name="Tasks" component={TasksNavigator}/>
-            <MainTab.Screen name="MoodJournal" component={MoodJournalScreen}/>
+            <MainTab.Screen name="MoodJournal" component={JournalNavigator} />
             <MainTab.Screen name="Medications" component={MedicationsScreen}/>
             <MainTab.Screen name="Profile" component={ProfileScreen}/>
             {/* We still add Calendar to the navigator but it won't be shown in CustomTabBar */}

@@ -7,24 +7,26 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
-    RefreshControl, Alert,
+    RefreshControl,
+    Alert, // Import Alert for error messages
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { JournalStackParamList } from '../../navigation/JournalNavigator';
-import {MoodJournal, supabase} from '../../utils/supabase';
+import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { MoodJournal } from '../../utils/supabase'; // Assuming MoodJournal type is correctly imported
 import ScreenLayout from '../../components/ScreenLayout';
 import { COLORS, SPACING, Typography, RADIUS, SHADOWS, MOOD_COLOR_MAP, MOOD_EMOJI_MAP, FONTS } from '../../utils/styles';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
-import BackButton from "../../components/BackButton";
-
+import BackButton from '../../components/BackButton'; // Ensure BackButton is imported
 
 type NavigationProp = StackNavigationProp<JournalStackParamList, 'MoodJournalList'>;
 
+// Extend MoodJournal to include the calculated avg_rating
 interface ExtendedMoodJournal extends MoodJournal {
-    avgRating?: number;
+    avg_rating?: number; // Make it optional since it's calculated after fetch
 }
 
 interface DailyJournalEntry {
@@ -42,17 +44,42 @@ const MoodJournalListScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [currentMonthDisplayed, setCurrentMonthDisplayed] = useState(moment()); // For the month filter in the header
 
+    // Helper to calculate avg_rating for a journal entry
+    const calculateAvgRating = (journal: MoodJournal): number => {
+        const { mood_rating, focus_rating, energy_rating, sleep_quality } = journal;
+        const sum = mood_rating + focus_rating + energy_rating + sleep_quality;
+        return parseFloat((sum / 4).toFixed(1)); // Average of 4 ratings, rounded to 1 decimal
+    };
+
     // Helper to get mood color based on rating
     const getMoodColor = (rating: number | undefined) => {
-        if (rating === undefined || !(rating in MOOD_COLOR_MAP)) return COLORS.card; // Default for no rating or invalid
-        return MOOD_COLOR_MAP[rating as keyof typeof MOOD_COLOR_MAP];
+        if (rating === undefined || rating < 1) return COLORS.card; // Default for no rating or invalid
+        // Map average rating to one of the 5 mood levels
+        const moodLevel = Math.round(rating); // Round to nearest integer (1-5)
+        return MOOD_COLOR_MAP[moodLevel as keyof typeof MOOD_COLOR_MAP];
     };
 
     // Helper to get mood emoji based on rating
     const getMoodEmoji = (rating: number | undefined) => {
-        if (rating === undefined || !(rating in MOOD_EMOJI_MAP)) return '❓'; // Default emoji
-        return MOOD_EMOJI_MAP[rating as keyof typeof MOOD_EMOJI_MAP];
+        if (rating === undefined || rating < 1) return '❓'; // Default emoji
+        const moodLevel = Math.round(rating);
+        return MOOD_EMOJI_MAP[moodLevel as keyof typeof MOOD_EMOJI_MAP];
     };
+
+    // Helper to get mood label based on rating
+    const getMoodLabel = (rating: number | undefined) => {
+        if (rating === undefined || rating < 1) return 'N/A';
+        const moodLevel = Math.round(rating);
+        const moodOption = [
+            { value: 1, label: 'Terrible' },
+            { value: 2, label: 'Bad' },
+            { value: 3, label: 'Okay' },
+            { value: 4, label: 'Good' },
+            { value: 5, label: 'Great' },
+        ].find(option => option.value === moodLevel);
+        return moodOption ? moodOption.label : 'N/A';
+    };
+
 
     // Helper to format date for display
     const formatDateForDisplay = (dateString: string) => {
@@ -71,28 +98,34 @@ const MoodJournalListScreen = () => {
         }
 
         setLoading(true);
-        const { data, error } = await supabase
-            .from('mood_journals')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from('mood_journals')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('Error fetching mood journals:', error.message);
-            Alert.alert('Error', 'Failed to fetch journal entries.');
+            if (error) {
+                console.error('Error fetching mood journals:', error.message);
+                Alert.alert('Error', 'Failed to fetch journal entries.');
+                return;
+            }
+
+            const newJournalsMap = new Map<string, ExtendedMoodJournal>();
+            data?.forEach(journal => {
+                const dateKey = moment(journal.created_at).format('YYYY-MM-DD');
+                // Calculate avg_rating before storing
+                const avg_rating = calculateAvgRating(journal);
+                newJournalsMap.set(dateKey, { ...journal, avg_rating: avg_rating } as ExtendedMoodJournal);
+            });
+            setJournalsMap(newJournalsMap);
+        } catch (error) {
+            console.error('Unexpected error fetching mood journals:', error);
+            Alert.alert('Error', 'An unexpected error occurred.');
+        } finally {
             setLoading(false);
             setRefreshing(false);
-            return;
         }
-
-        const newJournalsMap = new Map<string, ExtendedMoodJournal>();
-        data?.forEach(journal => {
-            const dateKey = moment(journal.created_at).format('YYYY-MM-DD');
-            newJournalsMap.set(dateKey, journal as ExtendedMoodJournal);
-        });
-        setJournalsMap(newJournalsMap);
-        setLoading(false);
-        setRefreshing(false);
     };
 
     useFocusEffect(
@@ -161,7 +194,8 @@ const MoodJournalListScreen = () => {
                     >
                         <View style={styles.moodRatingContainer}>
                             <Text style={styles.moodEmoji}>{getMoodEmoji(journal.avg_rating)}</Text>
-                            <Text style={styles.moodLabel}>{journal.label}</Text>
+                            {/* Use getMoodLabel for the label */}
+                            <Text style={styles.moodLabel}>{getMoodLabel(journal.avg_rating)}</Text>
                         </View>
                         {journal.symptoms && journal.symptoms.length > 0 && (
                             <View style={styles.symptomsContainer}>
@@ -206,10 +240,82 @@ const MoodJournalListScreen = () => {
         } else {
             setCurrentMonthDisplayed(currentMonthDisplayed.add(1, 'month'));
         }
-        // Note: For a continuous scrolling list, this merely updates the header display.
-        // If you want the list to jump to a specific month,
-        // you would need to adjust the `dailyEntries` generation or `FlatList`'s `scrollToIndex`
     };
+
+    const scrollToCurrentMonth = useCallback(() => {
+        setCurrentMonthDisplayed(moment());
+    }, []);
+
+    // Calculate statistics for the MonthStatisticsDisplay
+    const calculateMonthStatistics = useCallback(() => {
+        const monthStart = moment(currentMonthDisplayed).startOf('month');
+        const monthEnd = moment(currentMonthDisplayed).endOf('month');
+
+        let currentStreak = 0;
+        let moodSum = 0;
+        let entryCount = 0;
+        let happy = 0;
+        let bad = 0;
+        let neutral = 0;
+
+        // Calculate streak starting from today/last day of month backwards
+        let dayToCheck = moment();
+        if (!currentMonthDisplayed.isSame(moment(), 'month')) {
+            dayToCheck = moment(monthEnd); // If viewing a past month, calculate streak up to its end
+        }
+
+        // Ensure dayToCheck doesn't go beyond the current date in real time
+        if (dayToCheck.isAfter(moment())) {
+            dayToCheck = moment();
+        }
+
+        while (dayToCheck.isSameOrBefore(moment()) && dayToCheck.isSameOrAfter(monthStart)) {
+            const dateKey = dayToCheck.format('YYYY-MM-DD');
+            if (journalsMap.has(dateKey)) {
+                currentStreak++;
+            } else {
+                // Only break streak if the missing entry is for today or a past day
+                if (dayToCheck.isSameOrBefore(moment(), 'day')) {
+                    break;
+                }
+            }
+            dayToCheck.subtract(1, 'day');
+        }
+
+        // Calculate overall mood, happy/bad/neutral days for the current displayed month
+        let tempDay = moment(monthStart);
+        while (tempDay.isSameOrBefore(monthEnd)) {
+            const dateKey = tempDay.format('YYYY-MM-DD');
+            const journal = journalsMap.get(dateKey);
+
+            if (journal && journal.avg_rating !== undefined) {
+                moodSum += journal.avg_rating;
+                entryCount++;
+                if (journal.avg_rating >= 4) { // Ratings 4 and 5 are "Good" and "Great"
+                    happy++;
+                } else if (journal.avg_rating <= 2) { // Ratings 1 and 2 are "Terrible" and "Bad"
+                    bad++;
+                } else { // Rating 3 is "Okay"
+                    neutral++;
+                }
+            }
+            tempDay.add(1, 'day');
+        }
+
+        const overallMoodScore = entryCount > 0 ? parseFloat((moodSum / entryCount).toFixed(1)) : 0;
+
+        return {
+            streak: currentStreak,
+            overallMoodScore: overallMoodScore,
+            happyDays: happy,
+            badDays: bad,
+            neutralDays: neutral,
+            totalEntries: entryCount,
+        };
+    }, [journalsMap, currentMonthDisplayed]);
+
+    const monthStats = calculateMonthStatistics();
+
 
     return (
         <ScreenLayout>
@@ -224,10 +330,39 @@ const MoodJournalListScreen = () => {
                         <Ionicons name="chevron-forward" size={SPACING.lg} color={COLORS.textSecondary} />
                     </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => {/* open filter modal if needed */}} style={styles.filterIcon}>
-                    <Ionicons name="options-outline" size={SPACING.xl} color={COLORS.textPrimary} />
+                <TouchableOpacity onPress={() => scrollToCurrentMonth()} style={styles.filterIcon}>
+                    <Ionicons name="calendar-outline" size={SPACING.xl} color={COLORS.textPrimary} />
                 </TouchableOpacity>
             </View>
+
+            {/* Statistics Display Area - Replaces the MonthStripCalendar */}
+            <View style={styles.statisticsContainer}>
+                <View style={styles.statCard}>
+                    <Text style={styles.statLabel}>Current Streak</Text>
+                    <Text style={styles.statValue}>{monthStats.streak} days</Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Text style={styles.statLabel}>Overall Mood</Text>
+                    <Text style={styles.statValue}>
+                        {monthStats.overallMoodScore > 0 ? monthStats.overallMoodScore.toFixed(1) : 'N/A'}
+                    </Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Text style={styles.statLabel}>Happy Days</Text>
+                    <Text style={styles.statValue}>{monthStats.happyDays}</Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Text style={styles.statLabel}>Bad Days</Text>
+                    <Text style={styles.statValue}>{monthStats.badDays}</Text>
+                </View>
+                {monthStats.totalEntries > 0 && (
+                    <View style={styles.statCard}>
+                        <Text style={styles.statLabel}>Neutral Days</Text>
+                        <Text style={styles.statValue}>{monthStats.neutralDays}</Text>
+                    </View>
+                )}
+            </View>
+
 
             {loading ? (
                 <View style={styles.loadingContainer}>
@@ -287,7 +422,7 @@ const styles = StyleSheet.create({
         padding: SPACING.xxs,
     },
     filterIcon: {
-        // Adjust as needed
+        // This is now the "Go to current month" button
     },
     flatListContent: {
         paddingHorizontal: SPACING.md,
@@ -409,6 +544,46 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    // New styles for statistics container and cards
+    statisticsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-around',
+        marginTop: SPACING.md,
+        marginHorizontal: SPACING.md, // Match screen padding
+        marginBottom: SPACING.lg, // Space below stats
+        backgroundColor: COLORS.card, // Background for the stats block
+        borderRadius: RADIUS.lg,
+        padding: SPACING.md,
+        ...SHADOWS.medium,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    statCard: {
+        backgroundColor: COLORS.background,
+        borderRadius: RADIUS.md,
+        padding: SPACING.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: SPACING.xs,
+        width: '45%', // Two cards per row
+        aspectRatio: 1.2,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.small,
+    },
+    statLabel: {
+        ...Typography.caption,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginBottom: SPACING.xxs,
+    },
+    statValue: {
+        ...Typography.h3,
+        color: COLORS.primary, // Use primary color for values
+        fontWeight: 'bold',
+        textAlign: 'center',
     },
 });
 
